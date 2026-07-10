@@ -330,7 +330,9 @@ class SpecialistRegistry:
         """Asigna (o quita con None) un modelo concreto a un especialista.
         Persiste en JSON (escritura atómica + lock) para sobrevivir reinicios y
         evitar corrupción si llegan dos asignaciones a la vez."""
-        import json, os, threading
+        import json
+        import os
+        import threading
         if not hasattr(self, "_overrides_lock"):
             self._overrides_lock = threading.Lock()
         with self._overrides_lock:

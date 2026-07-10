@@ -892,7 +892,8 @@ async def search_history(q: str, limit: int = 20, request: Request = None) -> JS
 @router.post("/prompts")
 async def save_prompt(request: Request) -> JSONResponse:
     """Guarda un prompt en la biblioteca personal."""
-    import sqlite3, datetime
+    import sqlite3
+    import datetime
     body = await request.json()
     title   = body.get("title", "")
     content = body.get("content", "")
@@ -924,7 +925,8 @@ async def save_prompt(request: Request) -> JSONResponse:
 @router.get("/prompts")
 async def get_prompts(request: Request) -> JSONResponse:
     """Lista todos los prompts guardados."""
-    import sqlite3, json as _json
+    import sqlite3
+    import json as _json
     db_path = request.app.state.settings.mlops_db_path
     try:
         conn = sqlite3.connect(db_path)
@@ -1051,7 +1053,8 @@ async def run_benchmark(request: Request) -> JSONResponse:
 
     Body: {"prompts": [...], "single_model": "mistral:7b", "runs": 3}
     """
-    import time, httpx as _httpx
+    import time
+    import httpx as _httpx
     body         = await request.json()
     prompts      = body.get("prompts", GOLDEN_DATASET)
     single_model = body.get("single_model", "mistral:7b")

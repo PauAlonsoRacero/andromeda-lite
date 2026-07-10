@@ -1,7 +1,8 @@
 """orchestrator.py — STUB Lite. La orquestación multi-IA (paralelo + fusión)
 es exclusiva de Pro. Lite usa linear_orchestrator.py (power-scaling de UNA IA)."""
 from __future__ import annotations
-import copy, logging
+import copy
+import logging
 from dataclasses import dataclass, field
 logger = logging.getLogger("andromeda.orchestrator.lite")
 

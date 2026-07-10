@@ -1,5 +1,6 @@
 """andromeda_server.py — Entry point para PyInstaller."""
-import sys, os
+import sys
+import os
 
 data_dir = os.environ.get('ANDROMEDA_DATA_DIR',
     os.path.join(os.path.dirname(sys.executable if getattr(sys,'frozen',False) else __file__), 'data'))

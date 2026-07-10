@@ -100,7 +100,8 @@ _INSTALL_MAP = {
 
 
 def _detect_pkg_manager() -> str | None:
-    import shutil, sys as _sys
+    import shutil
+    import sys as _sys
     if _sys.platform.startswith("win"):
         return "winget" if shutil.which("winget") else None
     if _sys.platform == "darwin":
@@ -117,7 +118,8 @@ async def install_language(request: Request) -> JSONResponse:
     Nota: tras instalar puede hacer falta reiniciar la app para que el PATH se
     refresque (sobre todo en Windows).
     """
-    import asyncio, shutil
+    import asyncio
+    import shutil
     body = await request.json()
     lang = (body.get("language") or "").strip().lower()
     info = _INSTALL_MAP.get(lang)
