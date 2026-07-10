@@ -1,0 +1,126 @@
+# ============================================================
+# ANDROMEDA — Release Pipeline
+# Compila binarios de escritorio (.exe Windows, .app macOS) al
+# publicar un tag vX.Y.Z y los adjunta a la GitHub Release.
+# ============================================================
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:        # permite lanzarlo a mano desde la pestaña Actions
+
+jobs:
+
+  # ── Windows: .exe + instalador Inno Setup ──────────────────────────────────
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Backend deps + PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pyinstaller pywebview
+
+      - name: PyInstaller (.exe)
+        run: pyinstaller build_desktop.spec --noconfirm --clean
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Download Ollama redist (bundled in installer)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force packaging\redist | Out-Null
+          Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" `
+            -OutFile "packaging\redist\OllamaSetup.exe"
+          if (-not (Test-Path "packaging\redist\OllamaSetup.exe")) {
+            Write-Host "::warning::No se pudo descargar OllamaSetup.exe; el instalador no incluirá Ollama"
+          }
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
+            -OutFile "packaging\redist\MicrosoftEdgeWebView2Setup.exe"
+          if (-not (Test-Path "packaging\redist\MicrosoftEdgeWebView2Setup.exe")) {
+            Write-Host "::warning::No se pudo descargar WebView2; Windows 11 lo trae de serie"
+          }
+
+      - name: Build installer
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\installer.iss'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: andromeda-windows
+          path: dist/installer/*.exe
+
+  # ── macOS: .app empaquetada en .dmg/zip ─────────────────────────────────────
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Backend deps + PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pyinstaller pywebview
+
+      - name: PyInstaller (.app)
+        run: pyinstaller build_desktop.spec --noconfirm --clean
+
+      - name: Zip .app
+        run: |
+          cd dist
+          zip -r -y Andromeda-macos.zip Andromeda.app
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: andromeda-macos
+          path: dist/Andromeda-macos.zip
+
+  # ── Publicar Release con los binarios ───────────────────────────────────────
+  publish:
+    name: Publish Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/andromeda-windows/*.exe
+            artifacts/andromeda-macos/*.zip
+          generate_release_notes: true

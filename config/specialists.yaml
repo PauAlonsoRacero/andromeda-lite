@@ -1,0 +1,31 @@
+specialists:
+- id: generalist
+  active: true
+  keep_warm: false
+  forced_level: null
+  levels:
+    low:
+      model_name: ''
+      params_b: 3
+      vram_required_gb: 3.0
+      min_tier: 1
+      description: Consultas simples y rápidas
+    mid:
+      model_name: ''
+      params_b: 7
+      vram_required_gb: 5.0
+      min_tier: 1
+      description: Asistencia general de calidad
+    high:
+      model_name: ''
+      params_b: 22
+      vram_required_gb: 16.0
+      min_tier: 3
+      description: Razonamiento complejo y análisis
+    ultra:
+      model_name: ''
+      params_b: 70
+      vram_required_gb: 48.0
+      min_tier: 4
+      description: Calidad comparable a GPT-4
+  model_name: ''

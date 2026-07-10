@@ -1,0 +1,77 @@
+# ============================================================
+# ANDROMEDA — POLÍTICAS DE HARDWARE POR TIER
+# ============================================================
+#
+# Define cómo se comporta el sistema según la VRAM disponible.
+# El PolicyEngine lee este archivo al arranque y lo aplica en cada request.
+#
+# Si cambias este archivo, reinicia el backend para que surta efecto.
+# ============================================================
+
+# ── TIER 1 — Hardware ligero (4–8 GB VRAM) ────────────────────────────────────
+# Comportamiento conservador. Priorizar estabilidad sobre calidad.
+# Modelos pequeños, cuantización agresiva, un solo especialista.
+tier_1:
+  max_parallel: 1                     # Máximo 1 especialista simultáneo
+  recommended_quant: "Q4_K_M"         # Cuantización agresiva para caber en VRAM
+  max_context_tokens: 2048            # Contexto corto para no agotar memoria
+  strategy_budget: "conservative"     # Solo estrategias simples y seguras
+  can_run_verifier: false             # No hay VRAM para añadir el verificador
+  safe_vram_threshold_gb: 2.0         # Degradar si quedan menos de 2 GB libres
+  eligible_strategies:
+    - single                          # Un especialista, respuesta directa
+    - latency_first                   # El que responda más rápido
+    - hardware_aware_fallback         # Safety net — siempre disponible
+
+# ── TIER 2 — Hardware recomendado (8–16 GB VRAM) ──────────────────────────────
+# Comportamiento balanceado. Permite verificación y estrategias intermedias.
+# Punto de equilibrio calidad/rendimiento para uso diario.
+tier_2:
+  max_parallel: 2                     # 2 especialistas simultáneos
+  recommended_quant: "Q5_K_M"         # Buena calidad con VRAM razonable
+  max_context_tokens: 4096            # Contexto doble que T1
+  strategy_budget: "balanced"
+  can_run_verifier: true              # Hay margen para el verificador
+  safe_vram_threshold_gb: 6.0         # Degradar si quedan menos de 6 GB libres
+  eligible_strategies:
+    - single
+    - iterative_refine                # Generar → verificar → refinar
+    - verifier_pass                   # Generar + verificar independientemente
+    - latency_first
+    - hardware_aware_fallback
+
+# ── TIER 3 — Alto rendimiento (16–48 GB VRAM) ────────────────────────────────
+# Comportamiento agresivo. Estrategias avanzadas, mayor contexto, 3 especialistas.
+tier_3:
+  max_parallel: 3                     # 3 especialistas simultáneos
+  recommended_quant: "Q8_0"           # Casi sin pérdida de calidad
+  max_context_tokens: 8192            # Contextos largos para documentos y código extenso
+  strategy_budget: "aggressive"
+  can_run_verifier: true
+  safe_vram_threshold_gb: 10.0        # Umbral más alto — más margen
+  eligible_strategies:
+    - single
+    - iterative_refine
+    - verifier_pass
+    - confidence_weighted             # Múltiples especialistas, selección por confianza
+    - quality_first                   # El mejor output evaluado por el orquestador
+    - latency_first
+    - hardware_aware_fallback
+
+# ── TIER 4 — Workstation/Server (48+ GB VRAM) ────────────────────────────────
+# Sin restricciones prácticas. Modelos en full precision.
+tier_4:
+  max_parallel: 4                     # 4 especialistas simultáneos (máximo absoluto)
+  recommended_quant: "fp16"           # Full precision — máxima calidad
+  max_context_tokens: 16384           # Contextos muy largos
+  strategy_budget: "aggressive"
+  can_run_verifier: true
+  safe_vram_threshold_gb: 20.0
+  eligible_strategies:
+    - single
+    - iterative_refine
+    - verifier_pass
+    - confidence_weighted
+    - quality_first
+    - latency_first
+    - hardware_aware_fallback

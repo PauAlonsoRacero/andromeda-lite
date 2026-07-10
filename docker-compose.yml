@@ -1,0 +1,61 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# ANDROMEDA — DOCKER COMPOSE
+# Ollama corre en el HOST (Windows/Mac), no en Docker.
+# El backend se conecta a él vía host.docker.internal.
+# ══════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: andromeda-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ANDROMEDA_ENVIRONMENT=production
+      - ANDROMEDA_PORT=8000
+      - ANDROMEDA_OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - ANDROMEDA_FRONTEND_URL=http://localhost
+      - ANDROMEDA_MAX_PARALLEL_SPECIALISTS=3
+      - ANDROMEDA_TELEMETRY_ENABLED=true
+      - ANDROMEDA_TELEMETRY_DB_PATH=data/traces.db
+      - ANDROMEDA_SPECIALISTS_CONFIG_PATH=/config/specialists.yaml
+      - ANDROMEDA_HARDWARE_POLICIES_PATH=/config/hardware_policies.yaml
+      - ANDROMEDA_MCP_SERVERS_PATH=/config/mcp_servers.yaml
+      # Hardware real del host (lo rellena detect-hardware.ps1 en .env)
+      - ANDROMEDA_HOST_OS=${ANDROMEDA_HOST_OS:-}
+      - ANDROMEDA_HOST_CPU=${ANDROMEDA_HOST_CPU:-}
+      - ANDROMEDA_HOST_RAM_GB=${ANDROMEDA_HOST_RAM_GB:-}
+      - ANDROMEDA_HOST_GPU=${ANDROMEDA_HOST_GPU:-}
+      - ANDROMEDA_HOST_VRAM_GB=${ANDROMEDA_HOST_VRAM_GB:-}
+      - ANDROMEDA_MLOPS_ENABLED=true
+      - ANDROMEDA_MLOPS_DB_PATH=data/mlops_runs.db
+    volumes:
+      - ./config:/config
+      - andromeda_data:/app/data
+      - andromeda_logs:/app/logs
+    # Permite al contenedor llegar al host (donde corre Ollama)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        CACHE_BUST: ${CACHE_BUST:-default}
+    container_name: andromeda-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  andromeda_data:
+    name: andromeda_data
+  andromeda_logs:
+    name: andromeda_logs

@@ -1,0 +1,187 @@
+# mcp_servers.yaml — Servidores MCP (Model Context Protocol) de Andromeda.
+#
+# Actívalos desde Configuración → MCP Tools y pulsa "Reconectar".
+#
+# RUNTIMES (instálalos una vez):
+#   • Node 18+  → para los servidores que arrancan con "npx"
+#   • uv/uvx    → para los servidores Python (https://github.com/astral-sh/uv)
+#                 instálalo con:  curl -LsSf https://astral.sh/uv/install.sh | sh
+#
+# Andromeda lanza el comando tal cual; "npx -y" y "uvx" descargan el servidor
+# la primera vez automáticamente. Los que piden API key necesitan su variable
+# de entorno definida ANTES de abrir Andromeda.
+
+servers:
+
+  # ───────────────────── Node (npx) — sin clave ─────────────────────
+  filesystem:
+    label: "Sistema de archivos"
+    enabled: false
+    description: "Leer, escribir, mover y buscar archivos dentro de tu workspace."
+    command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "${ANDROMEDA_WORKSPACE}"]
+    install: "npx -y @modelcontextprotocol/server-filesystem"
+    runtime: "node"
+    requires_key: []
+    env: { ANDROMEDA_WORKSPACE: "${ANDROMEDA_WORKSPACE}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem"
+
+  memory:
+    label: "Memoria"
+    enabled: false
+    description: "Memoria persistente tipo grafo de conocimiento entre conversaciones."
+    command: ["npx", "-y", "@modelcontextprotocol/server-memory"]
+    install: "npx -y @modelcontextprotocol/server-memory"
+    runtime: "node"
+    requires_key: []
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/memory"
+
+  sequential-thinking:
+    label: "Razonamiento secuencial"
+    enabled: false
+    description: "Razonamiento paso a paso estructurado para problemas complejos."
+    command: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+    install: "npx -y @modelcontextprotocol/server-sequential-thinking"
+    runtime: "node"
+    requires_key: []
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking"
+
+  everything:
+    label: "Utilidades de ejemplo"
+    enabled: false
+    description: "Servidor de referencia con herramientas de ejemplo (eco, suma, prompts)."
+    command: ["npx", "-y", "@modelcontextprotocol/server-everything"]
+    install: "npx -y @modelcontextprotocol/server-everything"
+    runtime: "node"
+    requires_key: []
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/everything"
+
+  puppeteer:
+    label: "Navegador (Puppeteer)"
+    enabled: false
+    description: "Controlar un navegador real: navegar, hacer clic, rellenar y capturar."
+    command: ["npx", "-y", "@modelcontextprotocol/server-puppeteer"]
+    install: "npx -y @modelcontextprotocol/server-puppeteer"
+    runtime: "node"
+    requires_key: []
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer"
+
+  # ───────────────────── Python (uvx) — sin clave ─────────────────────
+  fetch:
+    label: "Fetch web"
+    enabled: false
+    description: "Descargar y leer páginas web (convierte URLs a markdown)."
+    command: ["uvx", "mcp-server-fetch"]
+    install: "uvx mcp-server-fetch"
+    runtime: "python"
+    requires_key: []
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch"
+
+  git:
+    label: "Git"
+    enabled: false
+    description: "Operar sobre repositorios Git locales: estado, log, diff, commits y ramas."
+    command: ["uvx", "mcp-server-git", "--repository", "${ANDROMEDA_WORKSPACE}"]
+    install: "uvx mcp-server-git"
+    runtime: "python"
+    requires_key: []
+    env: { ANDROMEDA_WORKSPACE: "${ANDROMEDA_WORKSPACE}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/git"
+
+  time:
+    label: "Fecha y hora"
+    enabled: false
+    description: "Hora actual y conversión entre zonas horarias."
+    command: ["uvx", "mcp-server-time"]
+    install: "uvx mcp-server-time"
+    runtime: "python"
+    requires_key: []
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/time"
+
+  sqlite:
+    label: "SQLite"
+    enabled: false
+    description: "Consultar y modificar bases de datos SQLite locales con SQL."
+    command: ["uvx", "mcp-server-sqlite", "--db-path", "${ANDROMEDA_WORKSPACE}/andromeda.db"]
+    install: "uvx mcp-server-sqlite"
+    runtime: "python"
+    requires_key: []
+    env: { ANDROMEDA_WORKSPACE: "${ANDROMEDA_WORKSPACE}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/sqlite"
+
+  # ───────────────────── Con API key / configuración ─────────────────────
+  github:
+    label: "GitHub"
+    enabled: false
+    description: "Repos, issues, pull requests y búsqueda de código en GitHub."
+    command: ["npx", "-y", "@modelcontextprotocol/server-github"]
+    install: "npx -y @modelcontextprotocol/server-github"
+    runtime: "node"
+    requires_key: ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+    env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/github"
+
+  gitlab:
+    label: "GitLab"
+    enabled: false
+    description: "Proyectos, issues y merge requests en GitLab."
+    command: ["npx", "-y", "@modelcontextprotocol/server-gitlab"]
+    install: "npx -y @modelcontextprotocol/server-gitlab"
+    runtime: "node"
+    requires_key: ["GITLAB_PERSONAL_ACCESS_TOKEN"]
+    env: { GITLAB_PERSONAL_ACCESS_TOKEN: "${GITLAB_PERSONAL_ACCESS_TOKEN}", GITLAB_API_URL: "${GITLAB_API_URL}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/gitlab"
+
+  postgres:
+    label: "PostgreSQL"
+    enabled: false
+    description: "Consultas de solo lectura sobre una base de datos PostgreSQL."
+    command: ["npx", "-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_CONNECTION_STRING}"]
+    install: "npx -y @modelcontextprotocol/server-postgres"
+    runtime: "node"
+    requires_key: ["POSTGRES_CONNECTION_STRING"]
+    env: { POSTGRES_CONNECTION_STRING: "${POSTGRES_CONNECTION_STRING}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/postgres"
+
+  brave-search:
+    label: "Brave Search"
+    enabled: false
+    description: "Búsqueda web y local mediante la API de Brave Search."
+    command: ["npx", "-y", "@modelcontextprotocol/server-brave-search"]
+    install: "npx -y @modelcontextprotocol/server-brave-search"
+    runtime: "node"
+    requires_key: ["BRAVE_API_KEY"]
+    env: { BRAVE_API_KEY: "${BRAVE_API_KEY}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search"
+
+  slack:
+    label: "Slack"
+    enabled: false
+    description: "Leer y enviar mensajes en canales de Slack."
+    command: ["npx", "-y", "@modelcontextprotocol/server-slack"]
+    install: "npx -y @modelcontextprotocol/server-slack"
+    runtime: "node"
+    requires_key: ["SLACK_BOT_TOKEN", "SLACK_TEAM_ID"]
+    env: { SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}", SLACK_TEAM_ID: "${SLACK_TEAM_ID}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/slack"
+
+  google-drive:
+    label: "Google Drive"
+    enabled: false
+    description: "Buscar y leer archivos de Google Drive."
+    command: ["npx", "-y", "@modelcontextprotocol/server-gdrive"]
+    install: "npx -y @modelcontextprotocol/server-gdrive"
+    runtime: "node"
+    requires_key: ["GDRIVE_CREDENTIALS_PATH"]
+    env: { GDRIVE_CREDENTIALS_PATH: "${GDRIVE_CREDENTIALS_PATH}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/gdrive"
+
+  google-maps:
+    label: "Google Maps"
+    enabled: false
+    description: "Geocodificación, lugares cercanos y rutas con la API de Google Maps."
+    command: ["npx", "-y", "@modelcontextprotocol/server-google-maps"]
+    install: "npx -y @modelcontextprotocol/server-google-maps"
+    runtime: "node"
+    requires_key: ["GOOGLE_MAPS_API_KEY"]
+    env: { GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY}" }
+    docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/google-maps"

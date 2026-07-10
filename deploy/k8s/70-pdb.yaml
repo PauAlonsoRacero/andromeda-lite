@@ -1,0 +1,11 @@
+# PodDisruptionBudget: garantiza que al menos 1 réplica del backend siga viva
+# durante mantenimientos del clúster (drenado de nodos, actualizaciones).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: andromeda-backend
+  namespace: andromeda
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: andromeda-backend }

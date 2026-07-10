@@ -1,0 +1,36 @@
+# ============================================================
+# ANDROMEDA — CONFIGURACIÓN GLOBAL
+# ============================================================
+# Los valores aquí son de referencia. Las variables de entorno
+# (.env) tienen prioridad sobre este archivo.
+# Este archivo documenta la configuración del sistema.
+# ============================================================
+
+system:
+  name: "Andromeda"
+  version: "1.0.0"
+  environment: "development"   # development | production
+
+ollama:
+  # En Docker: usa el nombre del servicio (ollama)
+  # En desarrollo local: http://localhost:11434
+  base_url: "http://ollama:11434"
+  timeout_seconds: 120
+
+inference:
+  default_temperature: 0.7
+  default_max_tokens: 2048
+  max_parallel_specialists: 3    # Techo absoluto del sistema
+
+observability:
+  enabled: true
+  db_path: "data/traces.db"
+  trace_history_limit: 200
+
+frontend:
+  port: 5173
+  url: "http://localhost:5173"
+
+backend:
+  port: 8000
+  debug: false

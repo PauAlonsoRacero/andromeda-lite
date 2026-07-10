@@ -1,0 +1,1811 @@
+/* ════════════════════════════════════════════════════════════════════
+   ANDROMEDA — Sistema de diseño iOS 26 "Liquid Glass"
+   Vidrio esmerilado, profundidad, translucidez, bordes suaves
+   ════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ── Acentos (paleta del logo: coral → violeta → azul). Comunes a ambos temas ── */
+  --blue:   #7b8cf0;
+  --indigo: #9b85e8;
+  --purple: #c89bd8;
+  --pink:   #f0a48c;
+  --coral:  #f0a48c;
+  --teal:   #9b9be8;
+  --green:  #34d399;
+  --amber:  #fbbf24;
+  --red:    #ff6b6b;
+
+  /* ── Gradiente de marca (coral cálido → violeta → azul frío) ── */
+  --grad-primary: linear-gradient(120deg, #f0795f 0%, #c87bd8 45%, #5b78f5 100%);
+  --grad-glass:   linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%);
+
+  /* ── Radios (iOS = muy redondeado) ── */
+  --r-xs: 10px;
+  --r-sm: 14px;
+  --r:    20px;
+  --r-lg: 28px;
+  --r-xl: 36px;
+
+  /* ── Fuentes ── */
+  --font: 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+
+  /* ── Orbes: color + ritmo, controlables desde Ajustes ──
+     Cada paleta (body.orb-*) redefine estos tres colores; el resto del CSS
+     de orbes solo lee las variables, nunca colores literales. */
+  --orb-1: 240, 121, 95;     /* coral  (RGB sin envolver para usar en rgba()) */
+  --orb-2: 91, 120, 245;     /* azul   */
+  --orb-3: 200, 123, 216;    /* violeta */
+  --orb-speed: 1;            /* multiplicador de velocidad (lo fija JS inline) */
+  --orb-intensity: 1;        /* opacidad/brillo global */
+  --orb-size: 1;             /* escala de tamaño de los orbes */
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TEMA OSCURO  (por defecto) — azul-violeta frío, profundo
+   ════════════════════════════════════════════════════════════════════ */
+:root, body.theme-dark {
+  --bg-0: #0d0e1a;          /* fondo más profundo */
+  --bg-1: #13141f;          /* fondo base */
+  --bg-2: #1a1b28;          /* superficie elevada */
+
+  --glass:        rgba(28, 28, 40, 0.55);
+  --titlebar-bg: rgba(10, 10, 15, 0.92);
+  --glass-bright: rgba(40, 40, 56, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-hi:     rgba(255, 255, 255, 0.12);
+
+  --text-1: #f5f5f7;        /* primario */
+  --text-2: #a8a8b3;        /* secundario */
+  --text-3: #6e6e7a;        /* terciario */
+
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow:    0 8px 32px rgba(0,0,0,0.4);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.5);
+  --glow:      0 0 40px rgba(91, 156, 246, 0.25);
+
+  --hairline: rgba(255,255,255,0.06);
+  --surface-1: rgba(255,255,255,0.03);
+  --surface-2: rgba(255,255,255,0.055);
+  --hover-surface: rgba(255,255,255,0.05);
+  --inset-surface: rgba(0,0,0,0.22);
+  --chip-surface: rgba(255,255,255,0.06);
+  --field-bg: rgba(0,0,0,0.25);
+  --toggle-off: rgba(255,255,255,0.15);
+  --sidebar-bg: rgba(10, 10, 14, 0.85);
+  --scroll-thumb: rgba(255,255,255,0.12);
+  --scroll-thumb-hover: rgba(255,255,255,0.2);
+  color-scheme: dark;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TEMA CLARO — "liquid glass" claro tipo macOS: blancos translúcidos,
+   blur generoso, sombras suaves de color. Los acentos de marca se
+   oscurecen un punto para contraste sobre blanco.
+   ════════════════════════════════════════════════════════════════════ */
+body.theme-light {
+  --bg-0: #f3f1ee;          /* perla cálido — más sofisticado que el azul plano */
+  --bg-1: #f8f7f4;
+  --bg-2: #ffffff;
+
+  --glass:        rgba(255, 255, 255, 0.55);
+  --titlebar-bg: rgba(244, 246, 251, 0.92);
+  --glass-bright: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(40, 35, 60, 0.10);
+  --glass-hi:     rgba(255, 255, 255, 0.95);
+
+  --text-1: #1a1822;        /* primario, casi negro cálido */
+  --text-2: #54505f;        /* secundario */
+  --text-3: #8a8694;        /* terciario */
+
+  /* Acentos un punto más saturados/oscuros para legibilidad sobre blanco */
+  --blue:   #4d63e0;
+  --purple: #a85fd0;
+  --teal:   #6f6fd0;
+  --green:  #15a572;
+  --amber:  #c98a06;
+  --red:    #e0494b;
+  --grad-primary: linear-gradient(120deg, #e8623f 0%, #b54fc8 45%, #4257e8 100%);
+  --grad-glass:   linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.25) 100%);
+
+  --shadow-sm: 0 2px 8px rgba(60, 50, 80, 0.08);
+  --shadow:    0 10px 36px rgba(60, 50, 80, 0.12);
+  --shadow-lg: 0 24px 64px rgba(60, 50, 80, 0.16);
+  --glow:      0 0 40px rgba(77, 99, 224, 0.15);
+
+  --hairline: rgba(40, 35, 60, 0.08);
+  --surface-1: rgba(255, 255, 255, 0.66);
+  --surface-2: #ffffff;
+  --hover-surface: rgba(40, 35, 60, 0.045);
+  --inset-surface: #ffffff;
+  --chip-surface: rgba(40, 35, 60, 0.05);
+  --field-bg: #ffffff;
+  --toggle-off: rgba(40, 35, 60, 0.22);
+  --sidebar-bg: rgba(228, 224, 218, 0.92);
+  --scroll-thumb: rgba(40, 35, 60, 0.16);
+  --scroll-thumb-hover: rgba(40, 35, 60, 0.28);
+  color-scheme: light;
+}
+/* En claro los orbes se ven bien: saturados y presentes, sin lavar el texto */
+body.theme-light .bg-orb {
+  mix-blend-mode: normal;
+  filter: blur(70px) saturate(1.5);
+  opacity: calc(var(--orb-intensity) * 1.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+}
+#root { position: relative; z-index: 1; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg-0);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv02', 'cv03', 'cv04';
+  overflow-x: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BANDAS TRICOLORES DE FONDO — tres franjas diagonales (40°), un color
+   cada una, que se desplazan y respiran (crecen/encogen) lentamente.
+   ═══════════════════════════════════════════════════════════════ */
+.bg-bands {
+  position: fixed;
+  inset: -60%;                 /* muy sobredimensionado: al rotar 40° cubre todo */
+  width: 220%;
+  height: 220%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform: rotate(40deg);
+  opacity: var(--orb-intensity, 0.6);
+}
+.bg-band {
+  position: absolute;
+  left: -30%;
+  width: 160%;
+  height: 38%;
+  filter: blur(80px);
+  will-change: transform;
+  border-radius: 45%;
+}
+/* Banda 1 — naranja cálido del logo */
+.bg-band-1 {
+  top: -8%;
+  background: linear-gradient(90deg, transparent, rgba(240,121,95,0.55), transparent);
+  animation: bandFlow1 calc(26s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+/* Banda 2 — magenta */
+.bg-band-2 {
+  top: 33%;
+  background: linear-gradient(90deg, transparent, rgba(200,123,216,0.5), transparent);
+  animation: bandFlow2 calc(32s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+/* Banda 3 — azul */
+.bg-band-3 {
+  top: 70%;
+  background: linear-gradient(90deg, transparent, rgba(91,120,245,0.5), transparent);
+  animation: bandFlow3 calc(38s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+/* Cada banda se desliza en su eje y respira (escala vertical) a su ritmo */
+@keyframes bandFlow1 {
+  0%   { transform: translateX(-8%) scaleY(1);    }
+  50%  { transform: translateX(10%) scaleY(1.6);  }
+  100% { transform: translateX(-8%) scaleY(1);    }
+}
+@keyframes bandFlow2 {
+  0%   { transform: translateX(6%) scaleY(1.3);   }
+  50%  { transform: translateX(-10%) scaleY(0.8); }
+  100% { transform: translateX(6%) scaleY(1.3);   }
+}
+@keyframes bandFlow3 {
+  0%   { transform: translateX(-6%) scaleY(0.9);  }
+  50%  { transform: translateX(12%) scaleY(1.5);  }
+  100% { transform: translateX(-6%) scaleY(0.9);  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ORBES DE FONDO (estilo alternativo) — gradientes flotando y pulsando
+   ═══════════════════════════════════════════════════════════════ */
+.bg-orbs { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bg-orb {
+  position: absolute; border-radius: 50%; filter: blur(80px);
+  will-change: transform, opacity;
+  opacity: var(--orb-intensity, 1);
+  transform: scale(var(--orb-size, 1));
+}
+.bg-orb-1 {
+  width: 58vw; height: 58vw; top: -20vw; right: -14vw;
+  background: radial-gradient(circle, rgba(var(--orb-1, 240,121,95), 0.46), transparent 66%);
+  animation: orbDrift1 calc(22s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+.bg-orb-2 {
+  width: 52vw; height: 52vw; bottom: -18vw; left: -14vw;
+  background: radial-gradient(circle, rgba(var(--orb-2, 200,123,216), 0.44), transparent 66%);
+  animation: orbDrift2 calc(28s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+.bg-orb-3 {
+  width: 46vw; height: 46vw; top: 32%; left: 38%;
+  background: radial-gradient(circle, rgba(var(--orb-3, 91,120,245), 0.36), transparent 66%);
+  animation: orbDrift3 calc(34s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+@keyframes orbDrift1 {
+  0%{transform:translate(0,0) scale(1);} 50%{transform:translate(-9vw,7vw) scale(1.18);} 100%{transform:translate(0,0) scale(1);}
+}
+@keyframes orbDrift2 {
+  0%{transform:translate(0,0) scale(1.1);} 50%{transform:translate(7vw,-6vw) scale(0.85);} 100%{transform:translate(0,0) scale(1.1);}
+}
+@keyframes orbDrift3 {
+  0%{transform:translate(0,0) scale(0.9);} 50%{transform:translate(-6vw,-8vw) scale(1.2);} 100%{transform:translate(0,0) scale(0.9);}
+}
+
+/* ── Presets de paleta de orbes (cambiables desde Ajustes → Apariencia) ── */
+body.orb-aurora  { --orb-1: 240,121,95;  --orb-2: 91,120,245;  --orb-3: 200,123,216; } /* marca */
+body.orb-ocean   { --orb-1: 56,189,248;  --orb-2: 45,108,223;  --orb-3: 34,211,170; }  /* azul-teal */
+body.orb-sunset  { --orb-1: 248,113,89;  --orb-2: 236,72,153;  --orb-3: 251,146,60; }  /* coral-rosa */
+body.orb-forest  { --orb-1: 52,211,153;  --orb-2: 132,204,22;  --orb-3: 16,185,129; }  /* verdes */
+body.orb-mono    { --orb-1: 148,163,184; --orb-2: 100,116,139; --orb-3: 203,213,225; } /* gris */
+body.orb-galaxy  { --orb-1: 168,85,247;  --orb-2: 99,102,241;  --orb-3: 217,70,239; }  /* violetas */
+
+/* ── Glass surface (la base de todo) ── */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
+}
+
+/* ── Scrollbar iOS ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+/* ── Botones ── */
+.btn {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 19px;
+  border-radius: 999px;            /* píldora total, estilo iOS 26 */
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+  isolation: isolate;
+  /* Física de muelle estilo Apple */
+  transition:
+    transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    filter 0.25s ease,
+    background 0.25s ease;
+}
+/* Reflejo de cristal: brillo sutil en la mitad superior (liquid glass) */
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 55%);
+  pointer-events: none;
+  z-index: 1;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active {
+  transform: scale(0.94);
+  transition: transform 0.1s cubic-bezier(0.4, 0, 1, 1);
+}
+
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Liquid glass: cristal translúcido con desenfoque alto, borde luminoso
+   y doble sombra (profundidad + halo interior claro). */
+.btn-glass {
+  background: var(--glass-bright);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  color: var(--text-1);
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow:
+    0 4px 18px rgba(0,0,0,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.btn-glass:hover {
+  background: var(--glass-hi);
+  box-shadow:
+    0 6px 24px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+}
+
+.btn-ghost {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-2);
+  border: 1px solid var(--glass-border);
+}
+.btn-sm { padding: 4px 12px; font-size: 12px; border-radius: 8px; }
+
+.btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--text-1); }
+
+.btn-danger {
+  background: rgba(255,107,107,0.15);
+  color: var(--red);
+  border: 1px solid rgba(255,107,107,0.3);
+}
+.btn-danger:hover { background: rgba(255,107,107,0.25); }
+
+/* ── Inputs ── */
+.g-input {
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 11px 16px;
+  border-radius: var(--r-sm);
+  background: var(--field-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-1);
+  transition: all 0.2s;
+  outline: none;
+}
+.g-input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(91,156,246,0.15);
+}
+.g-input::placeholder { color: var(--text-3); }
+
+/* ── Cards ── */
+.card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 14px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.15);
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.15), 0 8px 28px rgba(0,0,0,0.18);
+  border-color: rgba(255,255,255,0.16);
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 14px;
+  letter-spacing: -0.01em;
+}
+
+/* ── Spinner ── */
+.spin {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Page layout ── */
+.panel-page {
+  padding: 28px 32px;
+  max-width: 1100px;
+  margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
+}
+/* Dentro de Configuración, el scroll lo gestiona .cfg-content (su scrollbar va
+   pegado al borde derecho del modal). La página interior NO debe tener su propio
+   scroll ni padding lateral, o el scrollbar quedaría metido hacia dentro. */
+.cfg-content .panel-page {
+  height: auto;
+  overflow-y: visible;
+  padding: 24px 32px 28px 32px;
+  max-width: 920px;
+}
+.panel-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.panel-page-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+}
+.panel-page-sub {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+
+/* ── KPI grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.18);
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), transparent);
+  pointer-events: none;
+}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.kpi-val {
+  font-size: 27px;
+  font-weight: 700;
+  margin-top: 6px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-card {
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease;
+}
+.kpi-card:hover { transform: translateY(-2px); }
+
+/* ── Tables ── */
+.g-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.g-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.g-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-2);
+}
+.g-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* ── Bar (para gráficos) ── */
+.bar-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── Banner ── */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--r-sm);
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.banner-warn  { background: rgba(251,191,36,0.1);  border: 1px solid rgba(251,191,36,0.25); color: var(--amber); }
+.banner-error { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.25); color: var(--red); }
+.banner-ok    { background: rgba(52,211,153,0.1);  border: 1px solid rgba(52,211,153,0.25); color: var(--green); }
+
+/* ── Tabs ── */
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0,0,0,0.25);
+  border-radius: var(--r-sm);
+  margin-bottom: 20px;
+}
+.tab-btn {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: var(--r-xs);
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tab-btn.active {
+  background: var(--glass-bright);
+  color: var(--text-1);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Animaciones de entrada ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.4s cubic-bezier(0.4,0,0.2,1) both; }
+
+/* ── Aliases de compatibilidad (componentes antiguos) ── */
+:root {
+  --border: var(--glass-border);
+  --surface: var(--glass);
+  --bg: var(--bg-1);
+}
+
+/* MessageBubble iOS 26 */
+.msg-row { margin-bottom: 18px; display: flex; }
+.msg-user { justify-content: flex-end; align-items: flex-end; }
+.msg-assistant { justify-content: flex-start; }
+.msg-bubble {
+  max-width: 85%;
+  padding: 13px 17px;
+  border-radius: var(--r);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.msg-bubble-user {
+  background: var(--grad-primary);
+  color: white;
+  border-bottom-right-radius: 6px;
+}
+.msg-bubble-assistant {
+  background: var(--glass);
+  backdrop-filter: blur(30px);
+  border: 1px solid var(--glass-border);
+  color: var(--text-1);
+  border-bottom-left-radius: 6px;
+}
+
+/* ── Animación de entrada escalonada tipo iPhone ── */
+@keyframes enterScale {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.enter-stagger {
+  animation: enterScale 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+.enter-1 { animation-delay: 0.05s; }
+.enter-2 { animation-delay: 0.15s; }
+.enter-3 { animation-delay: 0.25s; }
+
+/* ── Aliases completos de compatibilidad iOS 26 ── */
+:root {
+  --border-bright:    var(--glass-hi);
+  --accent-primary:   var(--blue);
+  --accent-teal:      var(--teal);
+  --error:            var(--red);
+  --glass-1:          var(--glass);
+  --radius:           var(--r);
+  --radius-sm:        var(--r-sm);
+  --text-muted:       var(--text-3);
+  --text-secondary:   var(--text-2);
+}
+
+/* ══ MessageBubble iOS 26 ══ */
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 22px;
+  animation: fadeUp 0.35s cubic-bezier(0.4,0,0.2,1) both;
+}
+.msg-ai   { align-items: flex-start; }
+
+.bubble {
+  max-width: 88%;
+  padding: 13px 17px;
+  font-size: 15px;
+  line-height: 1.65;
+  border-radius: var(--r);
+  word-wrap: break-word;
+}
+.bubble-user {
+  background: var(--glass-bright);
+  color: var(--text-1);
+  border: 1px solid var(--glass-border);
+  border-bottom-right-radius: 7px;
+}
+.bubble-ai {
+  background: transparent;
+  border: none;
+  color: var(--text-1);
+  padding: 4px 2px;
+  max-width: 100%;
+}
+.bubble-error {
+  background: rgba(255,107,107,0.1);
+  border: 1px solid rgba(255,107,107,0.25);
+  color: var(--red);
+  border-radius: var(--r-sm);
+}
+
+.bubble p { margin: 0 0 10px; }
+.bubble p:last-child { margin-bottom: 0; }
+.bubble h1 { font-size: 19px; font-weight: 700; margin: 14px 0 8px; }
+.bubble h2 { font-size: 17px; font-weight: 700; margin: 12px 0 7px; }
+.bubble h3 { font-size: 15px; font-weight: 700; margin: 10px 0 6px; }
+.bubble ul { margin: 8px 0; padding-left: 20px; }
+.bubble li { margin: 3px 0; }
+.bubble code {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: rgba(0,0,0,0.3);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.bubble-user code { background: rgba(0,0,0,0.3); }
+.bubble hr { border: none; border-top: 1px solid var(--glass-border); margin: 12px 0; }
+
+.cursor {
+  display: inline-block;
+  width: 8px; height: 16px;
+  background: var(--blue);
+  border-radius: 2px;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--text-3);
+}
+.msg-time { font-family: var(--mono); }
+.msg-latency {
+  font-family: var(--mono);
+  color: var(--teal);
+}
+
+/* ── Fondo de OLAS ──────────────────────────────────────────────────────────
+   Capas de onda que se desplazan horizontalmente a distinto ritmo, creando un
+   movimiento fluido tipo marea. El nº de colores (2/3/4) lo controla data-count
+   ocultando las capas sobrantes desde el JSX. */
+.bg-waves {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: var(--orb-intensity, 0.6);
+}
+.bg-wave {
+  position: absolute;
+  left: -50%;
+  width: 200%;
+  height: var(--wave-h, 55%);
+  filter: blur(70px);
+  will-change: transform;
+  border-radius: 42% 58% 50% 50% / 55% 50% 50% 45%;
+}
+.bg-wave-1 {
+  bottom: -22%;
+  background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(240,121,95,0.55), transparent 70%);
+  animation: waveFlow1 calc(28s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+.bg-wave-2 {
+  bottom: -10%;
+  background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(91,120,245,0.50), transparent 70%);
+  animation: waveFlow2 calc(34s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+.bg-wave-3 {
+  bottom: 2%;
+  background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(200,123,216,0.45), transparent 70%);
+  animation: waveFlow3 calc(40s / var(--orb-speed, 1)) ease-in-out infinite;
+}
+.bg-wave-4 {
+  bottom: 14%;
+  background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(52,211,153,0.40), transparent 70%);
+  animation: waveFlow1 calc(46s / var(--orb-speed, 1)) ease-in-out infinite reverse;
+}
+@keyframes waveFlow1 {
+  0%,100% { transform: translateX(-8%) translateY(0) scaleY(1); }
+  50%     { transform: translateX(8%) translateY(-6%) scaleY(1.12); }
+}
+@keyframes waveFlow2 {
+  0%,100% { transform: translateX(6%) translateY(0) scaleY(1.05); }
+  50%     { transform: translateX(-7%) translateY(-4%) scaleY(0.92); }
+}
+@keyframes waveFlow3 {
+  0%,100% { transform: translateX(-5%) translateY(0) scaleY(0.95); }
+  50%     { transform: translateX(9%) translateY(-7%) scaleY(1.1); }
+}
+/* En incógnito las olas pierden el color. */
+body.incognito .bg-wave {
+  background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(150,150,158,0.12), transparent 70%) !important;
+  filter: blur(70px) saturate(0) !important;
+  opacity: 0.5 !important;
+}
+/* Sin animaciones: las olas quedan quietas. */
+body.no-anim .bg-wave { animation: none !important; }
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(10px) scale(0.992); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.page-enter {
+  animation: pageEnter 0.42s cubic-bezier(0.22, 0.85, 0.3, 1) both;
+}
+
+/* Entrada escalonada para listas (cards, mensajes, resultados). Aplica
+   .stagger al contenedor; cada hijo entra con un pequeño retardo en cascada. */
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stagger > * {
+  animation: staggerIn 0.4s cubic-bezier(0.22, 0.85, 0.3, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.stagger > *:nth-child(n+8) { animation-delay: 0.30s; }
+
+/* Respeta la preferencia del sistema de reducir movimiento (accesibilidad). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── Pulidos finales iOS 26 ── */
+/* Selección de texto */
+::selection { background: rgba(91,156,246,0.3); color: var(--text-1); }
+
+/* Inputs select estilizados */
+select.g-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236e6e7a' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+/* Tooltips suaves en hover de botones */
+.btn, button { transition: all 0.18s cubic-bezier(0.4,0,0.2,1); }
+
+/* Focus visible accesible */
+*:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* ── Modal overlay iOS 26 ── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: overlayFade 0.2s ease both;
+}
+@keyframes overlayFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Modal genérico (popups pequeños): respeta el tema activo */
+.settings-modal, .settings-overlay > div, .sys-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-hi);
+  max-width: 520px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+  color: var(--text-1);
+  animation: modalPop 0.28s cubic-bezier(0.34,1.3,0.64,1) both;
+}
+/* Overlay específico del panel de Sistema (mismo patrón que el genérico) */
+.sys-overlay {
+  position: fixed; inset: 0; z-index: 9500;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(8, 9, 16, 0.5);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  animation: overlayFade 0.2s ease both;
+}
+body.theme-light .sys-overlay { background: rgba(120, 130, 160, 0.3); }
+/* Animación de CIERRE del menú de sistema (igual que la de configuración). */
+.sys-overlay.closing { animation: overlayFadeOut 0.2s ease both; }
+.sys-overlay.closing .sys-modal { animation: modalPopOut 0.2s cubic-bezier(0.4, 0, 0.7, 0.3) both; }
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.94) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.settings-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  letter-spacing: -0.01em;
+}
+.settings-section { margin-bottom: 22px; }
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+.settings-section .stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 13px;
+}
+.settings-section .stat-row:last-child { border-bottom: none; }
+
+/* ════════════════════════════════════════════════════════════════════
+   iOS 26 LIQUID GLASS — acabado de cristal líquido auténtico
+   Translucidez, brillo especular, profundidad pulida
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Superficie de cristal líquido con brillo especular en la esquina superior */
+.liquid-glass {
+  position: relative;
+  background:
+    linear-gradient(135deg, var(--glass-hi) 0%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.01) 100%),
+    var(--glass);
+  backdrop-filter: blur(34px) saturate(200%) brightness(1.05);
+  -webkit-backdrop-filter: blur(34px) saturate(200%) brightness(1.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  box-shadow:
+    inset 0 1px 1px var(--glass-hi),
+    inset 0 -8px 24px rgba(255,255,255,0.04),
+    inset 0 1px 0 rgba(255,255,255,0.5),
+    var(--shadow);
+  overflow: hidden;
+}
+/* Reflejo especular superior — la "lengua" de luz característica de iOS 26 */
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 55%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.16) 0%, transparent 100%);
+  pointer-events: none;
+  border-radius: 22px 22px 50% 50% / 22px 22px 16px 16px;
+}
+/* Reflejo inferior tenue — da sensación de grosor de vidrio */
+.liquid-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 -1px 8px rgba(255,255,255,0.06);
+}
+body.theme-light .liquid-glass {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    inset 0 -10px 28px rgba(255,255,255,0.5),
+    var(--shadow);
+}
+
+/* Iconos estilo app de iOS 26 — redondeados, translúcidos, con brillo */
+.app-icon {
+  position: relative;
+  border-radius: 24%;
+  background: linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04));
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid rgba(255,255,255,0.25);
+  box-shadow:
+    inset 0 1px 2px rgba(255,255,255,0.5),
+    inset 0 -2px 4px rgba(0,0,0,0.1),
+    0 4px 16px rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.app-icon::after {
+  content: '';
+  position: absolute;
+  top: 6%; left: 12%;
+  width: 60%; height: 35%;
+  background: radial-gradient(ellipse at top left, rgba(255,255,255,0.4), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SISTEMA DE BOTONES ESTILO APPLE — spring, brillo, profundidad
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Base: todos los botones tienen física de muelle al pulsar */
+/* Botón primario con cristal líquido y gradiente del logo */
+.btn-primary {
+  background: var(--grad-primary);
+  color: white;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.35),
+    0 2px 10px rgba(240,164,140,0.3);
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.4),
+    0 6px 20px rgba(240,164,140,0.45);
+}
+
+/* Brillo especular que cruza el botón al hacer hover (estilo Apple) */
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -75%;
+  width: 50%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.btn-primary:hover::before { left: 125%; }
+
+/* ── Modo Incógnito: noir profundo y UNIFORME, sin color (solo orbes opcionales) ── */
+body.incognito {
+  --bg-0: #0a0a0c !important;
+  --bg-1: #0f0f12 !important;
+  --bg-2: #161618 !important;
+  --blue: #8a8a92;
+  --purple: #9a9a9e;
+  --teal: #828289;
+  --green: #7d8a82;
+  --amber: #9a9080;
+  --red: #9a7e7e;
+  --grad-primary: linear-gradient(135deg, #6a6a72, #44444c);
+  --text-1: #ededf0 !important;
+  --text-2: #9a9aa0 !important;
+  --text-3: #5e5e66 !important;
+  --glass:        rgba(22, 22, 26, 0.6) !important;
+  --glass-bright: rgba(28, 28, 32, 0.72) !important;
+  --glass-border: rgba(255, 255, 255, 0.06) !important;
+  --glass-hi:     rgba(255, 255, 255, 0.07) !important;
+  --hairline: rgba(255,255,255,0.05) !important;
+  --hover-surface: rgba(255,255,255,0.04) !important;
+  --inset-surface: rgba(0,0,0,0.3) !important;
+  --chip-surface: rgba(255,255,255,0.05) !important;
+  --field-bg: rgba(255,255,255,0.04) !important;
+  --toggle-off: rgba(255,255,255,0.14) !important;
+  --sidebar-bg: rgba(8, 8, 10, 0.92) !important;
+  color-scheme: dark;
+}
+/* En incógnito los orbes se vuelven gris neutro y muy tenues, sin tinte */
+body.incognito .bg-orb {
+  background: radial-gradient(circle, rgba(150,150,158,0.16), transparent 66%) !important;
+  filter: blur(90px) saturate(0) !important;
+  opacity: 0.42 !important;
+  mix-blend-mode: normal !important;
+}
+/* En incógnito las BANDAS tricolores también pierden el color (gris/negro). */
+body.incognito .bg-band {
+  background: linear-gradient(90deg, transparent, rgba(150,150,158,0.10), transparent) !important;
+  filter: saturate(0) !important;
+  opacity: 0.30 !important;
+  mix-blend-mode: normal !important;
+}
+body.incognito .app-icon { filter: saturate(0.2) brightness(0.9); }
+/* Transición suave al cambiar de modo/tema */
+body { transition: background 0.5s ease, color 0.4s ease; }
+.bg-orb { transition: filter 0.6s ease, opacity 0.6s ease, background 0.6s ease; }
+
+/* ═══════════════════════════════════════════════════════════════
+   ANIMACIONES ESTILO APPLE — springs, fades escalonados, pop
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Spring suave de entrada (overshoot tipo iOS) */
+@keyframes springIn {
+  0%   { opacity: 0; transform: scale(0.85) translateY(12px); }
+  60%  { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Aparición lateral suave */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Pulso de atención (para badges, alertas) */
+@keyframes softPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.06); opacity: 0.85; }
+}
+
+/* Brillo que respira (para estados activos) */
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(123,140,240,0.0); }
+  50%      { box-shadow: 0 0 18px 2px rgba(123,140,240,0.35); }
+}
+
+/* Rotación suave de carga */
+@keyframes gentleSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Clases utilitarias para aplicar las animaciones */
+.anim-spring   { animation: springIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+.anim-slide    { animation: slideInRight 0.4s cubic-bezier(0.4,0,0.2,1) both; }
+.anim-pulse    { animation: softPulse 2s ease-in-out infinite; }
+.anim-breathe  { animation: breathe 2.5s ease-in-out infinite; }
+
+/* Entrada escalonada para listas (cada hijo entra con retardo) */
+.stagger > * { animation: springIn 0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
+.stagger > *:nth-child(1) { animation-delay: 0.03s; }
+.stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger > *:nth-child(3) { animation-delay: 0.09s; }
+.stagger > *:nth-child(4) { animation-delay: 0.12s; }
+.stagger > *:nth-child(5) { animation-delay: 0.15s; }
+.stagger > *:nth-child(6) { animation-delay: 0.18s; }
+.stagger > *:nth-child(7) { animation-delay: 0.21s; }
+.stagger > *:nth-child(8) { animation-delay: 0.24s; }
+
+/* Hover de elevación para cualquier card interactiva */
+.lift { transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease; }
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+/* Respeta usuarios que prefieren menos movimiento (accesibilidad) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ZONA DE IMÁGENES — animación Apple al añadir / arrastrar
+   ═══════════════════════════════════════════════════════════════ */
+.img-drop-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 1.5px dashed var(--glass-border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    transform 0.32s cubic-bezier(0.34,1.56,0.64,1),
+    border-color 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+  user-select: none;
+}
+.img-drop-zone:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(123,140,240,0.5);
+  background: rgba(123,140,240,0.06);
+  color: var(--text-2);
+}
+.img-drop-zone:active { transform: scale(0.97); }
+.img-drop-zone.drag-over {
+  border-color: var(--blue);
+  border-style: solid;
+  background: rgba(123,140,240,0.12);
+  color: var(--text-1);
+  transform: scale(1.03);
+  box-shadow: 0 0 0 4px rgba(123,140,240,0.15), 0 8px 24px rgba(123,140,240,0.25);
+  animation: breathe 1.5s ease-in-out infinite;
+}
+
+/* Previsualización de imágenes con entrada spring */
+.img-preview-wrap {
+  position: relative;
+  display: inline-block;
+  animation: springIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.img-preview {
+  width: 64px; height: 64px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.img-preview-wrap:hover .img-preview { transform: scale(1.05); }
+.img-preview-del {
+  position: absolute;
+  top: -6px; right: -6px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--red);
+  color: white;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+.img-preview-del:hover { transform: scale(1.2) rotate(90deg); }
+
+/* Codex: el resaltado de fondo no debe tener su propio background (es overlay) */
+.codex-editor .hljs,
+.codex-editor pre code.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BIBLIOTECA DE IAs — componentes estética iOS 26
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Chip de estado (hardware detectado) */
+.ios-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 15px;
+  border-radius: 100px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--glass-border);
+  font-size: 13px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
+}
+
+/* Buscador iOS */
+.ios-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--glass-border);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.06);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.ios-search:focus-within {
+  border-color: rgba(123,140,240,0.4);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.06), 0 0 0 4px rgba(123,140,240,0.1);
+}
+.ios-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-1);
+  font-size: 14px;
+  font-family: var(--font);
+}
+.ios-search input::placeholder { color: var(--text-3); }
+
+/* Tarjeta de modelo iOS — glassmorphism, esquinas muy redondeadas */
+.ios-model-card {
+  padding: 18px 20px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 0.5px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.12),
+    0 2px 16px rgba(0,0,0,0.18);
+}
+
+/* Badge de tier — contorno fino estilo iOS */
+.ios-tier-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid;
+  letter-spacing: 0.02em;
+}
+
+/* Píldora "Cabe / No cabe" — la indicación principal */
+.ios-fit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.06);
+}
+
+/* Métricas en píldoras */
+.ios-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 13px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.18);
+  border: 0.5px solid var(--glass-border);
+  min-width: 78px;
+}
+.ios-metric-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ios-metric-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+/* Tags de uso */
+.ios-tag {
+  font-size: 11px;
+  padding: 4px 11px;
+  border-radius: 100px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text-3);
+  border: 0.5px solid var(--glass-border);
+}
+
+/* Notas de confirmación */
+.ios-note {
+  font-size: 12px;
+  margin-top: 12px;
+  padding: 9px 13px;
+  border-radius: 11px;
+  line-height: 1.45;
+}
+.ios-note-ok  { background: rgba(52,211,153,0.1);  color: var(--green); border: 0.5px solid rgba(52,211,153,0.2); }
+.ios-note-err { background: rgba(255,107,107,0.1); color: var(--red);   border: 0.5px solid rgba(255,107,107,0.2); }
+
+/* ── Animaciones uniformes (Lab, Stats, todas las páginas) ───────────────── */
+@keyframes growBar {
+  from { transform: scaleY(0); transform-origin: bottom; }
+  to   { transform: scaleY(1); transform-origin: bottom; }
+}
+.anim-grow-bar { animation: growBar 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+
+/* Toda card dentro de una página animada entra con stagger suave */
+.panel-page > .card { animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.panel-page > .card:nth-child(2) { animation-delay: 0.04s; }
+.panel-page > .card:nth-child(3) { animation-delay: 0.08s; }
+.panel-page > .card:nth-child(4) { animation-delay: 0.12s; }
+.panel-page > .card:nth-child(5) { animation-delay: 0.16s; }
+.panel-page > .card:nth-child(6) { animation-delay: 0.20s; }
+.panel-page > .kpi-grid { animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-grow-bar, .panel-page > .card, .panel-page > .kpi-grid { animation: none; }
+}
+
+/* ── Barra de progreso de descarga de modelos ────────────────────────────── */
+.dl-progress { margin-top: 12px; }
+.dl-progress-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px; gap: 10px;
+}
+.dl-progress-status {
+  font-size: 11px; color: var(--text-3); text-transform: capitalize;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dl-progress-nums {
+  font-size: 11px; font-family: var(--font-mono, monospace);
+  color: var(--text-2); flex-shrink: 0;
+}
+.dl-progress-track {
+  height: 8px; border-radius: 999px; overflow: hidden;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--glass-border);
+}
+.dl-progress-fill {
+  height: 100%; border-radius: 999px;
+  background: var(--grad-primary);
+  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative; overflow: hidden;
+}
+.dl-progress-fill::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+  animation: dlShimmer 1.6s ease-in-out infinite;
+}
+@keyframes dlShimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) { .dl-progress-fill::after { animation: none; } }
+
+/* ── Ajustes visuales con efecto real ────────────────────────────────────── */
+body.no-anim *, body.no-anim *::before, body.no-anim *::after {
+  animation: none !important;
+  transition: none !important;
+}
+body.compact .msg-bubble { padding: 10px 14px; }
+body.compact .msg-row { margin-bottom: 8px; }
+
+/* ── Codex: capas perfectamente alineadas (textarea ↔ resaltado) ─────────── */
+/* El tema de highlight.js mete padding y fuente propios en code.hljs,
+   descuadrando el caret visual respecto al texto real. Métricas idénticas: */
+.codex-editor pre,
+.codex-editor pre code,
+.codex-editor pre code.hljs,
+.codex-editor textarea {
+  font-family: var(--font-mono) !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
+  tab-size: 4 !important;
+  white-space: pre !important;
+  font-variant-ligatures: none !important;
+}
+.codex-editor pre code,
+.codex-editor pre code.hljs {
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  display: inline !important;
+  overflow: visible !important;
+}
+
+/* ── Sidebar: apertura/cierre orgánico ───────────────────────────────────── */
+.sidebar-anim {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(50px) saturate(160%);
+  -webkit-backdrop-filter: blur(50px) saturate(160%);
+  border-right: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: width 0.45s cubic-bezier(0.32, 0.72, 0, 1),
+              opacity 0.35s ease,
+              padding 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.sidebar-open   { width: 300px; opacity: 1; }
+.sidebar-closed { width: 0; opacity: 0; border-right-width: 0; pointer-events: none; }
+.sidebar-open > * { animation: sidebarContent 0.4s 0.1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes sidebarContent {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Panel IAs: expansión spring estilo iOS 26 ──────────────────────────── */
+.ias-expand {
+  animation: iasSpring 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) backwards;
+  transform-origin: bottom center;
+}
+@keyframes iasSpring {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-anim { transition: none; }
+  .sidebar-open > *, .ias-expand { animation: none; }
+}
+
+/* ── Barra de título custom (app de escritorio frameless) ────────────────── */
+.titlebar {
+  height: 36px;
+  display: flex;
+  align-items: stretch;
+  background: var(--titlebar-bg);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-bottom: 1px solid var(--glass-border);
+  user-select: none;
+  flex-shrink: 0;
+  transition: background 0.4s ease;
+}
+body.incognito .titlebar { background: rgba(20, 20, 23, 0.96) !important; }
+.titlebar-drag {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  cursor: default;
+}
+.titlebar-name {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--text-3);
+  font-family: 'Playfair Display', Georgia, serif;
+}
+.titlebar-controls { display: flex; align-items: stretch; }
+.tb-btn {
+  width: 46px; border: none; background: transparent;
+  color: var(--text-3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.tb-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-1); }
+.tb-close:hover { background: #e8443a; color: #fff; }
+
+/* ── Semáforos macOS en el titlebar ──────────────────────────────────────── */
+.titlebar-traffic { display: flex; align-items: center; gap: 8px; padding: 0 14px; }
+.tl {
+  width: 12px; height: 12px; border-radius: 50%; border: none;
+  cursor: pointer; padding: 0; transition: filter 0.15s;
+}
+.tl:hover { filter: brightness(1.25); }
+.tl-close { background: #ff5f57; }
+.tl-min   { background: #febc2e; }
+.tl-max   { background: #28c840; }
+
+/* ── Pantalla de login ───────────────────────────────────────────────────── */
+.login-page {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 24px; position: relative; z-index: 1;
+}
+.login-card {
+  width: min(380px, 92vw);
+  background: rgba(18, 18, 24, 0.72);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 38px 34px 28px;
+  text-align: center;
+}
+.login-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 32px; font-weight: 600; margin: 0 0 4px;
+  background: var(--grad-primary);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.login-sub { font-size: 13px; color: var(--text-3); margin-bottom: 26px; }
+.login-input { width: 100%; margin-bottom: 12px; padding: 12px 14px; font-size: 14px; }
+.login-error {
+  font-size: 12px; color: var(--red);
+  background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25);
+  border-radius: 10px; padding: 9px 12px; margin-bottom: 12px;
+}
+.login-btn { width: 100%; padding: 12px; font-size: 14px; margin-top: 4px; }
+.login-switch { font-size: 12.5px; color: var(--text-3); margin-top: 18px; }
+.login-switch a { color: var(--blue); cursor: pointer; }
+.login-note { font-size: 11px; color: var(--text-3); opacity: 0.7; margin-top: 16px; }
+
+/* ── Markdown renderizado en mensajes de IA ─────────────────────────────── */
+.md-content { line-height: 1.6; }
+.md-content p { margin: 0 0 10px; }
+.md-content p:last-child { margin-bottom: 0; }
+.md-content h1, .md-content h2, .md-content h3 { margin: 16px 0 8px; font-weight: 650; line-height: 1.3; }
+.md-content h1 { font-size: 1.4em; }
+.md-content h2 { font-size: 1.2em; }
+.md-content h3 { font-size: 1.05em; }
+.md-content ul, .md-content ol { margin: 8px 0; padding-left: 22px; }
+.md-content li { margin: 3px 0; }
+.md-content li > ul, .md-content li > ol { margin: 3px 0; }
+.md-content code {
+  background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 5px;
+  font-family: var(--mono); font-size: 0.88em;
+}
+.md-content a { color: var(--accent, #5b9cf6); text-decoration: none; border-bottom: 1px solid transparent; }
+.md-content a:hover { border-bottom-color: currentColor; }
+.md-content blockquote {
+  margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--glass-border);
+  color: var(--text-3); font-style: italic;
+}
+.md-content hr { border: none; border-top: 1px solid var(--glass-border); margin: 14px 0; }
+.md-content table {
+  border-collapse: collapse; margin: 12px 0; width: 100%; font-size: 0.92em;
+  display: block; overflow-x: auto;
+}
+.md-content th, .md-content td {
+  border: 1px solid var(--glass-border); padding: 6px 11px; text-align: left;
+}
+.md-content th { background: rgba(255,255,255,0.04); font-weight: 600; }
+.md-content tr:hover td { background: rgba(255,255,255,0.02); }
+.md-content strong { font-weight: 650; }
+
+/* ── Selección de texto en el chat (pywebview la bloquea por defecto) ────── */
+/* Forzar que las respuestas y mensajes sean seleccionables y copiables. */
+.bubble, .bubble-ai, .bubble-user, .md-content, .msg, .msg-bubble,
+.bubble *, .md-content * {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  cursor: auto;
+}
+/* El cursor de texto sobre contenido seleccionable */
+.md-content, .bubble { cursor: text; }
+
+/* ════════════════════════════════════════════════════════════════════
+   SELECTOR DE IAs (ChatSettings) — limpio, legible, liquid-glass
+   ════════════════════════════════════════════════════════════════════ */
+.ias-config {
+  display: flex; flex-direction: column; gap: 18px;
+  background: var(--glass);
+  backdrop-filter: blur(34px) saturate(180%);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r);
+  padding: 18px;
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
+}
+.ias-block { display: flex; flex-direction: column; gap: 11px; }
+.ias-block-head { display: flex; align-items: baseline; justify-content: space-between; }
+.ias-block-title { font-size: 13px; font-weight: 700; color: var(--text-1); letter-spacing: -0.01em; }
+.ias-block-meta { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+.ias-reset {
+  font-size: 11px; color: var(--text-3); background: none; border: none;
+  cursor: pointer; padding: 2px 4px; transition: color .15s;
+}
+.ias-reset:hover { color: var(--blue); }
+
+/* Paralelismo: 4 botones grandes */
+.ias-parallel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ias-parallel-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 14px 4px 11px; border-radius: var(--r-sm);
+  border: 1px solid var(--glass-border); background: var(--hover-surface);
+  cursor: pointer; transition: transform .18s cubic-bezier(0.34,1.56,0.64,1), background .18s, border-color .18s;
+}
+.ias-parallel-btn:hover:not(.disabled) { transform: translateY(-2px); border-color: var(--glass-hi); }
+.ias-parallel-btn.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, rgba(91,120,245,0.22), rgba(200,123,216,0.18));
+  box-shadow: inset 0 0 0 1.5px var(--blue), 0 4px 16px rgba(91,120,245,0.18);
+}
+.ias-parallel-btn.disabled { opacity: 0.32; cursor: not-allowed; }
+.ias-parallel-n { font-size: 20px; font-weight: 800; color: var(--text-1); line-height: 1; }
+.ias-parallel-btn.active .ias-parallel-n {
+  background: var(--grad-primary); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.ias-parallel-cap { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
+
+.ias-hint { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+.ias-legend { display: flex; align-items: center; gap: 5px; }
+
+/* Lista de especialistas */
+.ias-spec-list { display: flex; flex-direction: column; gap: 6px; }
+.ias-spec {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 11px; border-radius: var(--r-sm);
+  background: var(--hover-surface); border: 1px solid var(--glass-border);
+  transition: opacity .15s;
+}
+.ias-spec.inactive { opacity: 0.45; }
+.ias-spec-id { display: flex; align-items: center; gap: 9px; min-width: 168px; flex-shrink: 0; }
+.ias-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--text-3); display: inline-block;
+}
+.ias-dot.on { background: var(--green); box-shadow: 0 0 7px rgba(52,211,153,0.6); }
+.ias-spec-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.ias-spec-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); white-space: nowrap; }
+.ias-spec-model {
+  font-size: 10px; font-family: var(--mono); color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;
+}
+
+/* Segmented control de potencia */
+.ias-seg {
+  display: flex; flex: 1; gap: 2px; padding: 3px;
+  background: rgba(0,0,0,0.16); border-radius: 9px;
+}
+body.theme-light .ias-seg { background: rgba(15,23,60,0.06); }
+.ias-seg-btn {
+  flex: 1; padding: 6px 2px; border: none; border-radius: 6px; background: transparent;
+  color: var(--text-3); font-size: 10.5px; font-weight: 700; letter-spacing: .01em;
+  cursor: pointer; transition: background .14s, color .14s, transform .12s;
+}
+.ias-seg-btn:hover:not(.dis):not(.on) { color: var(--text-1); background: var(--hover-surface); }
+.ias-seg-btn.on {
+  color: #fff; background: var(--grad-primary);
+  box-shadow: 0 2px 8px rgba(91,120,245,0.3);
+}
+.ias-seg-btn.dis { color: var(--text-3); opacity: 0.35; cursor: not-allowed; text-decoration: line-through; }
+
+/* Pie: aplicar */
+.ias-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  padding-top: 14px; border-top: 1px solid var(--hairline);
+}
+.ias-pending { font-size: 11px; color: var(--coral); }
+.ias-apply {
+  padding: 9px 24px; border-radius: 11px; border: none;
+  font-size: 13px; font-weight: 700; cursor: default;
+  background: var(--hover-surface); color: var(--text-3);
+  transition: transform .2s cubic-bezier(0.34,1.56,0.64,1), background .2s, box-shadow .2s;
+}
+.ias-apply.ready {
+  cursor: pointer; color: #fff; background: var(--grad-primary);
+  box-shadow: 0 4px 16px rgba(91,120,245,0.32);
+}
+.ias-apply.ready:hover { transform: translateY(-1px); }
+.ias-apply.ready:active { transform: scale(0.96); }
+
+/* ════════════════════════════════════════════════════════════════════
+   OVERLAY DE CONFIGURACIÓN — modal ancho centrado, fondo blureado (estilo Claude)
+   Clases propias (cfg-*) para no colisionar con el .settings-modal genérico.
+   ════════════════════════════════════════════════════════════════════ */
+.cfg-overlay {
+  position: fixed; inset: 0; z-index: 9500;
+  display: flex; align-items: center; justify-content: center;
+  padding: 32px;
+  background: rgba(8, 9, 16, 0.5);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  animation: overlayFade 0.22s ease both;
+}
+body.theme-light .cfg-overlay { background: rgba(120, 130, 160, 0.3); }
+/* Animación de CIERRE (se aplican estas clases justo antes de desmontar). */
+.cfg-overlay.closing { animation: overlayFadeOut 0.2s ease both; }
+.cfg-modal.closing   { animation: modalPopOut 0.2s cubic-bezier(0.4, 0, 0.7, 0.3) both; }
+@keyframes overlayFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes modalPopOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.96) translateY(8px); }
+}
+.cfg-modal {
+  position: relative;
+  width: min(1080px, 96vw);
+  height: min(740px, 92vh);
+  background: var(--glass-bright);
+  backdrop-filter: blur(48px) saturate(180%);
+  -webkit-backdrop-filter: blur(48px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-hi);
+  overflow: hidden;
+  animation: modalPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.cfg-close {
+  position: absolute; top: 14px; right: 18px; z-index: 20;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-2); border: 1px solid var(--glass-border);
+  color: var(--text-2); cursor: pointer; transition: all .16s;
+  box-shadow: var(--shadow-sm);
+}
+.cfg-close:hover { background: var(--glass-hi); color: var(--text-1); transform: rotate(90deg); }
+/* El scrollbar va PEGADO al borde derecho del modal (sin padding en el
+   contenedor); el aire del contenido se lo damos a los hijos. La X queda
+   a la izquierda del scrollbar. */
+.cfg-content > div { padding: 24px 32px 28px 32px; }
+.cfg-content > .panel-page { padding: 24px 32px 28px 32px; }
+/* Si el hijo directo ya es una panel-page, su propio padding manda (no duplicar) */
+.cfg-content > div > .panel-page { padding-left: 0; padding-right: 0; }
+.cfg-content .panel-page-header,
+.cfg-content > div > .panel-page > .panel-page-header { padding-right: 40px; }
+.cfg-content::-webkit-scrollbar { width: 8px; }
+.cfg-content::-webkit-scrollbar-track { background: transparent; }
+.cfg-content::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb); border-radius: 4px;
+}
+.cfg-content::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+/* ════════════════════════════════════════════════════════════════════
+   GRÁFICOS MLOps
+   ════════════════════════════════════════════════════════════════════ */
+.chart-bar-track {
+  flex: 1; height: 20px; border-radius: 7px; overflow: hidden;
+  background: var(--hover-surface);
+}
+.chart-bar-fill {
+  height: 100%; border-radius: 7px; min-width: 26px;
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 8px;
+  animation: growBar 0.7s cubic-bezier(0.22,1,0.36,1) both;
+}
+.chart-bar-val { font-size: 10px; color: #fff; font-weight: 700; font-family: var(--mono); }
+.chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .chart-grid-2 { grid-template-columns: 1fr; } }
+.proj-note {
+  font-size: 11px; color: var(--text-3); line-height: 1.5;
+  padding: 10px 12px; border-radius: 10px; background: var(--hover-surface);
+  border: 1px solid var(--hairline); margin-top: 12px;
+}
+
+/* ── Refuerzos tema claro ──────────────────────────────────────────────────
+   Elementos con blanco translúcido hardcodeado (pensados para fondo oscuro)
+   quedan invisibles sobre el fondo claro. Los reanclamos a superficies claras
+   con borde sutil para que se vean bien en ambos temas. */
+body.theme-light .md-content pre,
+body.theme-light pre {
+  background: rgba(40, 35, 60, 0.05) !important;
+  color: var(--text-1);
+}
+body.theme-light input,
+body.theme-light textarea,
+body.theme-light select {
+  background: var(--field-bg);
+  color: var(--text-1);
+  border-color: var(--glass-border);
+}
+body.theme-light input::placeholder,
+body.theme-light textarea::placeholder {
+  color: var(--text-3);
+}
+/* Botones/chips que usaban rgba(255,255,255,0.08) como fondo */
+body.theme-light [style*="rgba(255,255,255,0.08)"],
+body.theme-light [style*="rgba(255, 255, 255, 0.08)"] {
+  background: rgba(40, 35, 60, 0.06) !important;
+}
+/* Texto que quedaba blanco fijo en superficies claras */
+body.theme-light .card,
+body.theme-light .panel-page {
+  color: var(--text-1);
+}
+/* El visor de artefactos y modales en claro */
+body.theme-light pre {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+
+/* Animaciones del popover de información (InfoButton) */
+@keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalPopIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}

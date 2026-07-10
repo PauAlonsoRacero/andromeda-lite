@@ -1,0 +1,69 @@
+version: '3.9'
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ANDROMEDA — DOCKER COMPOSE (desarrollo con hot-reload)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Uso: docker-compose -f docker-compose.dev.yml up
+#
+# Diferencias con producción:
+#   - Backend con hot-reload (uvicorn --reload)
+#   - Frontend con Vite dev server (HMR)
+#   - Código montado como volumen → cambios se reflejan al instante
+#   - Logs más verbosos (DEBUG)
+# ══════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: andromeda-ollama-dev
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: andromeda-backend-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - ANDROMEDA_ENVIRONMENT=development
+      - ANDROMEDA_PORT=8000
+      - ANDROMEDA_OLLAMA_BASE_URL=http://ollama:11434
+      - ANDROMEDA_FRONTEND_URL=http://localhost:5173
+      - ANDROMEDA_SPECIALISTS_CONFIG_PATH=/config/specialists.yaml
+      - ANDROMEDA_HARDWARE_POLICIES_PATH=/config/hardware_policies.yaml
+    volumes:
+      # Código montado para hot-reload
+      - ./backend:/app
+      - ./config:/config
+      - ./data:/app/data
+      - ./logs:/app/logs
+    # Sobrescribir el CMD del Dockerfile con hot-reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-alpine
+    container_name: andromeda-frontend-dev
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    # Instalar deps y arrancar Vite dev server con host 0.0.0.0
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+    name: andromeda_ollama_models

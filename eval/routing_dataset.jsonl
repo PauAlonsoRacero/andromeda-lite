@@ -1,0 +1,51 @@
+{"prompt": "hola", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "hola qué tal", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "buenas tardes", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "gracias por la ayuda", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "buenos días, ¿cómo estás?", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "oye una pregunta rápida", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "saludos, necesito ayuda", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "¿puedes ayudarme con algo?", "domain": "conversation", "tier_max": 2, "specialist": "generalist"}
+{"prompt": "¿cuál es la capital de Francia?", "domain": "factual", "tier_max": 1, "specialist": "summarizer"}
+{"prompt": "¿quién escribió el Quijote?", "domain": "factual", "tier_max": 1, "specialist": "summarizer"}
+{"prompt": "¿cuántos planetas hay en el sistema solar?", "domain": "factual", "tier_max": 1, "specialist": "summarizer"}
+{"prompt": "define qué es la fotosíntesis", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "¿qué diferencia hay entre TCP y UDP?", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "¿para qué sirve el protocolo HTTP?", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "dame una receta de tortilla de patatas", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "resume este artículo en tres puntos clave", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "enumera los planetas del sistema solar", "domain": "factual", "tier_max": 1, "specialist": "summarizer"}
+{"prompt": "¿cuáles son los colores primarios?", "domain": "factual", "tier_max": 1, "specialist": "summarizer"}
+{"prompt": "¿qué hora es en Nueva York?", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "explica qué es un agujero negro", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "escribe un email casual a un amigo sobre el finde", "domain": "writing", "tier_max": 2, "specialist": "technical-writer"}
+{"prompt": "redacta un correo formal para mi jefe pidiendo vacaciones", "domain": "writing", "tier_max": 2, "specialist": "technical-writer"}
+{"prompt": "corrige la gramática de este texto y mejóralo", "domain": "writing", "tier_max": 2, "specialist": "technical-writer"}
+{"prompt": "escribe un poema sobre el otoño", "domain": "writing", "tier_min": 1, "specialist": "technical-writer"}
+{"prompt": "redacta un ensayo sobre el impacto de la inteligencia artificial en la sociedad", "domain": "writing", "tier_min": 2, "specialist": "technical-writer"}
+{"prompt": "escribe una historia corta sobre un robot que aprende a sentir", "domain": "writing", "tier_min": 2, "specialist": "technical-writer"}
+{"prompt": "traduce este párrafo al inglés", "domain": "writing", "tier_max": 2, "specialist": "technical-writer"}
+{"prompt": "reformula este texto para que suene más profesional", "domain": "writing", "tier_max": 2, "specialist": "technical-writer"}
+{"prompt": "escribe un artículo de blog técnico sobre Kubernetes para principiantes", "domain": "writing", "tier_min": 2, "specialist": "technical-writer"}
+{"prompt": "redacta una propuesta comercial detallada para un cliente enterprise", "domain": "writing", "tier_min": 2, "specialist": "technical-writer"}
+{"prompt": "escribe la introducción de un documento técnico sobre microservicios", "domain": "writing", "tier_min": 2, "specialist": "technical-writer"}
+{"prompt": "implementa una función en python que ordene una lista", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "escribe un script de bash para hacer backup de una carpeta", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "crea una función que valide emails con expresiones regulares", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "debuggea este código que tiene una race condition", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "optimiza esta consulta SQL que tarda demasiado", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "escribe tests unitarios para esta clase de python", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "implementa un parser recursivo descendente para expresiones aritméticas con manejo de errores", "domain": "code", "tier_min": 3, "specialist": "software-engineering"}
+{"prompt": "diseña la arquitectura completa de un sistema distribuido escalable analizando trade-offs en profundidad", "domain": "code", "tier_min": 3, "specialist": "software-engineering"}
+{"prompt": "diseña un compilador completo con análisis léxico, sintáctico y generación de código", "domain": "code", "tier_min": 3, "specialist": "software-engineering"}
+{"prompt": "refactoriza este código para aplicar el patrón repository", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "configura un pipeline de CI/CD con GitHub Actions para desplegar en producción", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "escribe un Dockerfile para una app de node con multi-stage build", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "demuestra que la raíz de 2 es irracional", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "demuestra por inducción que la suma de los primeros n naturales es n(n+1)/2", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "analiza por qué este algoritmo tiene complejidad O(n log n) y razónalo", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "calcula la derivada de x^3 + 2x y explica el procedimiento", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "demuestra el teorema de incompletitud de Gödel y analiza sus implicaciones en profundidad", "domain": "reasoning", "tier_min": 3, "specialist": "verifier"}
+{"prompt": "resuelve este problema de optimización combinatoria y justifica que es óptimo", "domain": "reasoning", "tier_min": 3, "specialist": "verifier"}
+{"prompt": "verifica si este razonamiento lógico es correcto paso a paso", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "analiza la complejidad temporal y espacial de este algoritmo y demuéstrala", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
