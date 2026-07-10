@@ -1,0 +1,62 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "title": "Andromeda — Observabilidad",
+  "uid": "andromeda-main",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["andromeda", "mlops"],
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Peticiones totales",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "andromeda_requests_total", "refId": "A" }]
+    },
+    {
+      "id": 2,
+      "title": "Tasa de éxito (%)",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "min": 0, "max": 100, "unit": "percent" } },
+      "targets": [{ "expr": "andromeda_success_rate", "refId": "A" }]
+    },
+    {
+      "id": 3,
+      "title": "Latencia (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        { "expr": "andromeda_latency_ms{quantile=\"0.5\"}",  "legendFormat": "p50", "refId": "A" },
+        { "expr": "andromeda_latency_ms{quantile=\"0.95\"}", "legendFormat": "p95", "refId": "B" },
+        { "expr": "andromeda_latency_ms{quantile=\"0.99\"}", "legendFormat": "p99", "refId": "C" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Tasa de degradación (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "targets": [{ "expr": "andromeda_degradation_rate", "refId": "A" }]
+    },
+    {
+      "id": 5,
+      "title": "Llamadas por herramienta MCP",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [{ "expr": "andromeda_tool_calls_total", "legendFormat": "{{tool}}", "refId": "A" }]
+    },
+    {
+      "id": 6,
+      "title": "A/B — peticiones por variante",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [{ "expr": "andromeda_ab_requests_total", "legendFormat": "{{experiment}} · {{variant}}", "refId": "A" }]
+    }
+  ]
+}

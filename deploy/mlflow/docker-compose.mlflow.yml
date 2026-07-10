@@ -1,0 +1,23 @@
+# Servidor MLflow para tracking de runs y versionado de modelos.
+# Arranca con:  docker compose -f docker-compose.mlflow.yml up -d
+# UI en http://localhost:5001
+# Luego en Andromeda: ANDROMEDA_MLFLOW_ENABLED=true y
+#                     ANDROMEDA_MLFLOW_TRACKING_URI=http://localhost:5001
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: andromeda-mlflow
+    ports:
+      - "5001:5000"
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow_data:/mlflow
+    restart: unless-stopped
+
+volumes:
+  mlflow_data:

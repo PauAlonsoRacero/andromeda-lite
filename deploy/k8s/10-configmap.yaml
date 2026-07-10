@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: andromeda-config
+  namespace: andromeda
+data:
+  ANDROMEDA_ENVIRONMENT: "production"
+  ANDROMEDA_PORT: "8000"
+  # El backend habla con Ollama por el Service interno del clúster.
+  ANDROMEDA_OLLAMA_BASE_URL: "http://ollama:11434"
+  ANDROMEDA_MAX_PARALLEL_SPECIALISTS: "3"
+  ANDROMEDA_TELEMETRY_ENABLED: "true"
+  ANDROMEDA_MLOPS_ENABLED: "true"
+  # Monitorización: el endpoint /metrics queda expuesto para Prometheus.
+  ANDROMEDA_METRICS_ENABLED: "true"

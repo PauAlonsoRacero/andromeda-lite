@@ -1,0 +1,37 @@
+# Reglas de alerta de Prometheus para Andromeda.
+# Monitorización real = alertas, no solo dashboards. Estas reglas disparan
+# cuando algo va mal: servicio caído, errores altos o latencia degradada.
+groups:
+  - name: andromeda
+    rules:
+      - alert: AndromedaDown
+        expr: up{job="andromeda-backend"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "El backend de Andromeda no responde"
+          description: "Prometheus no puede scrapear /metrics desde hace 1 min."
+
+      - alert: HighErrorRate
+        expr: andromeda_success_rate < 80
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Tasa de éxito por debajo del 80%"
+          description: "Éxito actual: {{ $value }}%. Revisa modelos/inferencia."
+
+      - alert: HighLatencyP95
+        expr: andromeda_latency_ms{quantile="0.95"} > 15000
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Latencia p95 alta (> 15s)"
+          description: "p95 = {{ $value }} ms. Posible saturación o modelo lento."
+
+      - alert: HighDegradationRate
+        expr: andromeda_degradation_rate > 30
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Demasiadas peticiones degradadas (> 30%)"
+          description: "El sistema baja de nivel con frecuencia. Revisa hardware/VRAM."

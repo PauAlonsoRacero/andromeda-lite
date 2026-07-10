@@ -1,0 +1,24 @@
+{"prompt": "ey buenas", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "qué tal todo", "domain": "conversation", "tier_max": 1, "specialist": "generalist"}
+{"prompt": "tengo una duda", "domain": "conversation", "tier_max": 2, "specialist": "generalist"}
+{"prompt": "¿cuál es el río más largo del mundo?", "domain": "factual", "tier_max": 1, "specialist": "summarizer"}
+{"prompt": "¿qué significa la sigla API?", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "¿cuántos continentes hay?", "domain": "factual", "tier_max": 1, "specialist": "summarizer"}
+{"prompt": "dame un resumen de la revolución francesa", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "¿para qué se usa Redis?", "domain": "factual", "tier_max": 2, "specialist": "summarizer"}
+{"prompt": "escribe una carta de presentación para una oferta de trabajo", "domain": "writing", "tier_min": 2, "specialist": "technical-writer"}
+{"prompt": "redacta un post de LinkedIn anunciando mi nuevo proyecto", "domain": "writing", "tier_max": 2, "specialist": "technical-writer"}
+{"prompt": "corrige el estilo de este párrafo", "domain": "writing", "tier_max": 2, "specialist": "technical-writer"}
+{"prompt": "escribe un ensayo argumentativo sobre la energía nuclear con introducción, desarrollo y conclusión", "domain": "writing", "tier_min": 2, "specialist": "technical-writer"}
+{"prompt": "traduce esta frase al francés", "domain": "writing", "tier_max": 1, "specialist": "technical-writer"}
+{"prompt": "escribe una función en javascript para hacer debounce", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "arregla este bug de null pointer en mi código java", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "crea un endpoint REST en FastAPI para subir archivos", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "implementa un algoritmo de Dijkstra completo con cola de prioridad y demuestra su complejidad", "domain": "code", "tier_min": 3, "specialist": "software-engineering"}
+{"prompt": "diseña el esquema de base de datos para una red social escalable justificando cada decisión", "domain": "code", "tier_min": 3, "specialist": "software-engineering"}
+{"prompt": "escribe un docker-compose para levantar postgres y redis", "domain": "code", "tier_min": 2, "specialist": "software-engineering"}
+{"prompt": "demuestra que hay infinitos números primos", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "resuelve esta ecuación diferencial y explica cada paso", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "demuestra formalmente la corrección de este algoritmo de ordenamiento en profundidad", "domain": "reasoning", "tier_min": 3, "specialist": "verifier"}
+{"prompt": "analiza si esta afirmación lógica es una tautología", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}
+{"prompt": "calcula la integral de x^2 entre 0 y 1", "domain": "reasoning", "tier_min": 2, "specialist": "verifier"}

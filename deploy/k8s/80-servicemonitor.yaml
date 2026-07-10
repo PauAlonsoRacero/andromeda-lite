@@ -1,0 +1,16 @@
+# ServiceMonitor: descubrimiento automático por el Prometheus Operator.
+# Requiere kube-prometheus-stack instalado. Si no se usa Operator, las
+# anotaciones prometheus.io/* del Deployment ya bastan para el scrape estático.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: andromeda-backend
+  namespace: andromeda
+  labels: { release: kube-prometheus-stack }
+spec:
+  selector:
+    matchLabels: { app: andromeda-backend }
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

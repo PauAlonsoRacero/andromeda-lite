@@ -1,0 +1,168 @@
+# ============================================================
+# ANDROMEDA — CI/CD Pipeline
+# Runs on: push to main/develop, pull requests
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ── Backend tests ──────────────────────────────────────────────────────────
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --tb=short --cov=backend/app --cov-report=term-missing --cov-report=xml
+        env:
+          ANDROMEDA_ENVIRONMENT: test
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python || '3.12' }}
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  # ── Lint & type check ──────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install linters
+        run: pip install ruff
+
+      - name: Ruff lint
+        run: ruff check backend/ --ignore E501,F401
+        continue-on-error: true
+
+  # ── Frontend build check ───────────────────────────────────────────────────
+  build-frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+
+      - name: Check build output
+        run: |
+          test -d frontend/dist
+          test -f frontend/dist/index.html
+          echo "✓ Frontend build OK"
+
+  # ── Docker build check ────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [test-backend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t andromeda-backend ./backend
+
+      - name: Build frontend image
+        run: docker build -t andromeda-frontend ./frontend
+
+      - name: Smoke test backend
+        run: |
+          docker run -d --name andromeda-backend-test \
+            -p 8000:8000 \
+            -e ANDROMEDA_ENVIRONMENT=test \
+            andromeda-backend
+          sleep 5
+          curl -f http://localhost:8000/api/health || echo "Backend not ready (Ollama required)"
+          docker stop andromeda-backend-test
+
+  # ── Escaneo de seguridad de dependencias ───────────────────────────────────
+  security:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r backend/requirements.txt || true   # informativo de momento
+      - name: Bandit (análisis estático de seguridad)
+        run: |
+          pip install bandit
+          bandit -ll -r backend/app -q || true   # medio/alto; informativo
+
+  # ── Validación de manifiestos Kubernetes ───────────────────────────────────
+  k8s-validate:
+    name: Validate K8s manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz && sudo mv kubeconform /usr/local/bin/
+      - name: Validate manifests
+        run: kubeconform -summary -ignore-missing-schemas deploy/k8s/
+
+  # ── Summary ───────────────────────────────────────────────────────────────
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [test-backend, lint, build-frontend, k8s-validate, security]
+    if: always()
+
+    steps:
+      - name: Report
+        run: |
+          echo "Backend tests: ${{ needs.test-backend.result }}"
+          echo "Lint:          ${{ needs.lint.result }}"
+          echo "Frontend:      ${{ needs.build-frontend.result }}"
+          echo "K8s manifests: ${{ needs.k8s-validate.result }}"
+          echo "Security:      ${{ needs.security.result }}"

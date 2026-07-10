@@ -1,0 +1,31 @@
+# ── Core framework ────────────────────────────────────────────────────────────
+# Usamos límites de versión flexibles (>=) en los paquetes con código nativo
+# (pydantic-core, uvloop, httptools, etc.) para que pip descargue WHEELS
+# precompilados según tu versión de Python — sin compilar con Rust/C.
+# Pin exacto solo donde no hay riesgo de compilación.
+fastapi>=0.115.0,<1.0        # ASGI framework — SSE, Pydantic v2, OpenAPI
+uvicorn[standard]>=0.30.6    # ASGI server — event loop, WebSockets
+
+# ── HTTP async client ────────────────────────────────────────────────────────
+httpx>=0.27.2                # HTTP async — llamadas a Ollama sin bloquear
+
+# ── Validación y configuración ────────────────────────────────────────────────
+pydantic>=2.12        # >=2.12 garantiza pydantic-core>=2.41 con wheels para Python 3.14
+pydantic-settings>=2.7   # Carga .env en la clase Settings
+python-dotenv>=1.0.1        # Lee el archivo .env
+
+# ── Config y utilidades ───────────────────────────────────────────────────────
+pyyaml>=6.0.2               # Lee specialists.yaml y hardware_policies.yaml
+psutil>=6.0.0               # Detecta CPU, RAM (HardwareDetector)
+
+# ── Observabilidad ────────────────────────────────────────────────────────────
+colorlog>=6.8.2             # Logs con colores en consola
+python-docx>=1.1.0
+openpyxl>=3.1.0
+reportlab>=4.0.0
+pyjwt>=2.8                  # validación de licencias firmadas (Andromeda Cloud)
+cryptography>=42.0          # criptografía para licencias RS256
+
+# ── Necesarias en runtime ─────────────────────────────────────────────────────
+python-multipart>=0.0.9     # FastAPI: subida de archivos / form-data
+colorama>=0.4.6             # colores de consola en Windows

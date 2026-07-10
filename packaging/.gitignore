@@ -1,0 +1,3 @@
+# Ignorar binarios de terceros pero conservar el README explicativo
+redist/*
+!redist/README.md

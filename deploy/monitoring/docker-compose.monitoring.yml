@@ -1,0 +1,39 @@
+# Stack de monitorización: Prometheus + Grafana.
+# Arranca con:  docker compose -f docker-compose.monitoring.yml up -d
+# Grafana en http://localhost:3000 (admin/admin), dashboard "Andromeda" ya cargado.
+# Requiere que el backend de Andromeda exponga /metrics (puerto 8000).
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: andromeda-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: andromeda-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

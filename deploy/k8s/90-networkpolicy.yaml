@@ -1,0 +1,25 @@
+# NetworkPolicy: el backend solo acepta tráfico del frontend y del Ingress,
+# y solo puede salir hacia Ollama y DNS. Principio de mínimo privilegio de red.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: andromeda-backend
+  namespace: andromeda
+spec:
+  podSelector:
+    matchLabels: { app: andromeda-backend }
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: andromeda-frontend } }
+        - namespaceSelector: {}    # Ingress controller (ajustar en producción)
+      ports:
+        - { protocol: TCP, port: 8000 }
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app: ollama } }
+      ports:
+        - { protocol: TCP, port: 11434 }
+    - ports:        # DNS
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }

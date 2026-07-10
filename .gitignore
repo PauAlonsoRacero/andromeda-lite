@@ -1,0 +1,43 @@
+# ── Secretos y entorno ──────────────────────────────────────────────
+.env
+*.key
+keys/private.pem
+backend/app/cloud/cloud_session.json
+backend/app/cloud/cloud_license.jwt
+
+# ── Código exclusivo de Andromeda Pro (NUNCA subir) ─────────────────
+backend/app/specialists/profiles_pro.py
+backend/app/specialists/variants/
+backend/app/core/orchestrator_pro.py
+GRABAR-VARIANTES-ESPECIALIZADAS.ps1
+BORRAR-IDENTIDAD-MODELOS.ps1
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# ── Node / frontend ─────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+.vite/
+
+# ── Datos locales y build ───────────────────────────────────────────
+data/*
+!data/.gitkeep
+*.log
+logs/
+dist/
+build/
+Andromeda.app/
+*.dmg
+*.exe
+
+# ── SO / editor ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
