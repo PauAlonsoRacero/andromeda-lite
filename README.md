@@ -2,7 +2,7 @@
 
 # 🌌 Andromeda Lite
 
-**Local-first AI orchestration for your desktop — with a full MLOps lifecycle built in.**
+**Local-first AI orchestration for your desktop  with a full MLOps lifecycle built in.**
 
 Open source · Offline · Yours.
 
@@ -26,7 +26,7 @@ Open source · Offline · Yours.
 2. [The 30-second tour](#2-the-30-second-tour)
 3. [System architecture](#3-system-architecture)
 4. [How a single request flows](#4-how-a-single-request-flows)
-5. [The MLOps lifecycle — the heart of the project](#5-the-mlops-lifecycle--the-heart-of-the-project)
+5. [The MLOps lifecycle  the heart of the project](#5-the-mlops-lifecycle--the-heart-of-the-project)
 6. [Feature map](#6-feature-map)
 7. [MLOps maturity mapping](#7-mlops-maturity-mapping)
 8. [Tech stack](#8-tech-stack)
@@ -39,29 +39,29 @@ Open source · Offline · Yours.
 
 ## 1. What is Andromeda Lite?
 
-Andromeda Lite runs language models **entirely on your machine** through [Ollama](https://ollama.com) — no cloud, no token limits, no data leaving your computer. But it is more than a chat box on top of Ollama: it wraps a local model in a desktop app with **file access, tool use, an adaptive orchestrator, and a complete MLOps lifecycle** for evaluating, versioning, promoting and monitoring models in production.
+Andromeda Lite runs language models **entirely on your machine** through [Ollama](https://ollama.com)  no cloud, no token limits, no data leaving your computer. But it is more than a chat box on top of Ollama: it wraps a local model in a desktop app with **file access, tool use, an adaptive orchestrator, and a complete MLOps lifecycle** for evaluating, versioning, promoting and monitoring models in production.
 
-> **In one line:** it's a local AI agent for everyone, *and* a working demonstration of the model lifecycle an MLOps engineer is responsible for — evaluation → registry → promotion → serving → monitoring → feedback → drift detection.
+> **In one line:** it's a local AI agent for everyone, *and* a working demonstration of the model lifecycle an MLOps engineer is responsible for  evaluation → registry → promotion → serving → monitoring → feedback → drift detection.
 
 There are two faces to this project, and they're intentional:
 
 | | What it shows |
 |---|---|
 | 🧑‍💻 **As a product** | A polished, offline desktop app anyone can install: pull a model, chat, give it files and tools. |
-| 🛠️ **As an MLOps portfolio** | The full serving + experimentation + observability half of the ML lifecycle, implemented and running — not slides. |
+| 🛠️ **As an MLOps portfolio** | The full serving + experimentation + observability half of the ML lifecycle, implemented and running  not slides. |
 
 ---
 
 ## 2. The 30-second tour
 
-- **100% local inference** — prompts and files never leave your machine. Works fully offline.
-- **Adaptive orchestrator** — reads prompt complexity and scales the model's power level (low → ultra), capped by your hardware. Override any time.
-- **Sandboxed file actions** — the AI reads, writes, moves and deletes files inside a workspace folder, through explicit, reversible action blocks.
-- **MCP tools** — connect Model Context Protocol servers (filesystem, git, web…) with one click; the AI calls them on demand.
-- **Model Registry + A/B testing + quality eval** — version models, promote the best to production, compare them in real use with statistical rigor, and watch quality drift over time against SLOs.
-- **Plug-and-play models** — anything you `ollama pull` appears automatically. Zero config files.
-- **Privacy-first** — incognito mode persists nothing; network egress is off by default.
-- **Multilingual UI** — English, Spanish, German, Chinese, French.
+- **100% local inference**  prompts and files never leave your machine. Works fully offline.
+- **Adaptive orchestrator**  reads prompt complexity and scales the model's power level (low → ultra), capped by your hardware. Override any time.
+- **Sandboxed file actions**  the AI reads, writes, moves and deletes files inside a workspace folder, through explicit, reversible action blocks.
+- **MCP tools**  connect Model Context Protocol servers (filesystem, git, web…) with one click; the AI calls them on demand.
+- **Model Registry + A/B testing + quality eval**  version models, promote the best to production, compare them in real use with statistical rigor, and watch quality drift over time against SLOs.
+- **Plug-and-play models**  anything you `ollama pull` appears automatically. Zero config files.
+- **Privacy-first**  incognito mode persists nothing; network egress is off by default.
+- **Multilingual UI**  English, Spanish, German, Chinese, French.
 
 ---
 
@@ -121,7 +121,7 @@ sequenceDiagram
     Note over B: On completion: record metrics,<br/>A/B result, MLflow run, quality snapshot
 ```
 
-The power-level decision is **deterministic and explainable** — the app shows you why it picked a level, and you can pin one manually.
+The power-level decision is **deterministic and explainable**  the app shows you why it picked a level, and you can pin one manually.
 
 | Prompt | Level |
 |--------|-------|
@@ -132,9 +132,9 @@ The power-level decision is **deterministic and explainable** — the app shows 
 
 ---
 
-## 5. The MLOps lifecycle — the heart of the project
+## 5. The MLOps lifecycle  the heart of the project
 
-This is what makes Andromeda more than a chat app. For a model-serving product, the MLOps lifecycle isn't about training — it's about **knowing which model to serve, proving it's better, and catching it when it gets worse**. Andromeda implements that whole loop, and the app actually *uses* it.
+This is what makes Andromeda more than a chat app. For a model-serving product, the MLOps lifecycle isn't about training  it's about **knowing which model to serve, proving it's better, and catching it when it gets worse**. Andromeda implements that whole loop, and the app actually *uses* it.
 
 ```mermaid
 graph LR
@@ -164,16 +164,16 @@ graph LR
 |------|--------------|-------|
 | **1. Evaluate (offline)** | An LLM-as-judge scores a model 1–5 against a golden set across categories (factual, reasoning, code, safety…). Runs on demand or in CI. | `eval/quality_eval.py`, `eval/golden_set.jsonl` |
 | **2. Register** | Save a model version with its eval score and notes. Auto-versioned (v1, v2…). | `backend/app/mlops/registry.py` |
-| **3. Promote** | Move a version `staging → production`. Only one production version at a time — promoting another archives the previous. | `POST /api/registry/{id}/promote` |
+| **3. Promote** | Move a version `staging → production`. Only one production version at a time  promoting another archives the previous. | `POST /api/registry/{id}/promote` |
 | **4. Serve** | With *Serve production model* on, the chat serves exactly the promoted version (unless you force a model or an A/B is active). | `backend/app/routes/chat.py` |
 | **5. Monitor** | Prometheus metrics (`/metrics`) + a quality time-series (success, latency, satisfaction) snapshotted every 5 min. | `backend/app/observability/`, `quality_history.py` |
 | **6. Feedback & A/B** | 👍/👎 on each answer becomes a quality signal; A/B experiments compare two models in real traffic. | `backend/app/mlops/feedback.py`, `ab_testing.py` |
 | **7. Drift & SLO** | The quality history compares recent vs. prior windows (improving/stable/degrading) and checks SLO thresholds (success ≥ 95%, p95 ≤ 8s, satisfaction ≥ 70%). | `backend/app/mlops/quality_history.py` |
-| **8. Roll back** | If satisfaction drops, archive the version and re-promote the previous one — one-click rollback. | Model Registry UI |
+| **8. Roll back** | If satisfaction drops, archive the version and re-promote the previous one  one-click rollback. | Model Registry UI |
 
 ### Statistical rigor, not vibes
 
-The A/B testing doesn't declare a winner "by eye". It runs a **two-proportion z-test** and only calls a confident winner when there's enough sample **and** `p < 0.05` — on **both** success rate and user satisfaction (quality). Below that bar it shows a provisional leader and says so.
+The A/B testing doesn't declare a winner "by eye". It runs a **two-proportion z-test** and only calls a confident winner when there's enough sample **and** `p < 0.05`  on **both** success rate and user satisfaction (quality). Below that bar it shows a provisional leader and says so.
 
 ```mermaid
 graph TD
@@ -299,25 +299,25 @@ andromeda-lite/
 
 ```bash
 # 1. Pull a model (any size your hardware can handle)
-ollama pull llama3.2:3b       # light, fast — good starting point
+ollama pull llama3.2:3b       # light, fast  good starting point
 # or: ollama pull qwen2.5:7b   # more capable, needs more VRAM
 
 # 2. Clone
 git clone https://github.com/PauAlonsoRacero/andromeda-lite.git
 cd andromeda-lite
 
-# 3a. Run from source — backend
+# 3a. Run from source  backend
 cd backend
 pip install -r requirements.txt
 uvicorn app:create_app --factory --port 8000 &
 
-# 3b. Run from source — frontend
+# 3b. Run from source  frontend
 cd ../frontend
 npm install
 npm run dev
 ```
 
-Open the app, pick the model you pulled, and start chatting — the orchestrator handles the rest.
+Open the app, pick the model you pulled, and start chatting  the orchestrator handles the rest.
 
 **On Windows**, the simplest path is the one-click `RUN-WINDOWS.bat` (no Docker, no build). Prebuilt binaries are attached to each [Release](../../releases).
 
@@ -328,7 +328,7 @@ Open the app, pick the model you pulled, and start chatting — the orchestrator
 python eval/quality_eval.py --model llama3.2:3b --judge qwen2.5:7b --register
 ```
 
-Then open **Settings → Model Registry**, promote the version to *production*, toggle *Serve production model*, and chat — you're now serving the exact version you promoted. Watch **Analytics → Quality & SLO** as the satisfaction and latency series fill in.
+Then open **Settings → Model Registry**, promote the version to *production*, toggle *Serve production model*, and chat  you're now serving the exact version you promoted. Watch **Analytics → Quality & SLO** as the satisfaction and latency series fill in.
 
 ---
 
@@ -338,7 +338,7 @@ Then open **Settings → Model Registry**, promote the version to *production*, 
 |--------|--------|
 | Backend tests | **154 passing** (`pytest`) |
 | Frontend build | 119 modules, clean |
-| Static security scan | `bandit` — **0 medium+ issues** |
+| Static security scan | `bandit`  **0 medium+ issues** |
 | Dependency audit | `pip-audit` in CI |
 | Dead code | `pyflakes` clean in `backend/app` |
 | CI gates | tests · lint · frontend build · Docker build · security · k8s validation |
@@ -357,11 +357,11 @@ bandit -r backend/app -ll
 
 ## 12. Design principles
 
-- **Local-first & private** — your data stays on your machine; network egress and telemetry are off by default.
-- **Plug-and-play** — pull a model, it appears; no YAML to edit, no glue code.
-- **Explainable** — the orchestrator shows *why* it chose a power level; the A/B shows *why* a model wins (with p-values).
-- **Functional, not cosmetic** — the CI/CD, Kubernetes, monitoring and A/B pieces are real and tested, not scaffolding for show.
-- **Honest about scope** — Andromeda serves and operates models; it doesn't train them. The MLOps story is the deployment-and-operations lifecycle, implemented end to end.
+- **Local-first & private**  your data stays on your machine; network egress and telemetry are off by default.
+- **Plug-and-play**  pull a model, it appears; no YAML to edit, no glue code.
+- **Explainable**  the orchestrator shows *why* it chose a power level; the A/B shows *why* a model wins (with p-values).
+- **Functional, not cosmetic**  the CI/CD, Kubernetes, monitoring and A/B pieces are real and tested, not scaffolding for show.
+- **Honest about scope**  Andromeda serves and operates models; it doesn't train them. The MLOps story is the deployment-and-operations lifecycle, implemented end to end.
 
 ---
 
