@@ -11,7 +11,8 @@ Esto es fine-tuning ligero genuino: el modelo resultante responde según los eje
 """
 from __future__ import annotations
 
-import asyncio
+from app.core.background import spawn
+
 import json
 import re
 
@@ -52,7 +53,7 @@ async def finetune(request: Request) -> JSONResponse:
     body = await request.json()
     base_model = body.get("base_model", "").strip()
     if not base_model:
-        return JSONResponse(content={"error": "base_model requerido"}, status_code=400)
+        return JSONResponse(content={"error_key": "err.base_model_required"}, status_code=400)
 
     system = body.get("system", "").strip()
     params = body.get("parameters", {}) or {}
@@ -123,7 +124,7 @@ async def finetune(request: Request) -> JSONResponse:
         base_url = request.app.state.settings.ollama_base_url
 
     if not base_url:
-        return JSONResponse(content={"error": "Ollama no disponible"}, status_code=503)
+        return JSONResponse(content={"error_key": "err.ollama_unavailable"}, status_code=503)
 
     job_id = variant
     _jobs[job_id] = {
@@ -153,7 +154,7 @@ async def finetune(request: Request) -> JSONResponse:
             _jobs[job_id]["status"] = "failed"
             _jobs[job_id]["progress"] = f"Error: {str(exc)[:120]}"
 
-    asyncio.create_task(do_train())
+    spawn(do_train(), name="lab-train")
 
     return JSONResponse(content={
         "job_id": job_id,
@@ -178,7 +179,7 @@ async def parse_dataset(request: Request) -> JSONResponse:
     examples = []
 
     if not raw:
-        return JSONResponse(content={"examples": [], "error": "Sin datos"})
+        return JSONResponse(content={"examples": [], "error_key": "err.no_data"})
 
     if fmt == "jsonl":
         for line in raw.splitlines():
@@ -262,12 +263,12 @@ async def assign_variant(request: Request) -> JSONResponse:
     """
     registry = getattr(request.app.state, "registry", None)
     if registry is None:
-        return JSONResponse(content={"error": "Registry no disponible"}, status_code=503)
+        return JSONResponse(content={"error_key": "err.registry_unavailable"}, status_code=503)
     body = await request.json()
     specialist_id = body.get("specialist_id", "").strip()
     variant = body.get("variant")
     if not specialist_id:
-        return JSONResponse(content={"error": "specialist_id requerido"}, status_code=400)
+        return JSONResponse(content={"error_key": "err.specialist_required"}, status_code=400)
     try:
         registry.get_by_id(specialist_id)
     except ValueError:
@@ -311,7 +312,7 @@ async def test_variant(request: Request) -> JSONResponse:
     variant = body.get("variant", "").strip()
     prompt = body.get("prompt", "").strip()
     if not variant or not prompt:
-        return JSONResponse(content={"error": "variant y prompt requeridos"}, status_code=400)
+        return JSONResponse(content={"error_key": "err.variant_prompt_required"}, status_code=400)
 
     try:
         from ..ollama_resolver import resolve_ollama_url
@@ -319,7 +320,7 @@ async def test_variant(request: Request) -> JSONResponse:
     except Exception:
         base_url = request.app.state.settings.ollama_base_url
     if not base_url:
-        return JSONResponse(content={"error": "Ollama no disponible"}, status_code=503)
+        return JSONResponse(content={"error_key": "err.ollama_unavailable"}, status_code=503)
 
     try:
         async with httpx.AsyncClient(timeout=120, trust_env=False) as client:

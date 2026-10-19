@@ -1,6 +1,7 @@
 """
 __init__.py — Factory de la aplicación FastAPI de Andromeda.
 """
+from app.core.background import spawn
 import asyncio
 import logging
 import os
@@ -87,6 +88,15 @@ async def lifespan(app: FastAPI):
 
     # Logging level según entorno
     log_level = logging.DEBUG if settings.environment == "development" else logging.INFO
+    # En la app instalada, INFO: con DEBUG el registro de Windows se llenaba de
+    # líneas (más de mil en una sesión corta) y escribir tiene su coste. Para
+    # depurar: ANDROMEDA_LOG_LEVEL=DEBUG.
+    import sys as _sys
+    if getattr(_sys, "frozen", False):
+        log_level = logging.INFO
+    _forzado = os.environ.get("ANDROMEDA_LOG_LEVEL", "").upper()
+    if _forzado in ("DEBUG", "INFO", "WARNING", "ERROR"):
+        log_level = getattr(logging, _forzado)
     _configure_logging(log_level)
     logger = logging.getLogger("andromeda.startup")
 
@@ -170,7 +180,8 @@ async def lifespan(app: FastAPI):
         try:
             import httpx as _httpx
             async with _httpx.AsyncClient(trust_env=False) as _c:
-                _r = await _c.get(f"{working_url}/api/tags", timeout=5.0)
+                _tags_timeout = 0.5 if os.environ.get("ANDROMEDA_ENVIRONMENT") == "test" else 5.0
+                _r = await _c.get(f"{working_url}/api/tags", timeout=_tags_timeout)
                 if _r.status_code == 200:
                     _models = [m["name"] for m in _r.json().get("models", [])]
                     registry.set_available_models(_models)
@@ -182,7 +193,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"  Listo en http://0.0.0.0:{settings.port}")
 
     # 7. Warmup modelos en background
-    asyncio.create_task(warmup_models(
+    spawn(warmup_models(
         registry=registry,
         ollama_url=settings.ollama_base_url,
         hardware_tier=hardware.max_tier,
@@ -201,12 +212,24 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning(f"  No se pudo fijar ANDROMEDA_WORKSPACE: {exc}")
 
+    # Claves de API de los servidores MCP: se cargan del almacén local ANTES de
+    # inicializar el manager, para que los servidores que las necesitan puedan
+    # conectar sin exigir variables de entorno exportadas a mano.
+    from app.mcp import secrets_store
+    secrets_store.init(Path(settings.memory_db_path).parent)
+
+    # Ampliar el PATH del proceso: una app empaquetada (.app/.exe) arranca sin
+    # el PATH del shell y no encuentra npx/uvx aunque estén instalados.
+    from app.mcp import runtime_installer
+    runtime_installer.ensure_path_in_environ()
+
     mcp_config = os.path.join(
         os.path.dirname(settings.specialists_config_path), "mcp_servers.yaml"
     )
     mcp_manager = MCPManager(config_path=mcp_config)
     app.state.mcp_manager = mcp_manager
-    asyncio.create_task(mcp_manager.initialize())
+    spawn(mcp_manager.initialize(), name="mcp-init")
+
     logger.info("  MCP: inicializando servidores en background...")
 
     # 9. Memoria semántica
@@ -216,6 +239,14 @@ async def lifespan(app: FastAPI):
         ollama_url=settings.ollama_base_url,
     )
     app.state.memory_store = memory_store
+
+    # Memoria por significado activada de base: si falta el modelo de
+    # embeddings se descarga en segundo plano y se completan los recuerdos
+    # existentes. En tests no se toca la red.
+    if getattr(settings, "environment", "") != "test" and os.environ.get("ANDROMEDA_ENVIRONMENT") != "test":
+        from app.memory.semantic_setup import ensure_semantic_memory
+        spawn(ensure_semantic_memory(settings, getattr(app.state, "memory_store", None)),
+              name="semantic-memory")
     logger.info("  Memoria semántica: iniciada")
 
     # 9b. Perfil de memoria del usuario (bloque persistente que se inyecta en
@@ -226,6 +257,18 @@ async def lifespan(app: FastAPI):
         Path(memory_db).parent / "memory_profile.json"
     )
     logger.info("  Perfil de memoria: iniciado")
+
+    # 9b-bis. RAG local: índice BM25 persistente sobre los documentos del usuario.
+    from app.rag.bm25 import BM25Index
+    app.state.rag_index = BM25Index(Path(memory_db).parent / "rag_index.json")
+    logger.info(f"  RAG local: iniciado ({app.state.rag_index.stats()['chunks']} chunks)")
+
+    # 9b-ter. Skills: capacidades reutilizables auto-descubiertas por descripción.
+    from app.skills.loader import SkillRegistry
+    _skills_dir = _find_skills_dir(settings)
+    app.state.skill_registry = SkillRegistry(
+        _skills_dir, user_skills_dir=Path(memory_db).parent / "user_skills")
+    logger.info(f"  Skills: {len(app.state.skill_registry.skills)} cargadas")
 
     # 9c. Framework de A/B testing (comparar modelos en producción)
     from app.mlops.ab_testing import ABTesting
@@ -238,6 +281,15 @@ async def lifespan(app: FastAPI):
     fb_path = Path(memory_db).parent / "feedback.json"
     app.state.feedback_store = FeedbackStore(fb_path)
     logger.info("  Feedback de usuario: iniciado")
+
+    # 9e. Corpus de entrenamiento para Apolo (desactivado hasta que el usuario lo active)
+    try:
+        from app.mlops.training_corpus import TrainingCorpus
+        app.state.training_corpus = TrainingCorpus(Path(memory_db).parent)
+        logger.info(f"  Corpus de entrenamiento: {'activo' if app.state.training_corpus.is_enabled() else 'desactivado'}")
+    except Exception as _exc:
+        app.state.training_corpus = None
+        logger.warning(f"  Corpus de entrenamiento no disponible: {_exc}")
 
     # 9e. Model Registry (versionado + promoción a producción)
     from app.mlops.registry import ModelRegistry
@@ -262,8 +314,11 @@ async def lifespan(app: FastAPI):
                 app.state.quality_history.snapshot(m, fb.get("satisfaction"))
             except _aio.CancelledError:
                 break
-            except Exception:
-                pass
+            except Exception as _exc:
+                # Bucle de fondo: un fallo puntual al tomar una instantánea no
+                # debe matar la tarea, pero silenciarlo del todo esconde
+                # problemas persistentes durante horas.
+                logger.debug(f"Instantánea de calidad fallida: {_exc}")
     app.state._quality_task = asyncio.create_task(_quality_snapshot_loop())
 
     # 10. Project context placeholder
@@ -275,6 +330,17 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("Andromeda apagándose...")
+
+    # Cerrar los servidores MCP: cada uno es un proceso hijo (npx/uvx) que, sin
+    # esto, queda huérfano tras cerrar la aplicación.
+    try:
+        _mgr = getattr(app.state, "mcp_manager", None)
+        if _mgr is not None:
+            _n = await _mgr.disconnect_all()
+            if _n:
+                logger.info(f"  MCP: {_n} servidores cerrados")
+    except Exception as _exc:
+        logger.warning(f"  No se pudieron cerrar los servidores MCP: {_exc}")
     # Cancelar la tarea de snapshot de calidad y guardar una foto final.
     try:
         t = getattr(app.state, "_quality_task", None)
@@ -288,6 +354,30 @@ async def lifespan(app: FastAPI):
 
 
 # ── App factory ────────────────────────────────────────────────────────────────
+
+
+def _find_skills_dir(settings) -> Path:
+    """Carpeta de las skills integradas.
+
+    Antes se calculaba subiendo tres niveles desde este archivo. En desarrollo da
+    <raíz>/config/skills, pero en la app empaquetada el código vive en otra
+    carpeta y esa ruta no existe: las skills integradas NUNCA se cargaban en la
+    app instalada ("0 skills · 0 integradas"), ni en macOS ni en Windows.
+    """
+    import sys as _sys
+    candidatos = []
+    if os.environ.get("ANDROMEDA_SKILLS_DIR"):
+        candidatos.append(Path(os.environ["ANDROMEDA_SKILLS_DIR"]))
+    spec = getattr(settings, "specialists_config_path", None) or os.environ.get("ANDROMEDA_SPECIALISTS_CONFIG_PATH")
+    if spec:
+        candidatos.append(Path(spec).resolve().parent / "skills")       # misma carpeta config/
+    if getattr(_sys, "_MEIPASS", None):
+        candidatos.append(Path(_sys._MEIPASS) / "config" / "skills")    # PyInstaller
+    candidatos.append(Path(__file__).resolve().parent.parent.parent / "config" / "skills")  # desarrollo
+    for c in candidatos:
+        if c.is_dir() and any(c.iterdir()):
+            return c
+    return candidatos[-1]
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -347,6 +437,17 @@ def create_app() -> FastAPI:
         )
 
     # Routers
+    # Respuestas progresivas para escritorio. Se registra ANTES que el chat para
+    # que /api/chat/jobs no lo capture ninguna ruta genérica de /api/chat.
+    # Token aleatorio por arranque para reconocer las llamadas internas.
+    import secrets as _secrets
+    app.state.internal_token = _secrets.token_urlsafe(24)
+    from app.routes import system_open as system_open_routes
+    app.include_router(system_open_routes.router)
+    from app.routes import projects as projects_routes
+    app.include_router(projects_routes.router)
+    from app.routes import chat_jobs as chat_jobs_routes
+    app.include_router(chat_jobs_routes.router)
     app.include_router(chat.router,                prefix="/api/chat",    tags=["Chat"])
     app.include_router(models.router,              prefix="/api/models",  tags=["Models"])
     app.include_router(health.router,              prefix="/api/health",  tags=["Health"])
@@ -394,6 +495,30 @@ def create_app() -> FastAPI:
     app.include_router(feedback_routes.router, prefix="/api/feedback", tags=["Feedback"])
     from app.routes import registry as registry_routes
     app.include_router(registry_routes.router, prefix="/api/registry", tags=["Model-Registry"])
+    from app.routes import rag as rag_routes
+    app.include_router(rag_routes.router, prefix="/api/rag", tags=["RAG"])
+    from app.routes import skills as skills_routes
+    app.include_router(skills_routes.router, prefix="/api/skills", tags=["Skills"])
+    from app.routes import commands as commands_routes
+    app.include_router(commands_routes.router, prefix="/api/commands", tags=["Commands"])
+    from app.routes import save_file as save_file_routes
+    app.include_router(save_file_routes.router, prefix="/api/save-file", tags=["Files"])
+    from app.routes import components_health as comp_routes
+    app.include_router(comp_routes.router, prefix="/api/components", tags=["Observability"])
+
+    # Panel de diagnóstico: registra qué hace la aplicación por dentro. Apagado
+    # por defecto; se activa desde el panel o con ANDROMEDA_DIAGNOSTICS=1.
+    try:
+        from app.routes import training as training_routes
+        app.include_router(training_routes.router)
+    except Exception as _exc:
+        logging.getLogger("andromeda").warning(f"Rutas de entrenamiento no disponibles: {_exc}")
+
+    try:
+        from app.routes import diagnostics as diag_routes
+        app.include_router(diag_routes.router, tags=["Diagnostics"])
+    except Exception as _exc:
+        logging.getLogger("andromeda").warning(f"Panel de diagnóstico no disponible: {_exc}")
 
     # ── Endpoint /metrics para Prometheus (texto de exposición estándar) ──────
     from fastapi.responses import PlainTextResponse
@@ -433,17 +558,25 @@ def create_app() -> FastAPI:
     if os.path.isdir(_frontend_dist):
         app.mount("/assets", StaticFiles(directory=os.path.join(_frontend_dist, 'assets')), name="assets")
 
+        # index.html SIEMPRE fresco: el navegador interno (WebView2 en Windows)
+        # guarda caché por origen, y con el puerto fijo podía reutilizar el
+        # index.html de una versión anterior, que apunta a su propia interfaz.
+        # Los archivos de /assets llevan un hash en el nombre: esos sí se cachean.
+        _sin_cache = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                      "Pragma": "no-cache", "Expires": "0"}
+
         @app.get("/", include_in_schema=False)
         async def serve_spa():
-            return FileResponse(os.path.join(_frontend_dist, 'index.html'))
+            return FileResponse(os.path.join(_frontend_dist, 'index.html'), headers=_sin_cache)
 
         @app.get("/{path:path}", include_in_schema=False)
         async def serve_spa_catch_all(path: str):
             # API routes are handled before this catch-all
-            file_path = os.path.join(_frontend_dist, path)
-            if os.path.isfile(file_path):
+            file_path = os.path.realpath(os.path.join(_frontend_dist, path))
+            # Sin salir de la carpeta de la interfaz ("../" en la ruta)
+            if file_path.startswith(os.path.realpath(_frontend_dist) + os.sep) and os.path.isfile(file_path):
                 return FileResponse(file_path)
-            return FileResponse(os.path.join(_frontend_dist, 'index.html'))
+            return FileResponse(os.path.join(_frontend_dist, 'index.html'), headers=_sin_cache)
     else:
         @app.get("/", tags=["Root"])
         async def root():

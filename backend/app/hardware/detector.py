@@ -25,6 +25,8 @@ import os
 import sys
 import platform
 import subprocess
+import time
+import threading
 from app.core.silent_subprocess import silent_run
 
 import psutil
@@ -48,7 +50,7 @@ def _read_cpu_model() -> str:
     try:
         if system == "Linux":
             # /proc/cpuinfo tiene el "model name" real
-            with open("/proc/cpuinfo") as f:
+            with open("/proc/cpuinfo", encoding="utf-8") as f:
                 for line in f:
                     if "model name" in line:
                         return line.split(":", 1)[1].strip()
@@ -87,6 +89,43 @@ def _read_cpu_model() -> str:
     # Fallback a platform
     proc = platform.processor()
     return proc if proc and proc not in ("x86_64", "") else "CPU genérica"
+
+
+# Memoria de GPU de Apple Silicon: no cambia, se consulta una vez (system_profiler es lento).
+_APPLE_VRAM_TOTAL: float | None = None
+
+
+
+# ── Memoria libre de la GPU NVIDIA, en segundo plano ─────────────────────────
+_NV_ULTIMO = {"v": None, "t": 0.0}
+_NV_HILO = None
+_NV_INTERVALO = 4.0
+
+
+def _consultar_nvidia():
+    """GB libres según nvidia-smi, o None si no hay GPU NVIDIA."""
+    try:
+        r = silent_run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+                       capture_output=True, text=True, timeout=3)
+        if r.returncode != 0:
+            return None
+        total = 0.0
+        for linea in r.stdout.strip().split("\n"):
+            try:
+                total += float(linea.strip()) / 1024      # MB → GB
+            except ValueError:
+                continue
+        return round(total, 1)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+
+
+def _bucle_nvidia() -> None:
+    while True:
+        time.sleep(_NV_INTERVALO)
+        v = _consultar_nvidia()
+        if v is not None:
+            _NV_ULTIMO["v"], _NV_ULTIMO["t"] = v, time.monotonic()
 
 
 class HardwareDetector:
@@ -486,31 +525,37 @@ class HardwareDetector:
         # En Apple Silicon no existe nvidia-smi: usar la estimación de memoria
         # unificada de la detección inicial.
         if sys.platform == "darwin":
+            # Antes: `system_profiler` (0,3-1 s en macOS) en CADA mensaje, antes de
+            # generar, para devolver siempre el 75 % del total, estuviera la
+            # memoria libre o llena. Ahora: memoria realmente disponible (psutil,
+            # instantáneo), con el tope de GPU consultado una sola vez.
             try:
-                apple = self._detect_apple()
-                if apple:
-                    return apple[0].get("vram_free_gb", 0.0)
+                import psutil
+                global _APPLE_VRAM_TOTAL
+                if _APPLE_VRAM_TOTAL is None:
+                    apple = self._detect_apple()
+                    _APPLE_VRAM_TOTAL = float(apple[0].get("vram_total_gb", 0.0)) if apple else 0.0
+                disponible = psutil.virtual_memory().available / (1024 ** 3)
+                libre = disponible * 0.9          # margen para el sistema
+                if _APPLE_VRAM_TOTAL:
+                    libre = min(libre, _APPLE_VRAM_TOTAL)
+                return round(libre, 1)
             except Exception:
                 pass
+        # NVIDIA: nvidia-smi se ejecutaba en CADA mensaje antes de generar (en
+        # Windows, 0,1-0,5 s por la creación del proceso). Ahora un hilo lo
+        # consulta cada pocos segundos y aquí se devuelve el último valor.
+        global _NV_HILO
+        if _NV_ULTIMO["t"] == 0.0:
+            _NV_ULTIMO["v"] = _consultar_nvidia()        # primera vez: síncrono
+            _NV_ULTIMO["t"] = time.monotonic()
+        if _NV_HILO is None and _NV_ULTIMO["v"] is not None:
+            _NV_HILO = threading.Thread(target=_bucle_nvidia, name="nvidia-smi", daemon=True)
+            _NV_HILO.start()
         try:
-            result = silent_run(
-                ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
-                capture_output=True,
-                text=True,
-                timeout=3,
-            )
-
-            if result.returncode != 0:
+            if _NV_ULTIMO["v"] is None:
                 return 0.0
-
-            total_free = 0.0
-            for line in result.stdout.strip().split("\n"):
-                try:
-                    total_free += float(line.strip()) / 1024  # MB → GB
-                except ValueError:
-                    continue
-
-            return round(total_free, 1)
+            return _NV_ULTIMO["v"]
 
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             return 0.0

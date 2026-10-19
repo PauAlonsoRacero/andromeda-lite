@@ -21,12 +21,15 @@ export const LANG_AI_NAME = {
 
 const STORAGE_KEY = 'andromeda_lang'
 function initialLang() {
+  // Orden: lo que el usuario eligió > idioma del sistema > inglés.
+  // El inglés es el defecto porque es el idioma de mayor alcance para una
+  // herramienta de desarrollo distribuida internacionalmente.
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved && LANGS.some(l => l.id === saved)) return saved
-    const nav = (navigator.language || 'es').slice(0, 2)
-    return LANGS.some(l => l.id === nav) ? nav : 'es'
-  } catch { return 'es' }
+    const nav = (navigator.language || 'en').slice(0, 2)
+    return LANGS.some(l => l.id === nav) ? nav : 'en'
+  } catch { return 'en' }
 }
 
 export const [lang, setLangSignal] = createSignal(initialLang())
@@ -87,13 +90,11 @@ const DICT = {
     'chat.power': 'Potencia',
     'chat.clean': 'Limpiar',
     'chat.attach_images': 'Añadir imágenes',
-    'chat.attach_files': 'Adjuntar archivos',
-    'chat.prompts': 'Biblioteca de prompts',
     'settings.title': 'Configuración',
     'settings.general': 'General',
     'settings.appearance': 'Apariencia',
     'settings.models': 'Modelos de IA',
-    'settings.mcp': 'MCP Tools',
+    'settings.mcp': 'Herramientas MCP',
     'settings.memory': 'Memoria',
     'settings.alerts': 'Alertas',
     'settings.plan': 'Plan',
@@ -108,7 +109,7 @@ const DICT = {
     'incognito.title': 'Modo Incógnito',
     'incognito.subtitle': 'Una IA local que escala su potencia según tu pregunta y tu hardware. 100% privado.',
 
-    'an.title': 'Analytics',
+    'an.title': 'Analíticas',
     'an.subtitle': 'Observabilidad local de Andromeda — memoria, herramientas y rendimiento. Todo en tu máquina.',
     'an.refresh': 'actualiza cada 5s',
     'an.loading': 'Cargando métricas…',
@@ -119,7 +120,7 @@ const DICT = {
     'an.memory': 'Memoria semántica',
     'an.memories': 'Memorias',
     'an.avg_size': 'Tamaño medio',
-    'an.hit_rate': 'Hit rate',
+    'an.hit_rate': 'Tasa de acierto',
     'an.searches': 'búsquedas',
     'an.db_disk': 'DB en disco',
     'an.by_category': 'Por categoría',
@@ -230,7 +231,7 @@ const DICT = {
     'login.privacy_policy': 'política de privacidad',
     'login.terms': 'términos',
     'login.ph_pass': 'Contraseña (mín. 8)',
-    'login.ph_email': 'Email',
+    'login.ph_email': 'Correo electrónico',
     'login.ph_name': 'Nombre',
     'login.close': 'Cerrar',
     'proj.new_conv': '+ Nueva conversación',
@@ -361,7 +362,7 @@ const DICT = {
     'ui2.latency_trend': 'Tendencia de latencia media',
     'ui2.throughput_total': 'Throughput acumulado',
     'ui2.total_accum': 'Total acumulado',
-    'ui2.total_requests': 'Total requests',
+    'ui2.total_requests': 'Peticiones totales',
     'ui2.use_as': 'Usar como:',
     'ui2.use_by_model': 'Uso por modelo',
     'ui2.variant_created': 'Variante creada: ',
@@ -437,7 +438,7 @@ const DICT = {
     'cap.model_fallback_d': 'Si el modelo elegido falla o no está disponible, Andromeda prueba automáticamente otro.',
     'cap.note': 'Estos ajustes se guardan en tu equipo y cambian el comportamiento real de Andromeda al instante.',
 
-    'settings.abtesting': 'A/B Testing',
+    'settings.abtesting': 'Tests A/B',
     'ab.title': 'A/B Testing de modelos',
     'ab.sub': 'Compara dos modelos en producción y deja que los datos decidan cuál es mejor.',
     'ab.new': 'Nuevo experimento',
@@ -475,7 +476,7 @@ const DICT = {
     'ab.by_success': 'Por tasa de éxito',
     'ab.by_quality': 'Por calidad (👍/👎)',
 
-    'reg.title': 'Model Registry',
+    'reg.title': 'Registro de modelos',
     'reg.subtitle': 'Versiona modelos, evalúalos y promueve el mejor a producción. La app sirve la versión en producción.',
     'reg.serve_prod': 'Servir modelo de producción',
     'reg.serve_prod_desc': 'Cuando no hay modelo forzado ni A/B, usar el promovido a producción.',
@@ -484,12 +485,12 @@ const DICT = {
     'reg.notes_ph': 'Notas (opcional): p.ej. baseline, fine-tune…',
     'reg.save': 'Registrar',
     'reg.empty': 'Aún no hay modelos registrados.',
-    'reg.score': 'score',
+    'reg.score': 'puntuación',
     'reg.to_prod': '→ Producción',
-    'reg.to_staging': '→ Staging',
+    'reg.to_staging': '→ Preproducción',
     'reg.to_archived': 'Archivar',
     'reg.stage_production': 'producción',
-    'reg.stage_staging': 'staging',
+    'reg.stage_staging': 'preproducción',
     'reg.stage_archived': 'archivado',
     'reg.stage_none': '—',
     'common.delete': 'Eliminar',
@@ -599,7 +600,7 @@ const DICT = {
     'trace.degraded': 'degradado',
     'mdl.record_spec': 'Grabar IA especializada en el modelo',
 
-    'settings.registry': 'Model Registry',
+    'settings.registry': 'Registro de modelos',
     'settings.advanced': 'Avanzado',
     'ui2.theme_dark': 'Oscuro',
     'ui2.theme_light': 'Claro',
@@ -620,7 +621,7 @@ const DICT = {
     'onb.retry': 'Reintentar',
     'onb.continue': 'Continuar →',
     'cdx.run': '▶ Ejecutar',
-    'cdx.timeout': '⏱ timeout',
+    'cdx.timeout': '⏱ tiempo agotado',
     'cs.reset': 'Restablecer',
     'mdl.remove': 'Quitar',
     'mdl.connect_ollama': 'Conecta Ollama para activar este especialista',
@@ -658,12 +659,12 @@ const DICT = {
     'mdl.deactivate': 'Desactivar',
     'mdl.specialize_topic': 'Especializar en un topic',
     'mdl.speciality': 'Especialidad',
-    'mdl.vram_est': 'VRAM est.',
+    'mdl.vram_est': 'VRAM aprox.',
     'mdl.topic_domain': 'Topic / dominio',
     'mdl.topic_applies': 'Esta IA enfocará todas sus respuestas en el topic indicado. Se aplica al instante, sin reiniciar.',
     'mdl.save_spec': 'Guardar especialización',
     'mdl.record_diff': 'Diferencia: "Guardar especialización" se aplica al instante vía prompt. "Grabar en el modelo" crea una variante permanente con el topic horneado — más difícil de que se desvíe.',
-    'spec.generalist.name': 'Generalist AI',
+    'spec.generalist.name': 'IA generalista',
     'spec.generalist.desc': 'Asistente empresarial multiuso para consultas que no encajan en un dominio específico',
     'spec.generalist.domain': 'Asistencia general',
 
@@ -683,7 +684,7 @@ const DICT = {
     'mex.fit_no': 'No apto',
     'mex.spd_muyrapido': 'Muy rápido',
     'mex.spd_rapido': 'Rápido',
-    'mex.spd_usable': 'Usable',
+    'mex.spd_usable': 'Aceptable',
     'mex.spd_lento': 'Lento',
     'use.Chat general': 'Chat general',
     'use.Razonamiento': 'Razonamiento',
@@ -794,7 +795,7 @@ const DICT = {
     'plan.team_observability.desc': 'Telemetría agregada de todo el equipo, no solo local.',
     'plan.priority_support.label': 'Soporte prioritario y consultoría',
     'plan.priority_support.desc': 'Canal de soporte con SLA y acompañamiento en el despliegue.',
-    'plan.white_label.label': 'White-label / branding',
+    'plan.white_label.label': 'Marca blanca',
     'plan.white_label.desc': 'Personalizar nombre, logo y colores para tu organización.',
 
     'alert.events': 'Eventos',
@@ -817,7 +818,7 @@ const DICT = {
     'prof.new_pw': 'Nueva contraseña',
 
     'sys.lbl_system': 'Sistema',
-    'sys.lbl_backend': 'Backend',
+    'sys.lbl_backend': 'Servidor',
     'sys.lbl_tier': 'Tier HW',
     'sys.lbl_cpu_cores': 'Núcleos CPU',
     'sys.lbl_ram_total': 'RAM total',
@@ -870,6 +871,529 @@ const DICT = {
     'cs.lvl_na_hw': 'no disponible en tu hardware',
     'cs.parallel_title': 'IAs en paralelo',
     'msg.power_tip': 'Potencia elegida según la complejidad del prompt',
+
+    'skills.title': 'Skills',
+    'skills.desc': 'Paquetes de instrucciones que Andromeda activa por su cuenta cuando tu mensaje encaja con ellos. No hay que seleccionarlos a mano.',
+    'skills.reload': 'Recargar',
+    'skills.probe_ph': 'Prueba una frase…',
+    'skills.probe_btn': 'Probar',
+    'skills.would_activate': 'Activaría',
+    'skills.no_activation': 'No activaría ninguna skill.',
+    'skills.used_tip': 'Skill usada en esta respuesta',
+    'rag.title': 'Contexto de documentos',
+    'rag.desc': 'Indexa archivos de texto y el chat los usará como contexto, citando la fuente. Todo se procesa en tu máquina.',
+    'rag.docs': 'docs',
+    'rag.drop_hint': 'Arrastra archivos aquí o haz clic para seleccionar (.txt, .md, código…)',
+    'rag.indexing': 'Indexando…',
+    'rag.indexed_ok': '{ok} archivo(s) indexado(s)',
+    'rag.indexed_some': '{ok} indexado(s), {skip} omitido(s)',
+    'rag.remove': 'Quitar del índice',
+    'rag.query_ph': 'Prueba una búsqueda…',
+    'rag.query_btn': 'Buscar',
+    'rag.no_hits': 'Sin resultados en el índice.',
+    'rag.sources_tip': 'Fuentes usadas para esta respuesta',
+
+    'skills.create': 'Crear',
+    'skills.mine': 'mía',
+    'skills.delete': 'Borrar skill',
+    'skills.save': 'Guardar skill',
+    'skills.need_fields': 'El nombre y la descripción son obligatorios.',
+    'skills.f_name': 'Nombre (ej. Mis correos)',
+    'skills.f_desc': 'Cuándo debe activarse (esto decide el uso)',
+    'skills.f_triggers': 'Palabras clave, separadas por espacios',
+    'skills.f_body': 'Instrucciones que se aplicarán…',
+    'chat.compacted': 'Conversación resumida para caber en el contexto',
+
+    'mcp.needs_key': 'REQUIERE API KEY',
+    'mcp.key_set': 'CLAVE CONFIGURADA',
+    'mcp.requires': 'Requiere',
+    'mcp.enabled_not_connected': 'ACTIVADO (sin conectar)',
+    'mcp.key_help': 'Introduce la clave aquí. Se guarda solo en tu equipo y se aplica sin reiniciar.',
+    'mcp.get_key': 'Cómo obtenerla',
+    'mcp.key_ph': 'Pega tu clave…',
+    'mcp.key_save': 'Guardar',
+    'mcp.key_configured': 'Configurada',
+    'mcp.key_remove': 'Quitar',
+    'mcp.key_saved_msg': 'Clave guardada. Activa el servidor para conectar.',
+
+    'chat.ph_system_down': 'Sistema no disponible — verifica Ollama',
+    'chat.ph_no_ais': 'Sin IAs activas — ve a Modelos de IA',
+
+    'mb.fb_thanks': '¡Gracias!',
+    'mb.fb_error': 'No se pudo registrar',
+    'mb.saved_to_downloads': 'Guardado en Descargas',
+    'mb.save_error': 'No se pudo guardar',
+
+    'chat.no_models_installed': 'Aún no tienes ningún modelo instalado. Andromeda funciona con tus propios modelos locales: elige uno para empezar.',
+    'chat.web_off_hint': 'La búsqueda en internet está desactivada.',
+    'chat.web_off_cta': 'Activar en Ajustes',
+
+    'mcp.why_failed': 'Motivo',
+    'mcp.runtime_missing': 'Falta software necesario para los conectores MCP:',
+
+    'mcp.installing': 'Instalando {rt}… puede tardar un minuto.',
+    'mcp.installing_short': 'Instalando…',
+    'mcp.install_now': 'Instalar ahora',
+    'mcp.reconnected': 'Servidores reconectados',
+
+    'chl.try_another_search': 'Prueba otra búsqueda',
+    'chl.start_new_convo': 'Empieza una nueva conversación',
+    'chl.conversation': 'Conversación',
+    'chl.add_favorite': 'Añadir a favoritos',
+    'iu.drop_here': 'Suelta aquí…',
+    'lab.deterministic_hint': 'Determinista, para código y datos',
+    'mp.assign_model_hint': 'Asígnale un modelo de Ollama abajo para empezar a usar Andromeda',
+    'pp.password_min': 'La nueva contraseña debe tener al menos 8 caracteres',
+    'pp.change_password': 'Cambiar contraseña',
+    'me.very_fast': 'Muy rápido',
+    'me.fast': 'Rápido',
+
+    'info.how_it_works': 'Cómo funciona',
+
+    'ch.title': 'Estado de los componentes',
+    'ch.desc': 'Qué piezas de Andromeda están activas ahora mismo y qué están haciendo.',
+    'ch.active': 'activos',
+    'ch.refresh': 'Actualizar',
+    'ch.info_intro': 'Cada tarjeta es un subsistema. El color del borde indica su estado y el texto explica qué hacer si no está activo.',
+    'ch.st_ok': 'Activo (verde)',
+    'ch.st_ok_d': 'El componente funciona y se está usando.',
+    'ch.st_degraded': 'Degradado (ámbar)',
+    'ch.st_degraded_d': 'Responde, pero le falta algo para funcionar del todo.',
+    'ch.st_off': 'Apagado (gris)',
+    'ch.st_off_d': 'No está en uso. El texto de la tarjeta dice cómo activarlo.',
+    'ch.st_error': 'Error (rojo)',
+    'ch.st_error_d': 'Ha fallado al comprobarse. Revisa los registros.',
+    'ch.n_ollama': 'Ollama',
+    'ch.n_specialists': 'Especialistas',
+    'ch.n_memory': 'Memoria',
+    'ch.n_rag': 'Documentos (RAG)',
+    'ch.n_skills': 'Skills',
+    'ch.n_mcp': 'Conectores MCP',
+    'ch.n_web': 'Búsqueda web',
+    'ch.n_registry': 'Registro de modelos',
+    'ch.n_ab': 'Tests A/B',
+    'ch.n_feedback': 'Valoraciones',
+    'ch.n_workspace': 'Carpeta de trabajo',
+
+    'cd.not_init': 'No inicializado.',
+    'cd.ollama_none': 'Ollama no responde o no hay modelos descargados.',
+    'cd.ollama_ok': '{list}',
+    'cd.spec_none': 'Ningún especialista tiene modelo asignado.',
+    'cd.spec_ok': '{list}',
+    'cd.memory_ok': 'Memoria conversacional persistente.',
+    'cd.rag_empty': 'Sin documentos indexados todavía.',
+    'cd.rag_ok': '{chunks} fragmentos · {terms} términos indexados.',
+    'cd.skills_ok': '{builtin} de fábrica · {mine} creadas por ti.',
+    'cd.mcp_none': 'Activa un conector en la pestaña MCP.',
+    'cd.mcp_ok': '{tools} herramientas disponibles para las IAs.',
+    'cd.web_on': 'Las IAs pueden consultar internet.',
+    'cd.web_off': 'Actívala en Ajustes para permitir búsquedas web.',
+    'cd.reg_none': 'Ninguna versión promovida a producción.',
+    'cd.reg_ok': 'Sirviendo {model}.',
+    'cd.ab_none': 'No hay ningún test A/B en marcha.',
+    'cd.ab_ok': 'Comparando variantes con tráfico real.',
+    'cd.fb_none': 'Usa 👍/👎 en las respuestas para medir calidad.',
+    'cd.fb_ok': '{up} positivos · {down} negativos.',
+    'cd.ws_none': 'Carpeta de trabajo no configurada.',
+    'cd.ws_ok': '{path}',
+    'cd.probe_error': 'Error al comprobar: {err}',
+
+    'ch.s_ok': 'Activo',
+    'ch.s_degraded': 'Parcial',
+    'ch.s_off': 'Inactivo',
+    'ch.s_error': 'Error',
+
+    'ch.what_is': 'Qué es',
+    'ch.next_step': 'Siguiente paso',
+    'ch.next_ok': 'Funciona correctamente. No hay nada que hacer.',
+    'ch.about_ollama': 'El motor que ejecuta los modelos en tu máquina. Andromeda no incluye modelos: los descarga y ejecuta a través de Ollama.',
+    'ch.about_specialists': 'Perfiles de IA con instrucciones propias. Cada uno se especializa en un tipo de tarea y tiene su modelo asignado.',
+    'ch.about_memory': 'Datos que Andromeda recuerda entre conversaciones: tu nombre, preferencias y hechos que le cuentas.',
+    'ch.about_rag': 'Tus documentos indexados en local. Cuando preguntas algo relacionado, la IA los usa como contexto y cita la fuente.',
+    'ch.about_skills': 'Paquetes de instrucciones que se activan solos cuando tu mensaje encaja con ellos, sin que tengas que elegirlos.',
+    'ch.about_mcp': 'Conectores que dan herramientas reales a las IAs: acceso a archivos, repositorios, bases de datos o servicios externos.',
+    'ch.about_web': 'Permite que las IAs consulten internet. Viene desactivado porque Andromeda funciona sin conexión por diseño.',
+    'ch.about_registry': 'Control de versiones de modelos: registra cada versión y permite promover una a producción o revertirla.',
+    'ch.about_ab': 'Compara dos modelos con tu uso real y decide cuál es mejor con una prueba estadística, no a ojo.',
+    'ch.about_feedback': 'Tus votos 👍/👎 en las respuestas. Son la señal que mide la calidad real y alimenta los tests A/B.',
+    'ch.about_workspace': 'La carpeta donde las IAs pueden leer y escribir archivos. Todo queda fuera de ella por seguridad.',
+    'ch.hint_ollama': 'Instala Ollama y descarga un modelo con: ollama pull llama3.2',
+    'ch.hint_specialists': 'Ve a Modelos de IA y asigna un modelo a al menos un especialista.',
+    'ch.hint_memory': 'Cuéntale algo sobre ti en el chat y lo recordará para próximas conversaciones.',
+    'ch.hint_rag': 'Arrastra archivos de texto en Ajustes › Memoria para que la IA pueda consultarlos.',
+    'ch.hint_skills': 'Las skills de fábrica están listas. Puedes crear las tuyas en Ajustes › Memoria.',
+    'ch.hint_mcp': 'Abre Ajustes › Conectores MCP y activa el que necesites.',
+    'ch.hint_web': 'Actívala en Ajustes › Capacidades si quieres que las IAs consulten internet.',
+    'ch.hint_registry': 'Registra una versión desde Ajustes › Registro de modelos y promuévela a producción.',
+    'ch.hint_ab': 'Crea un experimento en Ajustes › Tests A/B para comparar dos modelos.',
+    'ch.hint_feedback': 'Vota con 👍 o 👎 en las respuestas del chat para empezar a medir la calidad.',
+    'ch.hint_workspace': 'Configura la carpeta en Ajustes › Capacidades para que las IAs puedan crear archivos.',
+
+    'sx.title': 'Buscador (SearXNG)',
+    'sx.desc': 'Andromeda busca a través de SearXNG, un metabuscador de código abierto. Por defecto usa instancias públicas. Si levantas la tuya, tus búsquedas no salen de tu equipo.',
+    'sx.save': 'Guardar',
+    'sx.checking': 'Comprobando…',
+    'sx.ok': 'Conectado correctamente. Se usará tu instancia.',
+    'sx.unreachable': 'No responde. Se usarán instancias públicas mientras tanto.',
+    'sx.using_public': 'Sin instancia propia: se usarán las públicas.',
+
+    'info.pct.title': 'Latencia: p50, p95 y p99',
+    'info.pct.intro': 'La media engaña: una respuesta muy lenta la dispara y no cuenta cuántas veces pasa. Los percentiles ordenan todas las respuestas de más rápida a más lenta y miran posiciones concretas.',
+    'info.pct.p50h': 'p50 — la mitad',
+    'info.pct.p50d': 'La mitad de las respuestas tardan menos que esto. Es la experiencia típica.',
+    'info.pct.p95h': 'p95 — casi lo peor',
+    'info.pct.p95d': '95 de cada 100 respuestas tardan menos. Solo 5 son más lentas. Es la métrica más útil: mide si los malos momentos son tolerables.',
+    'info.pct.p99h': 'p99 — el peor caso',
+    'info.pct.p99d': 'Solo 1 de cada 100 respuestas tarda más. Sirve para detectar bloqueos raros, no para el día a día.',
+    'info.pct.whyh': 'Por qué importa aquí',
+    'info.pct.whyd': 'Con modelos locales la latencia depende de tu hardware y del tamaño del modelo. Si el p95 se dispara pero el p50 está bien, suele ser que el modelo se está cargando en memoria en algunas peticiones.',
+
+    'ka.title': 'Mantener el modelo cargado',
+    'ka.desc': 'Evita recargar el modelo entre mensajes, que con modelos grandes son decenas de segundos. A cambio, ocupa memoria de vídeo mientras tanto.',
+    'ka.never': 'No mantener',
+    'ka.always': 'Siempre',
+
+    'err.ab_unavailable': 'A/B testing no disponible',
+    'err.ab_needs_variants': 'Se requiere un identificador y al menos 2 variantes',
+    'err.not_found': 'No encontrado',
+    'err.decision_required': 'Falta la decisión',
+    'err.username_format': 'El usuario debe tener entre 3 y 32 caracteres alfanuméricos',
+    'err.password_short': 'La contraseña debe tener al menos 8 caracteres',
+    'err.user_exists': 'Ese usuario ya existe',
+    'err.bad_credentials': 'Usuario o contraseña incorrectos',
+    'err.not_authenticated': 'No has iniciado sesión',
+    'err.new_password_short': 'La nueva contraseña debe tener al menos 8 caracteres',
+    'err.wrong_current_password': 'La contraseña actual no es correcta',
+    'err.content_required': 'Falta el contenido',
+    'err.prompt_response_required': 'Faltan el prompt y la respuesta',
+    'err.no_connection': 'No se pudo conectar con el servicio. Comprueba tu conexión',
+    'err.sign_in_first': 'Inicia sesión primero',
+    'err.path_required': 'Falta la ruta',
+    'err.no_project_indexed': 'No hay ningún proyecto indexado todavía',
+    'err.question_required': 'Falta la pregunta',
+    'err.empty_content': 'El contenido está vacío',
+    'err.delete_needs_confirm': 'El borrado permanente necesita confirmación',
+    'err.base_model_required': 'Falta el modelo base',
+    'err.ollama_unavailable': 'Ollama no está disponible',
+    'err.no_data': 'No hay datos',
+    'err.registry_unavailable': 'El registro de modelos no está disponible',
+    'err.specialist_required': 'Falta el especialista',
+    'err.variant_prompt_required': 'Faltan la variante y el prompt',
+    'err.mcp_unavailable': 'Los conectores MCP no están disponibles',
+    'err.tool_required': 'Falta la herramienta',
+    'err.prompt_required': 'Falta el prompt',
+    'err.mcp_not_ready': 'Los conectores MCP aún no están listos',
+    'err.value_empty': 'El valor no puede estar vacío',
+    'err.profile_unavailable': 'El perfil no está disponible',
+    'err.memory_unavailable': 'La memoria no está disponible',
+    'err.specialist_unconfigured': 'Ese especialista no tiene modelo asignado',
+    'err.mlops_unavailable': 'MLOps no está disponible',
+    'err.model_required': 'Falta el modelo',
+    'err.topic_required': 'Falta el tema',
+    'err.image_required': 'Falta la imagen',
+    'err.lab_unavailable': 'El laboratorio no está disponible',
+
+    'err.generic': 'Algo ha salido mal',
+    'err.server': 'Error del servidor. Revisa los registros si se repite',
+    'err.too_large': 'El contenido es demasiado grande',
+
+    'cd.ollama_tune': 'Funciona. Puedes ganar rendimiento activando en Ollama: {vars}',
+
+    'mb.download': 'descargar',
+    'mb.copy': 'copiar',
+    'mb.copied': 'copiado',
+    'mb.export': 'exportar',
+
+    'sb.click_download': 'pulsa para descargar',
+
+    'nav.diagnostics': 'Diagnóstico',
+    'dg.title': 'Consola de diagnóstico',
+    'dg.desc': 'Qué hace Andromeda por dentro en cada mensaje: qué prompt recibe el modelo, si busca en internet y por qué, y cuánto tarda cada paso.',
+    'dg.start': 'Empezar a registrar',
+    'dg.stop': 'Detener',
+    'dg.state': 'Estado del sistema',
+    'dg.copy': 'Copiar registro',
+    'dg.download': 'Descargar',
+    'dg.clear': 'Limpiar',
+    'dg.all': 'Todo',
+    'dg.filter': 'Filtrar por categoría',
+    'dg.copied': 'Copiado al portapapeles',
+    'dg.saved': 'Guardado en Descargas',
+    'dg.copy_error': 'No se pudo copiar',
+    'dg.waiting': 'Esperando actividad',
+    'dg.waiting_d': 'Escribe algo en el chat y aparecerá aquí cada paso que da Andromeda.',
+    'dg.off_explainer': 'El registro está apagado. Al activarlo se guardan en memoria los prompts y respuestas completos de la sesión, que es lo que hace falta para diagnosticar un fallo. No se escribe nada en disco y todo se borra al detenerlo o cerrar la aplicación.',
+    'dg.cap_red': 'Búsqueda web',
+    'dg.cap_creacion_archivos': 'Crear archivos',
+    'dg.cap_memoria_semantica': 'Memoria semántica',
+    'dg.cap_perfil_memoria': 'Perfil de memoria',
+    'dg.cap_documentos_rag': 'Documentos',
+    'dg.cap_skills': 'Skills',
+
+    'dg.temporary': 'Herramienta de desarrollo — se retirará antes de publicar la versión final. Expone prompts completos y variables de entorno.',
+
+    'tr.title': 'Recopilar datos para entrenar (Apolo)',
+    'tr.desc': 'Guarda en local tus conversaciones y los votos 👍/👎 para entrenar un modelo propio. Nunca en modo incógnito. Solo se exportan las respuestas marcadas como buenas.',
+    'tr.samples': 'muestras',
+    'tr.export': 'Exportar para MLX',
+    'err.training_unavailable': 'El corpus de entrenamiento no está disponible',
+
+
+    'chat.new_conversation': 'Nueva conversación',
+    'err.invalid_file': 'Archivo no válido',
+    'err.no_conversations': 'El archivo no contiene conversaciones',
+
+    'phase.thinking': 'Pensando…',
+    'phase.searching': 'Buscando en internet…',
+    'phase.writing': 'Escribiendo…',
+
+    'mcp.msg_connected': 'Conectado — {count} herramientas.',
+    'mcp.msg_disabled': 'Desactivado.',
+    'mcp.msg_failed': 'No se pudo conectar.',
+
+    'chat.open_image': "Ampliar imagen",
+
+    'art.view_code': 'Ver código',
+    'art.view_page': 'Ver página',
+
+    'proj.files': 'Archivos del proyecto',
+    'proj.files_desc': 'Añade archivos o carpetas completas. La IA los tiene en cuenta en las conversaciones de este proyecto, y lo que cree o modifique se guarda aquí.',
+    'proj.add_files': 'Añadir archivos',
+    'proj.add_folder': 'Añadir carpeta',
+    'proj.uploading': 'Subiendo',
+    'proj.no_files': 'Todavía no hay archivos en este proyecto.',
+    'proj.n_files': 'archivos',
+
+    'cs.lvl_low': 'Rápida',
+    'cs.lvl_mid': 'Equilibrada',
+    'cs.lvl_high': 'Potente',
+    'cs.lvl_ultra': 'Máxima',
+    'cs.power_explain': 'Elige qué modelo responde. Más potencia da respuestas mejores pero más lentas. En Auto, Andromeda elige según la dificultad de la pregunta y la memoria libre.',
+
+    'prev.open': "Abrir vista previa",
+    'prev.close': "Cerrar",
+    'prev.load_error': "No se pudo cargar el archivo.",
+    'chat.jump_bottom': "Ir al final",
+
+    'pcat.search': "Buscar prompts…",
+    'pcat.all': "Todos",
+    'pcat.none': "No hay prompts que coincidan.",
+    'pcat.use': "Usar",
+    'pcat.save': "Guardar en mi biblioteca",
+    'pcat.saved': "Guardado",
+    'pcat.catalog': "Catálogo",
+    'pcat.mine': "Mis prompts",
+    'pcat.title': "Biblioteca de prompts",
+    'pcat.desc': "Más de cien prompts listos para usar, por categorías. Rellena lo que va [entre corchetes]. Los que guardes aparecerán en «Mis prompts» del chat.",
+
+    'chat.files_context': "Tengo estos archivos adjuntos como contexto:",
+    'chat.files_skipped_name': "(archivos no incluidos)",
+    'chat.files_skipped': "Estos archivos no se incluyeron por ser binarios, demasiado grandes o por superar el límite total:",
+
+    'settings.prompts': "Biblioteca de prompts",
+
+    'prof.data_downloaded': "Datos descargados",
+    'prof.data_download_error': "No se pudieron descargar los datos",
+
+    'err.invalid_path': "Ruta de archivo no válida",
+    'err.invalid_url': "Enlace no válido",
+    'err.preview_failed': "No se pudo generar la vista previa de este archivo",
+    'err.project_file': "No se pudo procesar el archivo del proyecto",
+
+    'dl.saved_to': "Guardado en",
+
+    'mem.semantic_pending': "Preparando la memoria por significado…",
+    'mem.semantic_waiting_ollama': "Memoria por significado: esperando a que Ollama esté abierto",
+    'mem.semantic_downloading': "Descargando el modelo de memoria por significado",
+    'mem.semantic_ready': "Memoria por significado activa",
+    'mem.semantic_backfilled': "recuerdos actualizados",
+    'mem.semantic_offline': "Memoria por significado desactivada: el acceso a la red está apagado en Capacidades",
+    'mem.semantic_error': "No se pudo activar la memoria por significado; se reintentará",
+
+    'memf.search_title': "Buscar y consultar conversaciones",
+    'memf.search_desc': "Permite que Andromeda busque detalles relevantes en chats anteriores cuando te refieres a ellos.",
+    'memf.gen_title': "Generar memoria a partir de los chats",
+    'memf.gen_desc': "Permite que Andromeda recuerde lo que le cuentas: quién eres, tus gustos, proyectos y objetivos.",
+    'memf.sens_title': "Incluir temas sensibles en la memoria",
+    'memf.sens_desc': "Permite guardar detalles sobre temas sensibles, como salud, religión o política. Al desactivarlo se eliminan los ya guardados.",
+    'memf.imp_title': "Importar memoria de otros asistentes de IA",
+    'memf.imp_desc': "Trae a Andromeda lo que otro asistente sabe de ti. Te damos un prompt para pedírselo.",
+    'memf.imp_start': "Importar",
+    'memf.imp_step1': "Copia este prompt y envíaselo al otro asistente:",
+    'memf.imp_step2': "Pega aquí su respuesta:",
+    'memf.imp_placeholder': "- Me llamo…\n- Trabajo en…",
+    'memf.imp_do': "Añadir a la memoria",
+    'memf.imported': "{n} datos importados",
+    'memf.purged': "{n} recuerdos sensibles eliminados",
+    'memf.purge_incomplete': "La eliminación no se completó. Es posible que algunos recuerdos de temas sensibles aún se guarden.",
+    'memf.confirm_delete': "¿Borrar todo lo que Andromeda recuerda de esta sección?",
+    'memf.sec_tu': "Tú",
+    'memf.sec_temas': "Temas",
+    'memf.sec_areas': "Áreas",
+    'memf.sec_personas': "Personas",
+    'memf.sec_notas': "Notas",
+    'memf.empty': "Todavía no hay nada aquí.",
+    'memf.col_name': "Nombre",
+    'memf.col_summary': "Resumen",
+    'memf.col_updated': "Última actualización",
+    'memf.col_actions': "Acciones",
+    'memf.edit': "Editar",
+    'memf.today': "hoy",
+    'memf.days_ago': "hace {n} días",
+    'memf.file_preferencias': "Preferencias",
+    'memf.file_perfil': "Perfil",
+    'memf.file_gustos': "Gustos",
+    'memf.file_favoritos': "Favoritos",
+    'memf.file_objetivos': "Objetivos",
+    'memf.file_tecnologia': "Tecnología",
+    'memf.file_rutina': "Rutina",
+    'memf.file_proyectos': "Proyectos",
+    'memf.file_notas': "Notas",
+
+    'ui2.theme_macos': "macOS",
+
+    'err.invalid_request': "La petición no es válida",
+
+    'ap.design': "Diseño",
+
+    'ap.mode': "Modo",
+
+    'memf.updated': "Actualizado",
+
+    'memf.empty_all': "Andromeda aún no recuerda nada de ti. Irá aprendiendo a medida que converséis.",
+
+    'memf.describe_change': "Describe qué quieres cambiar…",
+
+    'memf.apply': "Aplicar",
+
+    'memf.edit_text': "Editar el texto",
+
+    'memf.save': "Guardar",
+
+    'memf.desc_preferencias': "Cómo quieres que Andromeda te responda: idioma, tono y formato.",
+
+    'memf.desc_perfil': "Quién eres: nombre, ocupación, ubicación y estudios.",
+
+    'memf.desc_gustos': "Tus aficiones y lo que te gusta o no te gusta.",
+
+    'memf.desc_favoritos': "Tus cosas favoritas.",
+
+    'memf.desc_objetivos': "Metas personales y profesionales que te has propuesto.",
+
+    'memf.desc_tecnologia': "Tu equipo, herramientas y tecnologías con las que trabajas.",
+
+    'memf.desc_rutina': "Tus horarios y hábitos diarios.",
+
+    'memf.desc_proyectos': "Proyectos en los que estás trabajando.",
+
+    'memf.desc_notas': "Cosas que le pediste a Andromeda que recordara.",
+
+    'memf.desc_persona': "Quién es {name} y su relación contigo.",
+
+    'err.memory_ai_edit': "No se pudo aplicar el cambio con la IA. Prueba a editar el texto.",
+
+    'err.ollama_offline': "Ollama no está disponible",
+
+    'chat.pro_subtitle': "El orquestador seleccionará automáticamente los mejores especialistas para cada pregunta.",
+
+    'ob.step1_pre': "Abre ",
+
+    'ob.step1_post': " en el menú lateral.",
+
+    'ob.step2_pre': "Descarga un modelo en ",
+
+    'ob.step2_post': ". Si es tu primera vez, qwen3:8b es un buen punto de partida (o gemma3 si tu equipo tiene 32 GB o más).",
+
+    'ob.step3': "Vuelve aquí y ya puedes chatear, crear archivos y ejecutar código, todo en local.",
+
+    'code.no_output': "(sin salida)",
+
+    'slo.insufficient': "Aún no hay datos suficientes para evaluar la calidad: {n} de {min} peticiones.",
+
+    'chm.models': "{n} modelos",
+
+    'chm.active': "{n} activos",
+
+    'chm.memories': "{n} recuerdos",
+
+    'chm.empty': "vacío",
+
+    'chm.docs': "{n} documentos",
+
+    'chm.skills': "{n} skills",
+
+    'chm.connected': "{n} conectados",
+
+    'chm.on': "activada",
+
+    'chm.off': "desactivada",
+
+    'chm.no_prod': "sin producción",
+
+    'chm.no_exp': "sin experimentos",
+
+    'chm.no_votes': "sin votos",
+
+    'chm.satisfaction': "{n}% satisfacción",
+
+    'chm.files': "{n} archivos",
+
+    'ap.accent': "Color de acento",
+
+    'ap.accent_blue': "Azul",
+
+    'ap.accent_purple': "Morado",
+
+    'ap.accent_pink': "Rosa",
+
+    'ap.accent_red': "Rojo",
+
+    'ap.accent_orange': "Naranja",
+
+    'ap.accent_yellow': "Amarillo",
+
+    'ap.accent_green': "Verde",
+
+    'ap.accent_graphite': "Grafito",
+
+    'ap.accent_andromeda': "Degradado Andromeda",
+
+    'mcp.risk_high': "Riesgo alto",
+
+    'mcp.manual_setup': "Requiere preparación",
+
+    'pp.title': "Pack de potencia recomendado",
+
+    'pp.sub': "Un modelo por nivel de potencia, elegido para este equipo ({gb} GB disponibles para modelos). La potencia automática escoge entre ellos en cada mensaje.",
+
+    'pp.download': "Descargar lo que falta ({gb} GB)",
+
+    'pp.downloading': "Descargando…",
+
+    'pp.complete': "Pack completo",
+
+    'pp.error': "Error",
+
+    'sug.11': "Resume en 5 puntos qué es Kubernetes",
+    'sug.12': "Crea una web de portfolio en HTML",
+    'sug.13': "Planifícame una semana de estudio",
+    'sug.14': "Explícame qué es un LLM como si tuviera 12 años",
+    'sug.15': "¿Qué diferencia hay entre RAM y VRAM?",
+    'sug.16': "Escribe un script que ordene mis descargas",
+    'sug.17': "Dame 10 ideas de proyectos para aprender Python",
+    'sug.18': "Busca las últimas noticias sobre IA",
+    'sug.19': "Explícame Git branch, merge y rebase",
+    'sug.20': "Hazme una tabla comparando Python y JavaScript",
+    'sug.21': "Escribe un email para pedir una reunión",
+    'sug.22': "¿Cómo funciona HTTPS?",
+    'sug.23': "Crea una hoja de cálculo para mis gastos",
+    'sug.24': "Explícame la diferencia entre IA, ML y deep learning",
+    'sug.25': "Ayúdame a preparar una entrevista técnica",
+    'sug.26': "Escribe un relato corto de ciencia ficción",
+    'sug.27': "¿Qué es Docker y para qué sirve?",
+    'sug.28': "Genera preguntas tipo test sobre redes",
+    'sug.29': "Explícame qué es una API REST con un ejemplo",
+    'sug.30': "Dame una rutina de ejercicio de 20 minutos",
   },
   en: {
     'nav.new_chat': 'New conversation',
@@ -890,8 +1414,6 @@ const DICT = {
     'chat.power': 'Power',
     'chat.clean': 'Clear',
     'chat.attach_images': 'Add images',
-    'chat.attach_files': 'Attach files',
-    'chat.prompts': 'Prompt library',
     'settings.title': 'Settings',
     'settings.general': 'General',
     'settings.appearance': 'Appearance',
@@ -1673,6 +2195,529 @@ const DICT = {
     'cs.lvl_na_hw': 'not available on your hardware',
     'cs.parallel_title': 'Parallel AIs',
     'msg.power_tip': 'Power chosen based on prompt complexity',
+
+    'skills.title': 'Skills',
+    'skills.desc': 'Instruction packages that Andromeda activates on its own when your message matches them. No manual selection needed.',
+    'skills.reload': 'Reload',
+    'skills.probe_ph': 'Try a phrase…',
+    'skills.probe_btn': 'Test',
+    'skills.would_activate': 'Would activate',
+    'skills.no_activation': 'Would not activate any skill.',
+    'skills.used_tip': 'Skill used for this answer',
+    'rag.title': 'Document context',
+    'rag.desc': 'Index text files and the chat will use them as context, citing the source. Everything is processed on your machine.',
+    'rag.docs': 'docs',
+    'rag.drop_hint': 'Drop files here or click to select (.txt, .md, code…)',
+    'rag.indexing': 'Indexing…',
+    'rag.indexed_ok': '{ok} file(s) indexed',
+    'rag.indexed_some': '{ok} indexed, {skip} skipped',
+    'rag.remove': 'Remove from index',
+    'rag.query_ph': 'Try a search…',
+    'rag.query_btn': 'Search',
+    'rag.no_hits': 'No results in the index.',
+    'rag.sources_tip': 'Sources used for this answer',
+
+    'skills.create': 'Create',
+    'skills.mine': 'mine',
+    'skills.delete': 'Delete skill',
+    'skills.save': 'Save skill',
+    'skills.need_fields': 'Name and description are required.',
+    'skills.f_name': 'Name (e.g. My emails)',
+    'skills.f_desc': 'When it should activate (this decides usage)',
+    'skills.f_triggers': 'Keywords, separated by spaces',
+    'skills.f_body': 'Instructions to apply…',
+    'chat.compacted': 'Conversation summarized to fit the context',
+
+    'mcp.needs_key': 'NEEDS API KEY',
+    'mcp.key_set': 'KEY CONFIGURED',
+    'mcp.requires': 'Requires',
+    'mcp.enabled_not_connected': 'ENABLED (not connected)',
+    'mcp.key_help': 'Enter the key here. It is stored only on your machine and applied without restarting.',
+    'mcp.get_key': 'How to get it',
+    'mcp.key_ph': 'Paste your key…',
+    'mcp.key_save': 'Save',
+    'mcp.key_configured': 'Configured',
+    'mcp.key_remove': 'Remove',
+    'mcp.key_saved_msg': 'Key saved. Enable the server to connect.',
+
+    'chat.ph_system_down': 'System unavailable — check Ollama',
+    'chat.ph_no_ais': 'No active AIs — go to AI Models',
+
+    'mb.fb_thanks': 'Thanks!',
+    'mb.fb_error': 'Could not record',
+    'mb.saved_to_downloads': 'Saved to Downloads',
+    'mb.save_error': 'Could not save',
+
+    'chat.no_models_installed': 'You don\'t have any model installed yet. Andromeda runs on your own local models: pick one to get started.',
+    'chat.web_off_hint': 'Internet search is turned off.',
+    'chat.web_off_cta': 'Enable in Settings',
+
+    'mcp.why_failed': 'Reason',
+    'mcp.runtime_missing': 'Missing software required by MCP connectors:',
+
+    'mcp.installing': 'Installing {rt}… this may take a minute.',
+    'mcp.installing_short': 'Installing…',
+    'mcp.install_now': 'Install now',
+    'mcp.reconnected': 'Servers reconnected',
+
+    'chl.try_another_search': 'Try another search',
+    'chl.start_new_convo': 'Start a new conversation',
+    'chl.conversation': 'Conversation',
+    'chl.add_favorite': 'Add to favorites',
+    'iu.drop_here': 'Drop here…',
+    'lab.deterministic_hint': 'Deterministic, for code and data',
+    'mp.assign_model_hint': 'Assign it an Ollama model below to start using Andromeda',
+    'pp.password_min': 'The new password must be at least 8 characters',
+    'pp.change_password': 'Change password',
+    'me.very_fast': 'Very fast',
+    'me.fast': 'Fast',
+
+    'info.how_it_works': 'How it works',
+
+    'ch.title': 'Component health',
+    'ch.desc': 'Which parts of Andromeda are active right now and what they are doing.',
+    'ch.active': 'active',
+    'ch.refresh': 'Refresh',
+    'ch.info_intro': 'Each card is a subsystem. The border colour shows its state and the text explains what to do if it is not active.',
+    'ch.st_ok': 'Active (green)',
+    'ch.st_ok_d': 'The component works and is in use.',
+    'ch.st_degraded': 'Degraded (amber)',
+    'ch.st_degraded_d': 'It responds but something is missing for it to work fully.',
+    'ch.st_off': 'Off (grey)',
+    'ch.st_off_d': 'Not in use. The card text says how to enable it.',
+    'ch.st_error': 'Error (red)',
+    'ch.st_error_d': 'It failed when probed. Check the logs.',
+    'ch.n_ollama': 'Ollama',
+    'ch.n_specialists': 'Specialists',
+    'ch.n_memory': 'Memory',
+    'ch.n_rag': 'Documents (RAG)',
+    'ch.n_skills': 'Skills',
+    'ch.n_mcp': 'MCP connectors',
+    'ch.n_web': 'Web search',
+    'ch.n_registry': 'Model registry',
+    'ch.n_ab': 'A/B testing',
+    'ch.n_feedback': 'Feedback',
+    'ch.n_workspace': 'Workspace',
+
+    'cd.not_init': 'Not initialised.',
+    'cd.ollama_none': 'Ollama is not responding or no models are downloaded.',
+    'cd.ollama_ok': '{list}',
+    'cd.spec_none': 'No specialist has a model assigned.',
+    'cd.spec_ok': '{list}',
+    'cd.memory_ok': 'Persistent conversational memory.',
+    'cd.rag_empty': 'No documents indexed yet.',
+    'cd.rag_ok': '{chunks} chunks · {terms} terms indexed.',
+    'cd.skills_ok': '{builtin} built-in · {mine} created by you.',
+    'cd.mcp_none': 'Enable a connector in the MCP tab.',
+    'cd.mcp_ok': '{tools} tools available to the AIs.',
+    'cd.web_on': 'The AIs can search the internet.',
+    'cd.web_off': 'Enable it in Settings to allow web searches.',
+    'cd.reg_none': 'No version promoted to production.',
+    'cd.reg_ok': 'Serving {model}.',
+    'cd.ab_none': 'No A/B test running.',
+    'cd.ab_ok': 'Comparing variants with real traffic.',
+    'cd.fb_none': 'Use 👍/👎 on answers to measure quality.',
+    'cd.fb_ok': '{up} positive · {down} negative.',
+    'cd.ws_none': 'Workspace folder not configured.',
+    'cd.ws_ok': '{path}',
+    'cd.probe_error': 'Probe failed: {err}',
+
+    'ch.s_ok': 'Active',
+    'ch.s_degraded': 'Partial',
+    'ch.s_off': 'Inactive',
+    'ch.s_error': 'Error',
+
+    'ch.what_is': 'What it is',
+    'ch.next_step': 'Next step',
+    'ch.next_ok': 'Working correctly. Nothing to do.',
+    'ch.about_ollama': 'The engine that runs models on your machine. Andromeda ships no models: it downloads and runs them through Ollama.',
+    'ch.about_specialists': 'AI profiles with their own instructions. Each specialises in a kind of task and has its own assigned model.',
+    'ch.about_memory': 'Facts Andromeda remembers across conversations: your name, preferences and things you tell it.',
+    'ch.about_rag': 'Your documents indexed locally. When you ask something related, the AI uses them as context and cites the source.',
+    'ch.about_skills': 'Instruction packages that activate on their own when your message matches, with no manual selection.',
+    'ch.about_mcp': 'Connectors that give the AIs real tools: files, repositories, databases or external services.',
+    'ch.about_web': 'Lets the AIs query the internet. Off by default because Andromeda works offline by design.',
+    'ch.about_registry': 'Model version control: records each version and lets you promote one to production or roll it back.',
+    'ch.about_ab': 'Compares two models on your real usage and picks a winner with a statistical test, not by eye.',
+    'ch.about_feedback': 'Your 👍/👎 votes on answers. They measure real quality and feed the A/B tests.',
+    'ch.about_workspace': 'The folder where the AIs may read and write files. Everything else is off limits for safety.',
+    'ch.hint_ollama': 'Install Ollama and pull a model with: ollama pull llama3.2',
+    'ch.hint_specialists': 'Go to AI Models and assign a model to at least one specialist.',
+    'ch.hint_memory': 'Tell it something about you in the chat and it will remember for next time.',
+    'ch.hint_rag': 'Drop text files in Settings › Memory so the AI can consult them.',
+    'ch.hint_skills': 'Built-in skills are ready. You can create your own in Settings › Memory.',
+    'ch.hint_mcp': 'Open Settings › MCP connectors and enable the one you need.',
+    'ch.hint_web': 'Enable it in Settings › Capabilities if you want the AIs to query the internet.',
+    'ch.hint_registry': 'Register a version in Settings › Model registry and promote it to production.',
+    'ch.hint_ab': 'Create an experiment in Settings › A/B testing to compare two models.',
+    'ch.hint_feedback': 'Vote 👍 or 👎 on chat answers to start measuring quality.',
+    'ch.hint_workspace': 'Set the folder in Settings › Capabilities so the AIs can create files.',
+
+    'sx.title': 'Search engine (SearXNG)',
+    'sx.desc': 'Andromeda searches through SearXNG, an open source metasearch engine. It uses public instances by default. Run your own and your searches never leave your machine.',
+    'sx.save': 'Save',
+    'sx.checking': 'Checking…',
+    'sx.ok': 'Connected. Your instance will be used.',
+    'sx.unreachable': 'Not responding. Public instances will be used meanwhile.',
+    'sx.using_public': 'No own instance: public ones will be used.',
+
+    'info.pct.title': 'Latency: p50, p95 and p99',
+    'info.pct.intro': 'The average is misleading: one very slow answer skews it and says nothing about how often it happens. Percentiles sort every response from fastest to slowest and look at specific positions.',
+    'info.pct.p50h': 'p50 — the middle',
+    'info.pct.p50d': 'Half the answers take less than this. It is the typical experience.',
+    'info.pct.p95h': 'p95 — near worst case',
+    'info.pct.p95d': '95 out of 100 answers are faster. Only 5 are slower. The most useful metric: it measures whether the bad moments are tolerable.',
+    'info.pct.p99h': 'p99 — worst case',
+    'info.pct.p99d': 'Only 1 in 100 answers takes longer. Useful for spotting rare stalls, not for everyday tuning.',
+    'info.pct.whyh': 'Why it matters here',
+    'info.pct.whyd': 'With local models, latency depends on your hardware and model size. If p95 spikes but p50 is fine, the model is usually being loaded into memory on some requests.',
+
+    'ka.title': 'Keep the model loaded',
+    'ka.desc': 'Avoids reloading the model between messages, which takes tens of seconds with large models. In exchange, it holds video memory meanwhile.',
+    'ka.never': 'Don\'t keep',
+    'ka.always': 'Always',
+
+    'err.ab_unavailable': 'A/B testing unavailable',
+    'err.ab_needs_variants': 'An id and at least 2 variants are required',
+    'err.not_found': 'Not found',
+    'err.decision_required': 'A decision is required',
+    'err.username_format': 'Username must be 3-32 alphanumeric characters',
+    'err.password_short': 'The password must be at least 8 characters',
+    'err.user_exists': 'That username is taken',
+    'err.bad_credentials': 'Incorrect username or password',
+    'err.not_authenticated': 'Not signed in',
+    'err.new_password_short': 'The new password must be at least 8 characters',
+    'err.wrong_current_password': 'The current password is incorrect',
+    'err.content_required': 'Content is required',
+    'err.prompt_response_required': 'Prompt and response are required',
+    'err.no_connection': 'Could not reach the service. Check your connection',
+    'err.sign_in_first': 'Sign in first',
+    'err.path_required': 'A path is required',
+    'err.no_project_indexed': 'No project has been indexed yet',
+    'err.question_required': 'A question is required',
+    'err.empty_content': 'The content is empty',
+    'err.delete_needs_confirm': 'Permanent deletion requires confirmation',
+    'err.base_model_required': 'A base model is required',
+    'err.ollama_unavailable': 'Ollama is unavailable',
+    'err.no_data': 'No data',
+    'err.registry_unavailable': 'The model registry is unavailable',
+    'err.specialist_required': 'A specialist is required',
+    'err.variant_prompt_required': 'Variant and prompt are required',
+    'err.mcp_unavailable': 'MCP connectors are unavailable',
+    'err.tool_required': 'A tool is required',
+    'err.prompt_required': 'A prompt is required',
+    'err.mcp_not_ready': 'MCP connectors are not ready yet',
+    'err.value_empty': 'The value cannot be empty',
+    'err.profile_unavailable': 'The profile is unavailable',
+    'err.memory_unavailable': 'Memory is unavailable',
+    'err.specialist_unconfigured': 'That specialist has no model assigned',
+    'err.mlops_unavailable': 'MLOps is unavailable',
+    'err.model_required': 'A model is required',
+    'err.topic_required': 'A topic is required',
+    'err.image_required': 'An image is required',
+    'err.lab_unavailable': 'The lab is unavailable',
+
+    'err.generic': 'Something went wrong',
+    'err.server': 'Server error. Check the logs if it persists',
+    'err.too_large': 'The content is too large',
+
+    'cd.ollama_tune': 'Working. You can gain performance by setting in Ollama: {vars}',
+
+    'mb.download': 'download',
+    'mb.copy': 'copy',
+    'mb.copied': 'copied',
+    'mb.export': 'export',
+
+    'sb.click_download': 'click to download',
+
+    'nav.diagnostics': 'Diagnostics',
+    'dg.title': 'Diagnostics console',
+    'dg.desc': 'What Andromeda does internally on each message: what prompt the model receives, whether it searches the web and why, and how long each step takes.',
+    'dg.start': 'Start recording',
+    'dg.stop': 'Stop',
+    'dg.state': 'System state',
+    'dg.copy': 'Copy log',
+    'dg.download': 'Download',
+    'dg.clear': 'Clear',
+    'dg.all': 'All',
+    'dg.filter': 'Filter by category',
+    'dg.copied': 'Copied to clipboard',
+    'dg.saved': 'Saved to Downloads',
+    'dg.copy_error': 'Could not copy',
+    'dg.waiting': 'Waiting for activity',
+    'dg.waiting_d': 'Send a message in the chat and every step Andromeda takes will show up here.',
+    'dg.off_explainer': 'Recording is off. Turning it on keeps the session\'s full prompts and responses in memory, which is what diagnosing a failure requires. Nothing is written to disk and everything is cleared when you stop it or close the app.',
+    'dg.cap_red': 'Web search',
+    'dg.cap_creacion_archivos': 'File creation',
+    'dg.cap_memoria_semantica': 'Semantic memory',
+    'dg.cap_perfil_memoria': 'Memory profile',
+    'dg.cap_documentos_rag': 'Documents',
+    'dg.cap_skills': 'Skills',
+
+    'dg.temporary': 'Development tool — will be removed before the final release. It exposes full prompts and environment variables.',
+
+    'tr.title': 'Collect training data (Apolo)',
+    'tr.desc': 'Stores your conversations and 👍/👎 votes locally to train your own model. Never in incognito mode. Only answers rated as good are exported.',
+    'tr.samples': 'samples',
+    'tr.export': 'Export for MLX',
+    'err.training_unavailable': 'Training corpus unavailable',
+
+
+    'chat.new_conversation': 'New conversation',
+    'err.invalid_file': 'Invalid file',
+    'err.no_conversations': 'The file contains no conversations',
+
+    'phase.thinking': 'Thinking…',
+    'phase.searching': 'Searching the web…',
+    'phase.writing': 'Writing…',
+
+    'mcp.msg_connected': 'Connected — {count} tools.',
+    'mcp.msg_disabled': 'Disabled.',
+    'mcp.msg_failed': 'Could not connect.',
+
+    'chat.open_image': "Enlarge image",
+
+    'art.view_code': 'View code',
+    'art.view_page': 'View page',
+
+    'proj.files': 'Project files',
+    'proj.files_desc': 'Add files or whole folders. The AI uses them in this project\'s conversations, and anything it creates or edits is saved here.',
+    'proj.add_files': 'Add files',
+    'proj.add_folder': 'Add folder',
+    'proj.uploading': 'Uploading',
+    'proj.no_files': 'No files in this project yet.',
+    'proj.n_files': 'files',
+
+    'cs.lvl_low': 'Fast',
+    'cs.lvl_mid': 'Balanced',
+    'cs.lvl_high': 'Strong',
+    'cs.lvl_ultra': 'Maximum',
+    'cs.power_explain': 'Choose which model answers. More power gives better but slower answers. On Auto, Andromeda picks based on how hard the question is and the free memory.',
+
+    'prev.open': "Open preview",
+    'prev.close': "Close",
+    'prev.load_error': "Could not load the file.",
+    'chat.jump_bottom': "Jump to bottom",
+
+    'pcat.search': "Search prompts…",
+    'pcat.all': "All",
+    'pcat.none': "No matching prompts.",
+    'pcat.use': "Use",
+    'pcat.save': "Save to my library",
+    'pcat.saved': "Saved",
+    'pcat.catalog': "Catalog",
+    'pcat.mine': "My prompts",
+    'pcat.title': "Prompt library",
+    'pcat.desc': "Over a hundred ready-to-use prompts by category. Fill in what's [in brackets]. Saved ones appear under “My prompts” in the chat.",
+
+    'chat.files_context': "I have these attached files as context:",
+    'chat.files_skipped_name': "(files not included)",
+    'chat.files_skipped': "These files were not included (binary, too large or over the total limit):",
+
+    'settings.prompts': "Prompt library",
+
+    'prof.data_downloaded': "Data downloaded",
+    'prof.data_download_error': "Could not download the data",
+
+    'err.invalid_path': "Invalid file path",
+    'err.invalid_url': "Invalid link",
+    'err.preview_failed': "Could not preview this file",
+    'err.project_file': "Could not process the project file",
+
+    'dl.saved_to': "Saved to",
+
+    'mem.semantic_pending': "Preparing meaning-based memory…",
+    'mem.semantic_waiting_ollama': "Meaning-based memory: waiting for Ollama",
+    'mem.semantic_downloading': "Downloading the meaning-based memory model",
+    'mem.semantic_ready': "Meaning-based memory active",
+    'mem.semantic_backfilled': "memories updated",
+    'mem.semantic_offline': "Meaning-based memory off: network access is disabled in Capabilities",
+    'mem.semantic_error': "Could not enable meaning-based memory; will retry",
+
+    'memf.search_title': "Search and reference chats",
+    'memf.search_desc': "Lets Andromeda search past chats for relevant details when you refer to them.",
+    'memf.gen_title': "Generate memory from chats",
+    'memf.gen_desc': "Lets Andromeda remember what you tell it: who you are, your interests, projects and goals.",
+    'memf.sens_title': "Include sensitive topics in memory",
+    'memf.sens_desc': "Allows saving details about sensitive topics such as health, religion or politics. Turning it off deletes those already saved.",
+    'memf.imp_title': "Import memory from other AI assistants",
+    'memf.imp_desc': "Bring what another assistant knows about you into Andromeda. We give you a prompt to ask for it.",
+    'memf.imp_start': "Import",
+    'memf.imp_step1': "Copy this prompt and send it to the other assistant:",
+    'memf.imp_step2': "Paste its answer here:",
+    'memf.imp_placeholder': "- My name is…\n- I work at…",
+    'memf.imp_do': "Add to memory",
+    'memf.imported': "{n} facts imported",
+    'memf.purged': "{n} sensitive memories deleted",
+    'memf.purge_incomplete': "Deletion did not complete. Some sensitive memories may still be stored.",
+    'memf.confirm_delete': "Delete everything Andromeda remembers in this section?",
+    'memf.sec_tu': "You",
+    'memf.sec_temas': "Topics",
+    'memf.sec_areas': "Areas",
+    'memf.sec_personas': "People",
+    'memf.sec_notas': "Notes",
+    'memf.empty': "Nothing here yet.",
+    'memf.col_name': "Name",
+    'memf.col_summary': "Summary",
+    'memf.col_updated': "Last updated",
+    'memf.col_actions': "Actions",
+    'memf.edit': "Edit",
+    'memf.today': "today",
+    'memf.days_ago': "{n} days ago",
+    'memf.file_preferencias': "Preferences",
+    'memf.file_perfil': "Profile",
+    'memf.file_gustos': "Interests",
+    'memf.file_favoritos': "Favourites",
+    'memf.file_objetivos': "Goals",
+    'memf.file_tecnologia': "Technology",
+    'memf.file_rutina': "Routine",
+    'memf.file_proyectos': "Projects",
+    'memf.file_notas': "Notes",
+
+    'ui2.theme_macos': "macOS",
+
+    'err.invalid_request': "Invalid request",
+
+    'ap.design': "Design",
+
+    'ap.mode': "Mode",
+
+    'memf.updated': "Updated",
+
+    'memf.empty_all': "Andromeda doesn't remember anything about you yet. It will learn as you chat.",
+
+    'memf.describe_change': "Describe what you want to change…",
+
+    'memf.apply': "Apply",
+
+    'memf.edit_text': "Edit text",
+
+    'memf.save': "Save",
+
+    'memf.desc_preferencias': "How you want Andromeda to respond: language, tone and format.",
+
+    'memf.desc_perfil': "Who you are: name, occupation, location and studies.",
+
+    'memf.desc_gustos': "Your hobbies and what you like or dislike.",
+
+    'memf.desc_favoritos': "Your favourite things.",
+
+    'memf.desc_objetivos': "Personal and professional goals you've set.",
+
+    'memf.desc_tecnologia': "Your hardware, tools and the technologies you work with.",
+
+    'memf.desc_rutina': "Your schedule and daily habits.",
+
+    'memf.desc_proyectos': "Projects you're working on.",
+
+    'memf.desc_notas': "Things you asked Andromeda to remember.",
+
+    'memf.desc_persona': "Who {name} is and how they relate to you.",
+
+    'err.memory_ai_edit': "Couldn't apply the change with the AI. Try editing the text.",
+
+    'err.ollama_offline': "Ollama is not available",
+
+    'chat.pro_subtitle': "The orchestrator automatically picks the best specialists for each question.",
+
+    'ob.step1_pre': "Open ",
+
+    'ob.step1_post': " in the sidebar.",
+
+    'ob.step2_pre': "Download a model in ",
+
+    'ob.step2_post': ". If it's your first time, qwen3:8b is a good starting point (or gemma3 if your computer has 32 GB or more).",
+
+    'ob.step3': "Come back here and start chatting, creating files and running code, all locally.",
+
+    'code.no_output': "(no output)",
+
+    'slo.insufficient': "Not enough data to assess quality yet: {n} of {min} requests.",
+
+    'chm.models': "{n} models",
+
+    'chm.active': "{n} active",
+
+    'chm.memories': "{n} memories",
+
+    'chm.empty': "empty",
+
+    'chm.docs': "{n} documents",
+
+    'chm.skills': "{n} skills",
+
+    'chm.connected': "{n} connected",
+
+    'chm.on': "on",
+
+    'chm.off': "off",
+
+    'chm.no_prod': "no production",
+
+    'chm.no_exp': "no experiments",
+
+    'chm.no_votes': "no votes",
+
+    'chm.satisfaction': "{n}% satisfaction",
+
+    'chm.files': "{n} files",
+
+    'ap.accent': "Accent colour",
+
+    'ap.accent_blue': "Blue",
+
+    'ap.accent_purple': "Purple",
+
+    'ap.accent_pink': "Pink",
+
+    'ap.accent_red': "Red",
+
+    'ap.accent_orange': "Orange",
+
+    'ap.accent_yellow': "Yellow",
+
+    'ap.accent_green': "Green",
+
+    'ap.accent_graphite': "Graphite",
+
+    'ap.accent_andromeda': "Andromeda gradient",
+
+    'mcp.risk_high': "High risk",
+
+    'mcp.manual_setup': "Needs setup",
+
+    'pp.title': "Recommended power pack",
+
+    'pp.sub': "One model per power level, chosen for this computer ({gb} GB available for models). Automatic power picks among them for each message.",
+
+    'pp.download': "Download what's missing ({gb} GB)",
+
+    'pp.downloading': "Downloading…",
+
+    'pp.complete': "Pack complete",
+
+    'pp.error': "Error",
+
+    'sug.11': "Summarise what Kubernetes is in 5 points",
+    'sug.12': "Build a portfolio website in HTML",
+    'sug.13': "Plan a week of study for me",
+    'sug.14': "Explain what an LLM is as if I were 12",
+    'sug.15': "What's the difference between RAM and VRAM?",
+    'sug.16': "Write a script that tidies my downloads",
+    'sug.17': "Give me 10 project ideas to learn Python",
+    'sug.18': "Search for the latest AI news",
+    'sug.19': "Explain Git branch, merge and rebase",
+    'sug.20': "Make a table comparing Python and JavaScript",
+    'sug.21': "Write an email to request a meeting",
+    'sug.22': "How does HTTPS work?",
+    'sug.23': "Create a spreadsheet for my expenses",
+    'sug.24': "Explain AI vs. machine learning vs. deep learning",
+    'sug.25': "Help me prepare for a technical interview",
+    'sug.26': "Write a short science-fiction story",
+    'sug.27': "What is Docker and what is it for?",
+    'sug.28': "Generate quiz questions about networking",
+    'sug.29': "Explain a REST API with an example",
+    'sug.30': "Give me a 20-minute workout",
   },
   de: {
     'nav.new_chat': 'Neue Unterhaltung',
@@ -1693,13 +2738,11 @@ const DICT = {
     'chat.power': 'Leistung',
     'chat.clean': 'Leeren',
     'chat.attach_images': 'Bilder hinzufügen',
-    'chat.attach_files': 'Dateien anhängen',
-    'chat.prompts': 'Prompt-Bibliothek',
     'settings.title': 'Einstellungen',
     'settings.general': 'Allgemein',
     'settings.appearance': 'Erscheinungsbild',
     'settings.models': 'KI-Modelle',
-    'settings.mcp': 'MCP-Tools',
+    'settings.mcp': 'MCP-Werkzeuge',
     'settings.memory': 'Speicher',
     'settings.alerts': 'Benachrichtigungen',
     'settings.plan': 'Tarif',
@@ -1714,7 +2757,7 @@ const DICT = {
     'incognito.title': 'Inkognito-Modus',
     'incognito.subtitle': 'Eine lokale KI, die ihre Leistung an Anfrage und Hardware anpasst. 100% privat.',
 
-    'an.title': 'Analytics',
+    'an.title': 'Analysen',
     'an.subtitle': 'Lokale Observability von Andromeda — Speicher, Werkzeuge und Leistung. Alles auf deinem Rechner.',
     'an.refresh': 'aktualisiert alle 5s',
     'an.loading': 'Metriken werden geladen…',
@@ -2081,7 +3124,7 @@ const DICT = {
     'ab.by_success': 'Nach Erfolgsrate',
     'ab.by_quality': 'Nach Qualität (👍/👎)',
 
-    'reg.title': 'Model Registry',
+    'reg.title': 'Modell-Registry',
     'reg.subtitle': 'Versioniere Modelle und befördere das beste in die Produktion.',
     'reg.serve_prod': 'Produktionsmodell verwenden',
     'reg.serve_prod_desc': 'Wenn kein Modell erzwungen wird, das Produktionsmodell nutzen.',
@@ -2090,7 +3133,7 @@ const DICT = {
     'reg.notes_ph': 'Notizen (optional)',
     'reg.save': 'Registrieren',
     'reg.empty': 'Noch keine Modelle registriert.',
-    'reg.score': 'Score',
+    'reg.score': 'Punktzahl',
     'reg.to_prod': '→ Produktion',
     'reg.to_staging': '→ Staging',
     'reg.to_archived': 'Archivieren',
@@ -2205,7 +3248,7 @@ const DICT = {
     'trace.degraded': 'verschlechtert',
     'mdl.record_spec': 'Spezialisierte KI trainieren',
 
-    'settings.registry': 'Model Registry',
+    'settings.registry': 'Modell-Registry',
     'settings.advanced': 'Erweitert',
     'ui2.theme_dark': 'Dunkel',
     'ui2.theme_light': 'Hell',
@@ -2226,7 +3269,7 @@ const DICT = {
     'onb.retry': 'Erneut versuchen',
     'onb.continue': 'Weiter →',
     'cdx.run': '▶ Ausführen',
-    'cdx.timeout': '⏱ Timeout',
+    'cdx.timeout': '⏱ Zeitüberschreitung',
     'cs.reset': 'Zurücksetzen',
     'mdl.remove': 'Entfernen',
     'mdl.connect_ollama': 'Ollama verbinden, um diesen Spezialisten zu aktivieren',
@@ -2264,12 +3307,12 @@ const DICT = {
     'mdl.deactivate': 'Deaktivieren',
     'mdl.specialize_topic': 'Auf ein Thema spezialisieren',
     'mdl.speciality': 'Fachgebiet',
-    'mdl.vram_est': 'VRAM gesch.',
+    'mdl.vram_est': 'VRAM ca.',
     'mdl.topic_domain': 'Thema / Domäne',
     'mdl.topic_applies': 'Diese KI richtet alle Antworten auf das angegebene Thema aus. Sofort wirksam, kein Neustart.',
     'mdl.save_spec': 'Spezialisierung speichern',
     'mdl.record_diff': 'Unterschied: „Spezialisierung speichern" wirkt sofort per Prompt. „Ins Modell backen" erzeugt eine dauerhafte Variante mit eingebackenem Thema — schwerer abzudriften.',
-    'spec.generalist.name': 'Generalist AI',
+    'spec.generalist.name': 'Generalisten-KI',
     'spec.generalist.desc': 'Vielseitiger Assistent für Anfragen ohne spezifische Domäne',
     'spec.generalist.domain': 'Allgemeine Hilfe',
 
@@ -2289,7 +3332,7 @@ const DICT = {
     'mex.fit_no': 'Nicht geeignet',
     'mex.spd_muyrapido': 'Sehr schnell',
     'mex.spd_rapido': 'Schnell',
-    'mex.spd_usable': 'Nutzbar',
+    'mex.spd_usable': 'Brauchbar',
     'mex.spd_lento': 'Langsam',
     'use.Chat general': 'Allgemeiner Chat',
     'use.Razonamiento': 'Schlussfolgern',
@@ -2400,7 +3443,7 @@ const DICT = {
     'plan.team_observability.desc': 'Aggregierte Telemetrie fürs ganze Team, nicht nur lokal.',
     'plan.priority_support.label': 'Priorisierter Support und Beratung',
     'plan.priority_support.desc': 'Support-Kanal mit SLA und Unterstützung beim Deployment.',
-    'plan.white_label.label': 'White-Label / Branding',
+    'plan.white_label.label': 'White-Label',
     'plan.white_label.desc': 'Name, Logo und Farben für deine Organisation anpassen.',
 
     'alert.events': 'Ereignisse',
@@ -2476,6 +3519,529 @@ const DICT = {
     'cs.lvl_na_hw': 'auf deiner Hardware nicht verfügbar',
     'cs.parallel_title': 'Parallele KIs',
     'msg.power_tip': 'Leistung nach Prompt-Komplexität gewählt',
+
+    'skills.title': 'Skills',
+    'skills.desc': 'Anweisungspakete, die Andromeda selbst aktiviert, wenn deine Nachricht dazu passt. Keine manuelle Auswahl nötig.',
+    'skills.reload': 'Neu laden',
+    'skills.probe_ph': 'Satz testen…',
+    'skills.probe_btn': 'Testen',
+    'skills.would_activate': 'Würde aktivieren',
+    'skills.no_activation': 'Würde keine Skill aktivieren.',
+    'skills.used_tip': 'Für diese Antwort genutzte Skill',
+    'rag.title': 'Dokumentenkontext',
+    'rag.desc': 'Indiziere Textdateien und der Chat nutzt sie als Kontext mit Quellenangabe. Alles läuft lokal.',
+    'rag.docs': 'Dok.',
+    'rag.drop_hint': 'Dateien hierher ziehen oder klicken (.txt, .md, Code…)',
+    'rag.indexing': 'Indexiere…',
+    'rag.indexed_ok': '{ok} Datei(en) indiziert',
+    'rag.indexed_some': '{ok} indiziert, {skip} übersprungen',
+    'rag.remove': 'Aus Index entfernen',
+    'rag.query_ph': 'Suche testen…',
+    'rag.query_btn': 'Suchen',
+    'rag.no_hits': 'Keine Treffer im Index.',
+    'rag.sources_tip': 'Für diese Antwort genutzte Quellen',
+
+    'skills.create': 'Erstellen',
+    'skills.mine': 'eigene',
+    'skills.delete': 'Skill löschen',
+    'skills.save': 'Skill speichern',
+    'skills.need_fields': 'Name und Beschreibung sind erforderlich.',
+    'skills.f_name': 'Name (z. B. Meine E-Mails)',
+    'skills.f_desc': 'Wann sie aktiviert wird (das entscheidet)',
+    'skills.f_triggers': 'Schlüsselwörter, durch Leerzeichen getrennt',
+    'skills.f_body': 'Anzuwendende Anweisungen…',
+    'chat.compacted': 'Konversation für den Kontext zusammengefasst',
+
+    'mcp.needs_key': 'API-KEY NÖTIG',
+    'mcp.key_set': 'SCHLÜSSEL GESETZT',
+    'mcp.requires': 'Benötigt',
+    'mcp.enabled_not_connected': 'AKTIV (nicht verbunden)',
+    'mcp.key_help': 'Gib den Schlüssel hier ein. Er wird nur lokal gespeichert und ohne Neustart angewendet.',
+    'mcp.get_key': 'So bekommst du ihn',
+    'mcp.key_ph': 'Schlüssel einfügen…',
+    'mcp.key_save': 'Speichern',
+    'mcp.key_configured': 'Konfiguriert',
+    'mcp.key_remove': 'Entfernen',
+    'mcp.key_saved_msg': 'Schlüssel gespeichert. Aktiviere den Server zum Verbinden.',
+
+    'chat.ph_system_down': 'System nicht verfügbar — prüfe Ollama',
+    'chat.ph_no_ais': 'Keine aktiven KIs — gehe zu KI-Modelle',
+
+    'mb.fb_thanks': 'Danke!',
+    'mb.fb_error': 'Nicht gespeichert',
+    'mb.saved_to_downloads': 'In Downloads gespeichert',
+    'mb.save_error': 'Speichern fehlgeschlagen',
+
+    'chat.no_models_installed': 'Du hast noch kein Modell installiert. Andromeda läuft mit deinen eigenen lokalen Modellen: wähle eines aus.',
+    'chat.web_off_hint': 'Die Internetsuche ist deaktiviert.',
+    'chat.web_off_cta': 'In Einstellungen aktivieren',
+
+    'mcp.why_failed': 'Grund',
+    'mcp.runtime_missing': 'Für MCP-Konnektoren fehlt Software:',
+
+    'mcp.installing': 'Installiere {rt}… das kann eine Minute dauern.',
+    'mcp.installing_short': 'Installiere…',
+    'mcp.install_now': 'Jetzt installieren',
+    'mcp.reconnected': 'Server neu verbunden',
+
+    'chl.try_another_search': 'Andere Suche versuchen',
+    'chl.start_new_convo': 'Starte eine neue Unterhaltung',
+    'chl.conversation': 'Unterhaltung',
+    'chl.add_favorite': 'Zu Favoriten hinzufügen',
+    'iu.drop_here': 'Hier ablegen…',
+    'lab.deterministic_hint': 'Deterministisch, für Code und Daten',
+    'mp.assign_model_hint': 'Weise unten ein Ollama-Modell zu, um Andromeda zu nutzen',
+    'pp.password_min': 'Das neue Passwort muss mindestens 8 Zeichen haben',
+    'pp.change_password': 'Passwort ändern',
+    'me.very_fast': 'Sehr schnell',
+    'me.fast': 'Schnell',
+
+    'info.how_it_works': 'So funktioniert es',
+
+    'ch.title': 'Komponentenstatus',
+    'ch.desc': 'Welche Teile von Andromeda gerade aktiv sind und was sie tun.',
+    'ch.active': 'aktiv',
+    'ch.refresh': 'Aktualisieren',
+    'ch.info_intro': 'Jede Karte ist ein Subsystem. Die Randfarbe zeigt den Status, der Text erklärt, was zu tun ist.',
+    'ch.st_ok': 'Aktiv (grün)',
+    'ch.st_ok_d': 'Die Komponente funktioniert und wird genutzt.',
+    'ch.st_degraded': 'Eingeschränkt (gelb)',
+    'ch.st_degraded_d': 'Reagiert, aber etwas fehlt für den vollen Betrieb.',
+    'ch.st_off': 'Aus (grau)',
+    'ch.st_off_d': 'Nicht in Gebrauch. Der Kartentext erklärt die Aktivierung.',
+    'ch.st_error': 'Fehler (rot)',
+    'ch.st_error_d': 'Prüfung fehlgeschlagen. Logs prüfen.',
+    'ch.n_ollama': 'Ollama',
+    'ch.n_specialists': 'Spezialisten',
+    'ch.n_memory': 'Speicher',
+    'ch.n_rag': 'Dokumente (RAG)',
+    'ch.n_skills': 'Skills',
+    'ch.n_mcp': 'MCP-Konnektoren',
+    'ch.n_web': 'Websuche',
+    'ch.n_registry': 'Modell-Registry',
+    'ch.n_ab': 'A/B-Tests',
+    'ch.n_feedback': 'Bewertungen',
+    'ch.n_workspace': 'Arbeitsordner',
+
+    'cd.not_init': 'Nicht initialisiert.',
+    'cd.ollama_none': 'Ollama antwortet nicht oder es sind keine Modelle vorhanden.',
+    'cd.ollama_ok': '{list}',
+    'cd.spec_none': 'Keinem Spezialisten ist ein Modell zugewiesen.',
+    'cd.spec_ok': '{list}',
+    'cd.memory_ok': 'Dauerhafter Gesprächsspeicher.',
+    'cd.rag_empty': 'Noch keine Dokumente indiziert.',
+    'cd.rag_ok': '{chunks} Fragmente · {terms} Begriffe indiziert.',
+    'cd.skills_ok': '{builtin} integriert · {mine} von dir erstellt.',
+    'cd.mcp_none': 'Aktiviere einen Konnektor im MCP-Tab.',
+    'cd.mcp_ok': '{tools} Werkzeuge für die KIs verfügbar.',
+    'cd.web_on': 'Die KIs können das Internet abfragen.',
+    'cd.web_off': 'In den Einstellungen aktivieren, um Websuchen zu erlauben.',
+    'cd.reg_none': 'Keine Version in Produktion.',
+    'cd.reg_ok': 'Bedient {model}.',
+    'cd.ab_none': 'Kein A/B-Test aktiv.',
+    'cd.ab_ok': 'Vergleicht Varianten mit echtem Traffic.',
+    'cd.fb_none': 'Nutze 👍/👎 bei Antworten, um Qualität zu messen.',
+    'cd.fb_ok': '{up} positiv · {down} negativ.',
+    'cd.ws_none': 'Arbeitsordner nicht konfiguriert.',
+    'cd.ws_ok': '{path}',
+    'cd.probe_error': 'Prüfung fehlgeschlagen: {err}',
+
+    'ch.s_ok': 'Aktiv',
+    'ch.s_degraded': 'Teilweise',
+    'ch.s_off': 'Inaktiv',
+    'ch.s_error': 'Fehler',
+
+    'ch.what_is': 'Was es ist',
+    'ch.next_step': 'Nächster Schritt',
+    'ch.next_ok': 'Funktioniert korrekt. Nichts zu tun.',
+    'ch.about_ollama': 'Die Engine, die Modelle lokal ausführt. Andromeda liefert keine Modelle mit, sondern nutzt Ollama.',
+    'ch.about_specialists': 'KI-Profile mit eigenen Anweisungen. Jedes ist auf eine Aufgabenart spezialisiert.',
+    'ch.about_memory': 'Fakten, die Andromeda über Unterhaltungen hinweg behält: Name, Vorlieben, Angaben.',
+    'ch.about_rag': 'Deine lokal indizierten Dokumente. Bei passenden Fragen nutzt die KI sie als Kontext mit Quellenangabe.',
+    'ch.about_skills': 'Anweisungspakete, die sich selbst aktivieren, wenn deine Nachricht dazu passt.',
+    'ch.about_mcp': 'Konnektoren, die den KIs echte Werkzeuge geben: Dateien, Repositories, Datenbanken, Dienste.',
+    'ch.about_web': 'Erlaubt den KIs Internetzugriff. Standardmäßig aus, da Andromeda offline arbeitet.',
+    'ch.about_registry': 'Modell-Versionierung: erfasst Versionen und erlaubt Freigabe oder Rückkehr.',
+    'ch.about_ab': 'Vergleicht zwei Modelle im echten Einsatz und entscheidet statistisch, nicht nach Gefühl.',
+    'ch.about_feedback': 'Deine 👍/👎-Bewertungen. Sie messen echte Qualität und speisen A/B-Tests.',
+    'ch.about_workspace': 'Der Ordner, in dem KIs Dateien lesen und schreiben dürfen. Alles andere ist gesperrt.',
+    'ch.hint_ollama': 'Installiere Ollama und lade ein Modell: ollama pull llama3.2',
+    'ch.hint_specialists': 'Gehe zu KI-Modelle und weise mindestens einem Spezialisten ein Modell zu.',
+    'ch.hint_memory': 'Erzähl ihm etwas über dich; es merkt es sich für später.',
+    'ch.hint_rag': 'Ziehe Textdateien in Einstellungen › Speicher, damit die KI sie nutzen kann.',
+    'ch.hint_skills': 'Die mitgelieferten Skills sind bereit. Eigene erstellst du in Einstellungen › Speicher.',
+    'ch.hint_mcp': 'Öffne Einstellungen › MCP-Konnektoren und aktiviere den gewünschten.',
+    'ch.hint_web': 'Aktiviere sie in Einstellungen › Fähigkeiten für Internetzugriff.',
+    'ch.hint_registry': 'Registriere eine Version in Einstellungen › Modell-Registry und gib sie frei.',
+    'ch.hint_ab': 'Erstelle ein Experiment in Einstellungen › A/B-Tests.',
+    'ch.hint_feedback': 'Bewerte Antworten mit 👍 oder 👎, um Qualität zu messen.',
+    'ch.hint_workspace': 'Lege den Ordner in Einstellungen › Fähigkeiten fest.',
+
+    'sx.title': 'Suchmaschine (SearXNG)',
+    'sx.desc': 'Andromeda sucht über SearXNG, eine quelloffene Metasuchmaschine. Standardmäßig über öffentliche Instanzen. Mit einer eigenen bleiben deine Suchen lokal.',
+    'sx.save': 'Speichern',
+    'sx.checking': 'Prüfe…',
+    'sx.ok': 'Verbunden. Deine Instanz wird verwendet.',
+    'sx.unreachable': 'Keine Antwort. Es werden vorerst öffentliche Instanzen genutzt.',
+    'sx.using_public': 'Keine eigene Instanz: öffentliche werden genutzt.',
+
+    'info.pct.title': 'Latenz: p50, p95 und p99',
+    'info.pct.intro': 'Der Durchschnitt täuscht: eine sehr langsame Antwort verzerrt ihn. Perzentile sortieren alle Antworten und betrachten bestimmte Positionen.',
+    'info.pct.p50h': 'p50 — die Mitte',
+    'info.pct.p50d': 'Die Hälfte der Antworten ist schneller. Das ist die typische Erfahrung.',
+    'info.pct.p95h': 'p95 — fast der schlechteste Fall',
+    'info.pct.p95d': '95 von 100 Antworten sind schneller. Die nützlichste Metrik: sie misst, ob die schlechten Momente erträglich sind.',
+    'info.pct.p99h': 'p99 — der schlimmste Fall',
+    'info.pct.p99d': 'Nur 1 von 100 Antworten dauert länger. Nützlich, um seltene Blockaden zu finden.',
+    'info.pct.whyh': 'Warum das hier zählt',
+    'info.pct.whyd': 'Bei lokalen Modellen hängt die Latenz von Hardware und Modellgröße ab. Steigt p95 stark, wird das Modell oft neu geladen.',
+
+    'ka.title': 'Modell geladen lassen',
+    'ka.desc': 'Vermeidet das Neuladen zwischen Nachrichten (bei großen Modellen zehn Sekunden und mehr). Dafür bleibt VRAM belegt.',
+    'ka.never': 'Nicht behalten',
+    'ka.always': 'Immer',
+
+    'err.ab_unavailable': 'A/B-Tests nicht verfügbar',
+    'err.ab_needs_variants': 'Eine ID und mindestens 2 Varianten sind erforderlich',
+    'err.not_found': 'Nicht gefunden',
+    'err.decision_required': 'Entscheidung erforderlich',
+    'err.username_format': 'Benutzername: 3-32 alphanumerische Zeichen',
+    'err.password_short': 'Das Passwort muss mindestens 8 Zeichen haben',
+    'err.user_exists': 'Dieser Benutzer existiert bereits',
+    'err.bad_credentials': 'Benutzername oder Passwort falsch',
+    'err.not_authenticated': 'Nicht angemeldet',
+    'err.new_password_short': 'Das neue Passwort muss mindestens 8 Zeichen haben',
+    'err.wrong_current_password': 'Das aktuelle Passwort ist falsch',
+    'err.content_required': 'Inhalt erforderlich',
+    'err.prompt_response_required': 'Prompt und Antwort erforderlich',
+    'err.no_connection': 'Dienst nicht erreichbar. Verbindung prüfen',
+    'err.sign_in_first': 'Bitte zuerst anmelden',
+    'err.path_required': 'Pfad erforderlich',
+    'err.no_project_indexed': 'Noch kein Projekt indiziert',
+    'err.question_required': 'Frage erforderlich',
+    'err.empty_content': 'Der Inhalt ist leer',
+    'err.delete_needs_confirm': 'Endgültiges Löschen erfordert Bestätigung',
+    'err.base_model_required': 'Basismodell erforderlich',
+    'err.ollama_unavailable': 'Ollama nicht verfügbar',
+    'err.no_data': 'Keine Daten',
+    'err.registry_unavailable': 'Modell-Registry nicht verfügbar',
+    'err.specialist_required': 'Spezialist erforderlich',
+    'err.variant_prompt_required': 'Variante und Prompt erforderlich',
+    'err.mcp_unavailable': 'MCP-Konnektoren nicht verfügbar',
+    'err.tool_required': 'Werkzeug erforderlich',
+    'err.prompt_required': 'Prompt erforderlich',
+    'err.mcp_not_ready': 'MCP-Konnektoren noch nicht bereit',
+    'err.value_empty': 'Der Wert darf nicht leer sein',
+    'err.profile_unavailable': 'Profil nicht verfügbar',
+    'err.memory_unavailable': 'Speicher nicht verfügbar',
+    'err.specialist_unconfigured': 'Diesem Spezialisten ist kein Modell zugewiesen',
+    'err.mlops_unavailable': 'MLOps nicht verfügbar',
+    'err.model_required': 'Modell erforderlich',
+    'err.topic_required': 'Thema erforderlich',
+    'err.image_required': 'Bild erforderlich',
+    'err.lab_unavailable': 'Das Labor ist nicht verfügbar',
+
+    'err.generic': 'Etwas ist schiefgelaufen',
+    'err.server': 'Serverfehler. Bei Wiederholung Logs prüfen',
+    'err.too_large': 'Der Inhalt ist zu groß',
+
+    'cd.ollama_tune': 'Läuft. Mehr Leistung mit diesen Ollama-Variablen: {vars}',
+
+    'mb.download': 'herunterladen',
+    'mb.copy': 'kopieren',
+    'mb.copied': 'kopiert',
+    'mb.export': 'exportieren',
+
+    'sb.click_download': 'zum Herunterladen klicken',
+
+    'nav.diagnostics': 'Diagnose',
+    'dg.title': 'Diagnose-Konsole',
+    'dg.desc': 'Was Andromeda intern bei jeder Nachricht tut: welchen Prompt das Modell erhält, ob im Web gesucht wird und warum, und wie lange jeder Schritt dauert.',
+    'dg.start': 'Aufzeichnung starten',
+    'dg.stop': 'Stoppen',
+    'dg.state': 'Systemstatus',
+    'dg.copy': 'Log kopieren',
+    'dg.download': 'Herunterladen',
+    'dg.clear': 'Leeren',
+    'dg.all': 'Alle',
+    'dg.filter': 'Nach Kategorie filtern',
+    'dg.copied': 'In die Zwischenablage kopiert',
+    'dg.saved': 'In Downloads gespeichert',
+    'dg.copy_error': 'Kopieren fehlgeschlagen',
+    'dg.waiting': 'Warte auf Aktivität',
+    'dg.waiting_d': 'Schreibe etwas im Chat und jeder Schritt von Andromeda erscheint hier.',
+    'dg.off_explainer': 'Die Aufzeichnung ist aus. Beim Aktivieren werden Prompts und Antworten der Sitzung im Speicher gehalten. Nichts wird auf die Festplatte geschrieben.',
+    'dg.cap_red': 'Websuche',
+    'dg.cap_creacion_archivos': 'Dateierstellung',
+    'dg.cap_memoria_semantica': 'Semantischer Speicher',
+    'dg.cap_perfil_memoria': 'Speicherprofil',
+    'dg.cap_documentos_rag': 'Dokumente',
+    'dg.cap_skills': 'Skills',
+
+    'dg.temporary': 'Entwicklungswerkzeug — wird vor der finalen Version entfernt. Zeigt vollständige Prompts und Umgebungsvariablen.',
+
+    'tr.title': 'Trainingsdaten sammeln (Apolo)',
+    'tr.desc': 'Speichert Gespräche und 👍/👎-Bewertungen lokal, um ein eigenes Modell zu trainieren. Nie im Inkognito-Modus. Exportiert werden nur positiv bewertete Antworten.',
+    'tr.samples': 'Beispiele',
+    'tr.export': 'Für MLX exportieren',
+    'err.training_unavailable': 'Trainingskorpus nicht verfügbar',
+
+
+    'chat.new_conversation': 'Neue Unterhaltung',
+    'err.invalid_file': 'Ungültige Datei',
+    'err.no_conversations': 'Die Datei enthält keine Unterhaltungen',
+
+    'phase.thinking': 'Denke nach…',
+    'phase.searching': 'Suche im Web…',
+    'phase.writing': 'Schreibe…',
+
+    'mcp.msg_connected': 'Verbunden — {count} Werkzeuge.',
+    'mcp.msg_disabled': 'Deaktiviert.',
+    'mcp.msg_failed': 'Verbindung fehlgeschlagen.',
+
+    'chat.open_image': "Bild vergrößern",
+
+    'art.view_code': 'Code anzeigen',
+    'art.view_page': 'Seite anzeigen',
+
+    'proj.files': 'Projektdateien',
+    'proj.files_desc': 'Füge Dateien oder ganze Ordner hinzu. Die KI nutzt sie in den Gesprächen dieses Projekts; was sie erstellt oder ändert, wird hier gespeichert.',
+    'proj.add_files': 'Dateien hinzufügen',
+    'proj.add_folder': 'Ordner hinzufügen',
+    'proj.uploading': 'Lade hoch',
+    'proj.no_files': 'Noch keine Dateien in diesem Projekt.',
+    'proj.n_files': 'Dateien',
+
+    'cs.lvl_low': 'Schnell',
+    'cs.lvl_mid': 'Ausgewogen',
+    'cs.lvl_high': 'Stark',
+    'cs.lvl_ultra': 'Maximal',
+    'cs.power_explain': 'Wähle, welches Modell antwortet. Mehr Leistung ergibt bessere, aber langsamere Antworten. Bei Auto wählt Andromeda nach Schwierigkeit und freiem Speicher.',
+
+    'prev.open': "Vorschau öffnen",
+    'prev.close': "Schließen",
+    'prev.load_error': "Datei konnte nicht geladen werden.",
+    'chat.jump_bottom': "Nach unten",
+
+    'pcat.search': "Prompts suchen…",
+    'pcat.all': "Alle",
+    'pcat.none': "Keine passenden Prompts.",
+    'pcat.use': "Verwenden",
+    'pcat.save': "In meiner Bibliothek speichern",
+    'pcat.saved': "Gespeichert",
+    'pcat.catalog': "Katalog",
+    'pcat.mine': "Meine Prompts",
+    'pcat.title': "Prompt-Bibliothek",
+    'pcat.desc': "Über hundert fertige Prompts nach Kategorien. Fülle aus, was [in Klammern] steht. Gespeicherte erscheinen im Chat unter „Meine Prompts“.",
+
+    'chat.files_context': "Ich habe diese Dateien als Kontext angehängt:",
+    'chat.files_skipped_name': "(nicht enthaltene Dateien)",
+    'chat.files_skipped': "Diese Dateien wurden nicht aufgenommen (binär, zu groß oder über dem Gesamtlimit):",
+
+    'settings.prompts': "Prompt-Bibliothek",
+
+    'prof.data_downloaded': "Daten heruntergeladen",
+    'prof.data_download_error': "Daten konnten nicht heruntergeladen werden",
+
+    'err.invalid_path': "Ungültiger Dateipfad",
+    'err.invalid_url': "Ungültiger Link",
+    'err.preview_failed': "Vorschau dieser Datei nicht möglich",
+    'err.project_file': "Projektdatei konnte nicht verarbeitet werden",
+
+    'dl.saved_to': "Gespeichert unter",
+
+    'mem.semantic_pending': "Bedeutungsbasierter Speicher wird vorbereitet…",
+    'mem.semantic_waiting_ollama': "Bedeutungsbasierter Speicher: warte auf Ollama",
+    'mem.semantic_downloading': "Modell für bedeutungsbasierten Speicher wird geladen",
+    'mem.semantic_ready': "Bedeutungsbasierter Speicher aktiv",
+    'mem.semantic_backfilled': "Erinnerungen aktualisiert",
+    'mem.semantic_offline': "Bedeutungsbasierter Speicher aus: Netzwerkzugriff in Fähigkeiten deaktiviert",
+    'mem.semantic_error': "Bedeutungsbasierter Speicher konnte nicht aktiviert werden; neuer Versuch folgt",
+
+    'memf.search_title': "Unterhaltungen durchsuchen",
+    'memf.search_desc': "Andromeda durchsucht frühere Chats nach relevanten Details, wenn du dich darauf beziehst.",
+    'memf.gen_title': "Erinnerungen aus Chats erzeugen",
+    'memf.gen_desc': "Andromeda merkt sich, was du erzählst: wer du bist, Interessen, Projekte und Ziele.",
+    'memf.sens_title': "Sensible Themen speichern",
+    'memf.sens_desc': "Erlaubt das Speichern sensibler Themen wie Gesundheit, Religion oder Politik. Beim Ausschalten werden sie gelöscht.",
+    'memf.imp_title': "Erinnerungen aus anderen KI-Assistenten importieren",
+    'memf.imp_desc': "Übernimm, was ein anderer Assistent über dich weiß. Wir geben dir einen Prompt dafür.",
+    'memf.imp_start': "Importieren",
+    'memf.imp_step1': "Kopiere diesen Prompt und sende ihn an den anderen Assistenten:",
+    'memf.imp_step2': "Füge seine Antwort hier ein:",
+    'memf.imp_placeholder': "- Ich heiße…\n- Ich arbeite bei…",
+    'memf.imp_do': "Zur Erinnerung hinzufügen",
+    'memf.imported': "{n} Einträge importiert",
+    'memf.purged': "{n} sensible Erinnerungen gelöscht",
+    'memf.purge_incomplete': "Das Löschen wurde nicht abgeschlossen. Einige sensible Erinnerungen könnten noch gespeichert sein.",
+    'memf.confirm_delete': "Alles löschen, was Andromeda in diesem Bereich weiß?",
+    'memf.sec_tu': "Du",
+    'memf.sec_temas': "Themen",
+    'memf.sec_areas': "Bereiche",
+    'memf.sec_personas': "Personen",
+    'memf.sec_notas': "Notizen",
+    'memf.empty': "Noch nichts hier.",
+    'memf.col_name': "Name",
+    'memf.col_summary': "Zusammenfassung",
+    'memf.col_updated': "Zuletzt aktualisiert",
+    'memf.col_actions': "Aktionen",
+    'memf.edit': "Bearbeiten",
+    'memf.today': "heute",
+    'memf.days_ago': "vor {n} Tagen",
+    'memf.file_preferencias': "Vorlieben",
+    'memf.file_perfil': "Profil",
+    'memf.file_gustos': "Interessen",
+    'memf.file_favoritos': "Favoriten",
+    'memf.file_objetivos': "Ziele",
+    'memf.file_tecnologia': "Technologie",
+    'memf.file_rutina': "Routine",
+    'memf.file_proyectos': "Projekte",
+    'memf.file_notas': "Notizen",
+
+    'ui2.theme_macos': "macOS",
+
+    'err.invalid_request': "Ungültige Anfrage",
+
+    'ap.design': "Design",
+
+    'ap.mode': "Modus",
+
+    'memf.updated': "Aktualisiert",
+
+    'memf.empty_all': "Andromeda weiß noch nichts über dich. Es lernt beim Chatten.",
+
+    'memf.describe_change': "Beschreibe, was du ändern möchtest…",
+
+    'memf.apply': "Anwenden",
+
+    'memf.edit_text': "Text bearbeiten",
+
+    'memf.save': "Speichern",
+
+    'memf.desc_preferencias': "Wie Andromeda antworten soll: Sprache, Ton und Format.",
+
+    'memf.desc_perfil': "Wer du bist: Name, Beruf, Ort und Ausbildung.",
+
+    'memf.desc_gustos': "Deine Hobbys und was du magst oder nicht magst.",
+
+    'memf.desc_favoritos': "Deine Lieblingsdinge.",
+
+    'memf.desc_objetivos': "Persönliche und berufliche Ziele.",
+
+    'memf.desc_tecnologia': "Deine Geräte, Werkzeuge und Technologien.",
+
+    'memf.desc_rutina': "Dein Zeitplan und tägliche Gewohnheiten.",
+
+    'memf.desc_proyectos': "Projekte, an denen du arbeitest.",
+
+    'memf.desc_notas': "Dinge, die Andromeda sich merken sollte.",
+
+    'memf.desc_persona': "Wer {name} ist und die Beziehung zu dir.",
+
+    'err.memory_ai_edit': "Änderung per KI nicht möglich. Bearbeite den Text direkt.",
+
+    'err.ollama_offline': "Ollama ist nicht verfügbar",
+
+    'chat.pro_subtitle': "Der Orchestrator wählt für jede Frage automatisch die besten Spezialisten.",
+
+    'ob.step1_pre': "Öffne ",
+
+    'ob.step1_post': " in der Seitenleiste.",
+
+    'ob.step2_pre': "Lade ein Modell herunter unter ",
+
+    'ob.step2_post': ". Für den Einstieg ist qwen3:8b gut (oder gemma3 ab 32 GB Arbeitsspeicher).",
+
+    'ob.step3': "Komm hierher zurück und leg los: chatten, Dateien erstellen und Code ausführen, alles lokal.",
+
+    'code.no_output': "(keine Ausgabe)",
+
+    'slo.insufficient': "Noch zu wenige Daten für eine Bewertung: {n} von {min} Anfragen.",
+
+    'chm.models': "{n} Modelle",
+
+    'chm.active': "{n} aktiv",
+
+    'chm.memories': "{n} Erinnerungen",
+
+    'chm.empty': "leer",
+
+    'chm.docs': "{n} Dokumente",
+
+    'chm.skills': "{n} Skills",
+
+    'chm.connected': "{n} verbunden",
+
+    'chm.on': "aktiv",
+
+    'chm.off': "aus",
+
+    'chm.no_prod': "keine Produktion",
+
+    'chm.no_exp': "keine Experimente",
+
+    'chm.no_votes': "keine Bewertungen",
+
+    'chm.satisfaction': "{n}% Zufriedenheit",
+
+    'chm.files': "{n} Dateien",
+
+    'ap.accent': "Akzentfarbe",
+
+    'ap.accent_blue': "Blau",
+
+    'ap.accent_purple': "Lila",
+
+    'ap.accent_pink': "Pink",
+
+    'ap.accent_red': "Rot",
+
+    'ap.accent_orange': "Orange",
+
+    'ap.accent_yellow': "Gelb",
+
+    'ap.accent_green': "Grün",
+
+    'ap.accent_graphite': "Graphit",
+
+    'ap.accent_andromeda': "Andromeda-Verlauf",
+
+    'mcp.risk_high': "Hohes Risiko",
+
+    'mcp.manual_setup': "Einrichtung nötig",
+
+    'pp.title': "Empfohlenes Leistungspaket",
+
+    'pp.sub': "Ein Modell pro Leistungsstufe, passend zu diesem Rechner ({gb} GB für Modelle). Die automatische Leistung wählt pro Nachricht.",
+
+    'pp.download': "Fehlendes herunterladen ({gb} GB)",
+
+    'pp.downloading': "Wird geladen…",
+
+    'pp.complete': "Paket vollständig",
+
+    'pp.error': "Fehler",
+
+    'sug.11': "Fasse in 5 Punkten zusammen, was Kubernetes ist",
+    'sug.12': "Erstelle eine Portfolio-Website in HTML",
+    'sug.13': "Plane mir eine Lernwoche",
+    'sug.14': "Erkläre mir ein LLM, als wäre ich 12",
+    'sug.15': "Was ist der Unterschied zwischen RAM und VRAM?",
+    'sug.16': "Schreib ein Skript, das meine Downloads sortiert",
+    'sug.17': "Gib mir 10 Projektideen zum Python-Lernen",
+    'sug.18': "Suche die neuesten KI-Nachrichten",
+    'sug.19': "Erkläre Git Branch, Merge und Rebase",
+    'sug.20': "Erstelle eine Tabelle: Python vs. JavaScript",
+    'sug.21': "Schreib eine E-Mail für eine Terminanfrage",
+    'sug.22': "Wie funktioniert HTTPS?",
+    'sug.23': "Erstelle eine Tabelle für meine Ausgaben",
+    'sug.24': "Erkläre KI, ML und Deep Learning",
+    'sug.25': "Hilf mir bei einem technischen Vorstellungsgespräch",
+    'sug.26': "Schreib eine kurze Science-Fiction-Geschichte",
+    'sug.27': "Was ist Docker und wofür nutzt man es?",
+    'sug.28': "Erstelle Quizfragen zu Netzwerken",
+    'sug.29': "Erkläre eine REST-API mit Beispiel",
+    'sug.30': "Gib mir ein 20-Minuten-Training",
   },
   zh: {
     'nav.new_chat': '新对话',
@@ -2496,8 +4062,6 @@ const DICT = {
     'chat.power': '算力',
     'chat.clean': '清空',
     'chat.attach_images': '添加图片',
-    'chat.attach_files': '附加文件',
-    'chat.prompts': '提示词库',
     'settings.title': '设置',
     'settings.general': '通用',
     'settings.appearance': '外观',
@@ -2639,7 +4203,7 @@ const DICT = {
     'login.privacy_policy': '隐私政策',
     'login.terms': '条款',
     'login.ph_pass': '密码（至少 8 位）',
-    'login.ph_email': '邮箱',
+    'login.ph_email': '电子邮件',
     'login.ph_name': '姓名',
     'login.close': '关闭',
     'proj.new_conv': '+ 新对话',
@@ -3067,7 +4631,7 @@ const DICT = {
     'mdl.deactivate': '停用',
     'mdl.specialize_topic': '专精于某个主题',
     'mdl.speciality': '专长',
-    'mdl.vram_est': '显存估计',
+    'mdl.vram_est': '显存约',
     'mdl.topic_domain': '主题 / 领域',
     'mdl.topic_applies': '该 AI 会将所有回答聚焦于指定主题。即时生效，无需重启。',
     'mdl.save_spec': '保存专精',
@@ -3203,7 +4767,7 @@ const DICT = {
     'plan.team_observability.desc': '面向整个团队的聚合遥测，而非仅本地。',
     'plan.priority_support.label': '优先支持与咨询',
     'plan.priority_support.desc': '带 SLA 的支持渠道与部署指导。',
-    'plan.white_label.label': '白标 / 品牌定制',
+    'plan.white_label.label': '白标',
     'plan.white_label.desc': '为你的组织定制名称、徽标和颜色。',
 
     'alert.events': '事件',
@@ -3279,6 +4843,529 @@ const DICT = {
     'cs.lvl_na_hw': '你的硬件不支持',
     'cs.parallel_title': '并行 AI',
     'msg.power_tip': '根据提示复杂度选择的算力',
+
+    'skills.title': '技能',
+    'skills.desc': '当你的消息与之匹配时，Andromeda 会自动启用的指令包。无需手动选择。',
+    'skills.reload': '重新加载',
+    'skills.probe_ph': '测试一句话…',
+    'skills.probe_btn': '测试',
+    'skills.would_activate': '将启用',
+    'skills.no_activation': '不会启用任何技能。',
+    'skills.used_tip': '本回答使用的技能',
+    'rag.title': '文档上下文',
+    'rag.desc': '索引文本文件后，对话会将其作为上下文并注明来源。全部在本机处理。',
+    'rag.docs': '文档',
+    'rag.drop_hint': '拖放文件到此处或点击选择（.txt、.md、代码…）',
+    'rag.indexing': '正在索引…',
+    'rag.indexed_ok': '已索引 {ok} 个文件',
+    'rag.indexed_some': '已索引 {ok} 个，跳过 {skip} 个',
+    'rag.remove': '从索引中移除',
+    'rag.query_ph': '测试一下搜索…',
+    'rag.query_btn': '搜索',
+    'rag.no_hits': '索引中没有结果。',
+    'rag.sources_tip': '本回答使用的来源',
+
+    'skills.create': '创建',
+    'skills.mine': '自建',
+    'skills.delete': '删除技能',
+    'skills.save': '保存技能',
+    'skills.need_fields': '名称和描述为必填项。',
+    'skills.f_name': '名称（例如：我的邮件）',
+    'skills.f_desc': '何时启用（这决定使用时机）',
+    'skills.f_triggers': '关键词，用空格分隔',
+    'skills.f_body': '要应用的指令…',
+    'chat.compacted': '已压缩对话以适应上下文',
+
+    'mcp.needs_key': '需要 API 密钥',
+    'mcp.key_set': '密钥已配置',
+    'mcp.requires': '需要',
+    'mcp.enabled_not_connected': '已启用（未连接）',
+    'mcp.key_help': '在此输入密钥。仅保存在本机，无需重启即可生效。',
+    'mcp.get_key': '如何获取',
+    'mcp.key_ph': '粘贴你的密钥…',
+    'mcp.key_save': '保存',
+    'mcp.key_configured': '已配置',
+    'mcp.key_remove': '移除',
+    'mcp.key_saved_msg': '密钥已保存。启用服务器以连接。',
+
+    'chat.ph_system_down': '系统不可用 — 请检查 Ollama',
+    'chat.ph_no_ais': '没有启用的 AI — 请前往 AI 模型',
+
+    'mb.fb_thanks': '谢谢！',
+    'mb.fb_error': '无法记录',
+    'mb.saved_to_downloads': '已保存到下载文件夹',
+    'mb.save_error': '保存失败',
+
+    'chat.no_models_installed': '你还没有安装任何模型。Andromeda 使用你自己的本地模型：请选择一个开始。',
+    'chat.web_off_hint': '互联网搜索已关闭。',
+    'chat.web_off_cta': '在设置中启用',
+
+    'mcp.why_failed': '原因',
+    'mcp.runtime_missing': 'MCP 连接器所需的软件缺失：',
+
+    'mcp.installing': '正在安装 {rt}… 可能需要一分钟。',
+    'mcp.installing_short': '安装中…',
+    'mcp.install_now': '立即安装',
+    'mcp.reconnected': '服务器已重新连接',
+
+    'chl.try_another_search': '换个搜索词试试',
+    'chl.start_new_convo': '开始新对话',
+    'chl.conversation': '对话',
+    'chl.add_favorite': '添加到收藏',
+    'iu.drop_here': '拖放到此处…',
+    'lab.deterministic_hint': '确定性输出，适合代码和数据',
+    'mp.assign_model_hint': '在下方为其分配一个 Ollama 模型即可开始使用 Andromeda',
+    'pp.password_min': '新密码至少需要 8 个字符',
+    'pp.change_password': '修改密码',
+    'me.very_fast': '非常快',
+    'me.fast': '快',
+
+    'info.how_it_works': '工作原理',
+
+    'ch.title': '组件状态',
+    'ch.desc': 'Andromeda 各部分的当前状态及其运行情况。',
+    'ch.active': '个活跃',
+    'ch.refresh': '刷新',
+    'ch.info_intro': '每张卡片代表一个子系统。边框颜色表示状态，文字说明未启用时该怎么做。',
+    'ch.st_ok': '活跃（绿色）',
+    'ch.st_ok_d': '组件正常运行且正在使用。',
+    'ch.st_degraded': '降级（琥珀色）',
+    'ch.st_degraded_d': '有响应，但缺少完全运行所需的条件。',
+    'ch.st_off': '关闭（灰色）',
+    'ch.st_off_d': '未启用。卡片文字说明如何启用。',
+    'ch.st_error': '错误（红色）',
+    'ch.st_error_d': '检测失败。请查看日志。',
+    'ch.n_ollama': 'Ollama',
+    'ch.n_specialists': '专家',
+    'ch.n_memory': '记忆',
+    'ch.n_rag': '文档 (RAG)',
+    'ch.n_skills': '技能',
+    'ch.n_mcp': 'MCP 连接器',
+    'ch.n_web': '网络搜索',
+    'ch.n_registry': '模型注册表',
+    'ch.n_ab': 'A/B 测试',
+    'ch.n_feedback': '反馈',
+    'ch.n_workspace': '工作区',
+
+    'cd.not_init': '未初始化。',
+    'cd.ollama_none': 'Ollama 无响应或未下载模型。',
+    'cd.ollama_ok': '{list}',
+    'cd.spec_none': '没有专家分配了模型。',
+    'cd.spec_ok': '{list}',
+    'cd.memory_ok': '持久的对话记忆。',
+    'cd.rag_empty': '尚未索引任何文档。',
+    'cd.rag_ok': '{chunks} 个片段 · 已索引 {terms} 个词条。',
+    'cd.skills_ok': '{builtin} 个内置 · {mine} 个自建。',
+    'cd.mcp_none': '在 MCP 标签页中启用连接器。',
+    'cd.mcp_ok': '为 AI 提供 {tools} 个可用工具。',
+    'cd.web_on': 'AI 可以访问互联网。',
+    'cd.web_off': '在设置中启用以允许网络搜索。',
+    'cd.reg_none': '没有版本被提升到生产环境。',
+    'cd.reg_ok': '正在服务 {model}。',
+    'cd.ab_none': '没有正在进行的 A/B 测试。',
+    'cd.ab_ok': '正在用真实流量比较变体。',
+    'cd.fb_none': '在回答上使用 👍/👎 来衡量质量。',
+    'cd.fb_ok': '{up} 个好评 · {down} 个差评。',
+    'cd.ws_none': '未配置工作区文件夹。',
+    'cd.ws_ok': '{path}',
+    'cd.probe_error': '检测失败：{err}',
+
+    'ch.s_ok': '活跃',
+    'ch.s_degraded': '部分',
+    'ch.s_off': '未启用',
+    'ch.s_error': '错误',
+
+    'ch.what_is': '这是什么',
+    'ch.next_step': '下一步',
+    'ch.next_ok': '运行正常，无需操作。',
+    'ch.about_ollama': '在本机运行模型的引擎。Andromeda 不自带模型，而是通过 Ollama 下载并运行。',
+    'ch.about_specialists': '拥有各自指令的 AI 配置。每个专注于一类任务并分配了模型。',
+    'ch.about_memory': 'Andromeda 在对话之间记住的信息：你的名字、偏好和你告诉它的事实。',
+    'ch.about_rag': '本地索引的文档。当你提出相关问题时，AI 会将其作为上下文并注明来源。',
+    'ch.about_skills': '当你的消息匹配时自动启用的指令包，无需手动选择。',
+    'ch.about_mcp': '为 AI 提供真实工具的连接器：文件、代码仓库、数据库或外部服务。',
+    'ch.about_web': '允许 AI 访问互联网。默认关闭，因为 Andromeda 的设计是离线运行。',
+    'ch.about_registry': '模型版本控制：记录每个版本，可提升到生产环境或回滚。',
+    'ch.about_ab': '用真实使用情况比较两个模型，并通过统计检验判定优劣，而非凭感觉。',
+    'ch.about_feedback': '你对回答的 👍/👎 评价。用于衡量真实质量并支持 A/B 测试。',
+    'ch.about_workspace': 'AI 可以读写文件的文件夹。出于安全考虑，其他位置不可访问。',
+    'ch.hint_ollama': '安装 Ollama 并下载模型：ollama pull llama3.2',
+    'ch.hint_specialists': '前往 AI 模型，至少为一个专家分配模型。',
+    'ch.hint_memory': '在对话中告诉它一些关于你的信息，它会记住。',
+    'ch.hint_rag': '在 设置 › 记忆 中拖入文本文件，AI 即可查阅。',
+    'ch.hint_skills': '内置技能已就绪。你可以在 设置 › 记忆 中创建自己的技能。',
+    'ch.hint_mcp': '打开 设置 › MCP 连接器 并启用所需的连接器。',
+    'ch.hint_web': '如需 AI 访问互联网，请在 设置 › 能力 中启用。',
+    'ch.hint_registry': '在 设置 › 模型注册表 中注册版本并提升到生产环境。',
+    'ch.hint_ab': '在 设置 › A/B 测试 中创建实验以比较两个模型。',
+    'ch.hint_feedback': '在对话回答上点 👍 或 👎 即可开始衡量质量。',
+    'ch.hint_workspace': '在 设置 › 能力 中设置文件夹，AI 即可创建文件。',
+
+    'sx.title': '搜索引擎 (SearXNG)',
+    'sx.desc': 'Andromeda 通过开源元搜索引擎 SearXNG 进行搜索。默认使用公共实例。自建实例后，搜索记录不会离开你的设备。',
+    'sx.save': '保存',
+    'sx.checking': '检查中…',
+    'sx.ok': '连接成功，将使用你的实例。',
+    'sx.unreachable': '无响应。暂时使用公共实例。',
+    'sx.using_public': '未设置自建实例：将使用公共实例。',
+
+    'info.pct.title': '延迟：p50、p95 和 p99',
+    'info.pct.intro': '平均值有误导性：一次很慢的响应就会拉高它。百分位数将所有响应从快到慢排序，并查看特定位置。',
+    'info.pct.p50h': 'p50 — 中位数',
+    'info.pct.p50d': '一半的响应比这更快。这是典型体验。',
+    'info.pct.p95h': 'p95 — 接近最差情况',
+    'info.pct.p95d': '100 次中有 95 次更快，只有 5 次更慢。这是最有用的指标：衡量最差情况是否可接受。',
+    'info.pct.p99h': 'p99 — 最差情况',
+    'info.pct.p99d': '100 次中只有 1 次更慢。用于发现罕见的卡顿。',
+    'info.pct.whyh': '为何重要',
+    'info.pct.whyd': '本地模型的延迟取决于硬件和模型大小。若 p95 飙升而 p50 正常，通常是某些请求在重新加载模型。',
+
+    'ka.title': '保持模型已加载',
+    'ka.desc': '避免在消息之间重新加载模型（大模型需要数十秒）。代价是期间占用显存。',
+    'ka.never': '不保持',
+    'ka.always': '始终',
+
+    'err.ab_unavailable': 'A/B 测试不可用',
+    'err.ab_needs_variants': '需要一个 id 和至少 2 个变体',
+    'err.not_found': '未找到',
+    'err.decision_required': '需要决策内容',
+    'err.username_format': '用户名需为 3-32 个字母数字字符',
+    'err.password_short': '密码至少需要 8 个字符',
+    'err.user_exists': '该用户已存在',
+    'err.bad_credentials': '用户名或密码错误',
+    'err.not_authenticated': '未登录',
+    'err.new_password_short': '新密码至少需要 8 个字符',
+    'err.wrong_current_password': '当前密码不正确',
+    'err.content_required': '需要内容',
+    'err.prompt_response_required': '需要 prompt 和 response',
+    'err.no_connection': '无法连接到服务。请检查网络连接',
+    'err.sign_in_first': '请先登录',
+    'err.path_required': '需要路径',
+    'err.no_project_indexed': '尚未索引任何项目',
+    'err.question_required': '需要问题',
+    'err.empty_content': '内容为空',
+    'err.delete_needs_confirm': '永久删除需要确认',
+    'err.base_model_required': '需要基础模型',
+    'err.ollama_unavailable': 'Ollama 不可用',
+    'err.no_data': '无数据',
+    'err.registry_unavailable': '模型注册表不可用',
+    'err.specialist_required': '需要指定专家',
+    'err.variant_prompt_required': '需要变体和 prompt',
+    'err.mcp_unavailable': 'MCP 连接器不可用',
+    'err.tool_required': '需要指定工具',
+    'err.prompt_required': '需要 prompt',
+    'err.mcp_not_ready': 'MCP 连接器尚未就绪',
+    'err.value_empty': '值不能为空',
+    'err.profile_unavailable': '个人资料不可用',
+    'err.memory_unavailable': '记忆功能不可用',
+    'err.specialist_unconfigured': '该专家未分配模型',
+    'err.mlops_unavailable': 'MLOps 不可用',
+    'err.model_required': '需要模型',
+    'err.topic_required': '需要主题',
+    'err.image_required': '需要图片',
+    'err.lab_unavailable': '实验室不可用',
+
+    'err.generic': '出错了',
+    'err.server': '服务器错误。如果反复出现请查看日志',
+    'err.too_large': '内容过大',
+
+    'cd.ollama_tune': '运行中。在 Ollama 中设置以下变量可提升性能：{vars}',
+
+    'mb.download': '下载',
+    'mb.copy': '复制',
+    'mb.copied': '已复制',
+    'mb.export': '导出',
+
+    'sb.click_download': '点击下载',
+
+    'nav.diagnostics': '诊断',
+    'dg.title': '诊断控制台',
+    'dg.desc': 'Andromeda 在每条消息内部所做的事：模型收到什么提示词、是否联网搜索及原因、每一步耗时多久。',
+    'dg.start': '开始记录',
+    'dg.stop': '停止',
+    'dg.state': '系统状态',
+    'dg.copy': '复制日志',
+    'dg.download': '下载',
+    'dg.clear': '清空',
+    'dg.all': '全部',
+    'dg.filter': '按类别筛选',
+    'dg.copied': '已复制到剪贴板',
+    'dg.saved': '已保存到下载文件夹',
+    'dg.copy_error': '复制失败',
+    'dg.waiting': '等待活动',
+    'dg.waiting_d': '在对话中发送消息，Andromeda 的每一步都会显示在这里。',
+    'dg.off_explainer': '记录已关闭。启用后会在内存中保存本次会话的完整提示词和回复，这正是诊断故障所需的。不会写入磁盘，停止或关闭应用后全部清除。',
+    'dg.cap_red': '网络搜索',
+    'dg.cap_creacion_archivos': '创建文件',
+    'dg.cap_memoria_semantica': '语义记忆',
+    'dg.cap_perfil_memoria': '记忆档案',
+    'dg.cap_documentos_rag': '文档',
+    'dg.cap_skills': '技能',
+
+    'dg.temporary': '开发工具 — 正式版发布前将移除。会暴露完整的提示词和环境变量。',
+
+    'tr.title': '收集训练数据（Apolo）',
+    'tr.desc': '在本地保存对话和 👍/👎 评价，用于训练自己的模型。隐身模式下从不保存。只导出被评为好的回答。',
+    'tr.samples': '条样本',
+    'tr.export': '导出为 MLX 格式',
+    'err.training_unavailable': '训练语料不可用',
+
+
+    'chat.new_conversation': '新对话',
+    'err.invalid_file': '无效文件',
+    'err.no_conversations': '文件中没有对话',
+
+    'phase.thinking': '思考中…',
+    'phase.searching': '正在联网搜索…',
+    'phase.writing': '正在撰写…',
+
+    'mcp.msg_connected': '已连接 — {count} 个工具。',
+    'mcp.msg_disabled': '已停用。',
+    'mcp.msg_failed': '无法连接。',
+
+    'chat.open_image': "放大图片",
+
+    'art.view_code': '查看代码',
+    'art.view_page': '查看页面',
+
+    'proj.files': '项目文件',
+    'proj.files_desc': '添加文件或整个文件夹。AI 会在此项目的对话中使用它们，它创建或修改的内容也保存在这里。',
+    'proj.add_files': '添加文件',
+    'proj.add_folder': '添加文件夹',
+    'proj.uploading': '正在上传',
+    'proj.no_files': '此项目还没有文件。',
+    'proj.n_files': '个文件',
+
+    'cs.lvl_low': '快速',
+    'cs.lvl_mid': '均衡',
+    'cs.lvl_high': '强大',
+    'cs.lvl_ultra': '最强',
+    'cs.power_explain': '选择由哪个模型回答。性能越高，回答越好但越慢。自动模式下，Andromeda 会根据问题难度和可用内存选择。',
+
+    'prev.open': "打开预览",
+    'prev.close': "关闭",
+    'prev.load_error': "无法加载文件。",
+    'chat.jump_bottom': "跳到底部",
+
+    'pcat.search': "搜索提示词…",
+    'pcat.all': "全部",
+    'pcat.none': "没有匹配的提示词。",
+    'pcat.use': "使用",
+    'pcat.save': "保存到我的库",
+    'pcat.saved': "已保存",
+    'pcat.catalog': "目录",
+    'pcat.mine': "我的提示词",
+    'pcat.title': "提示词库",
+    'pcat.desc': "一百多个按类别整理的现成提示词。填写[方括号]中的内容。保存的会出现在聊天的“我的提示词”中。",
+
+    'chat.files_context': "我附上了这些文件作为上下文：",
+    'chat.files_skipped_name': "（未包含的文件）",
+    'chat.files_skipped': "这些文件未包含（二进制、过大或超出总限制）：",
+
+    'settings.prompts': "提示词库",
+
+    'prof.data_downloaded': "数据已下载",
+    'prof.data_download_error': "无法下载数据",
+
+    'err.invalid_path': "文件路径无效",
+    'err.invalid_url': "链接无效",
+    'err.preview_failed': "无法预览此文件",
+    'err.project_file': "无法处理项目文件",
+
+    'dl.saved_to': "已保存到",
+
+    'mem.semantic_pending': "正在准备语义记忆…",
+    'mem.semantic_waiting_ollama': "语义记忆：正在等待 Ollama",
+    'mem.semantic_downloading': "正在下载语义记忆模型",
+    'mem.semantic_ready': "语义记忆已启用",
+    'mem.semantic_backfilled': "条记忆已更新",
+    'mem.semantic_offline': "语义记忆已关闭：功能中已禁用网络访问",
+    'mem.semantic_error': "无法启用语义记忆，将重试",
+
+    'memf.search_title': "搜索和引用对话",
+    'memf.search_desc': "当你提到之前的对话时，Andromeda 会在其中搜索相关内容。",
+    'memf.gen_title': "从对话生成记忆",
+    'memf.gen_desc': "让 Andromeda 记住你告诉它的内容：你是谁、兴趣、项目和目标。",
+    'memf.sens_title': "在记忆中包含敏感话题",
+    'memf.sens_desc': "允许保存健康、宗教或政治等敏感话题。关闭后会删除已保存的内容。",
+    'memf.imp_title': "从其他 AI 助手导入记忆",
+    'memf.imp_desc': "把其他助手了解的你的信息带入 Andromeda。我们会提供一个提示词。",
+    'memf.imp_start': "导入",
+    'memf.imp_step1': "复制此提示词并发送给另一个助手：",
+    'memf.imp_step2': "在此粘贴它的回答：",
+    'memf.imp_placeholder': "- 我叫……\n- 我在……工作",
+    'memf.imp_do': "添加到记忆",
+    'memf.imported': "已导入 {n} 条",
+    'memf.purged': "已删除 {n} 条敏感记忆",
+    'memf.purge_incomplete': "删除未完成，部分敏感记忆可能仍被保存。",
+    'memf.confirm_delete': "删除 Andromeda 在此部分记住的所有内容？",
+    'memf.sec_tu': "你",
+    'memf.sec_temas': "话题",
+    'memf.sec_areas': "领域",
+    'memf.sec_personas': "人物",
+    'memf.sec_notas': "笔记",
+    'memf.empty': "这里还没有内容。",
+    'memf.col_name': "名称",
+    'memf.col_summary': "摘要",
+    'memf.col_updated': "最后更新",
+    'memf.col_actions': "操作",
+    'memf.edit': "编辑",
+    'memf.today': "今天",
+    'memf.days_ago': "{n} 天前",
+    'memf.file_preferencias': "偏好",
+    'memf.file_perfil': "个人资料",
+    'memf.file_gustos': "兴趣",
+    'memf.file_favoritos': "最爱",
+    'memf.file_objetivos': "目标",
+    'memf.file_tecnologia': "技术",
+    'memf.file_rutina': "日常",
+    'memf.file_proyectos': "项目",
+    'memf.file_notas': "笔记",
+
+    'ui2.theme_macos': "macOS",
+
+    'err.invalid_request': "请求无效",
+
+    'ap.design': "设计",
+
+    'ap.mode': "模式",
+
+    'memf.updated': "更新于",
+
+    'memf.empty_all': "Andromeda 还不记得你的任何信息，会在对话中逐渐了解。",
+
+    'memf.describe_change': "描述你想修改的内容……",
+
+    'memf.apply': "应用",
+
+    'memf.edit_text': "编辑文本",
+
+    'memf.save': "保存",
+
+    'memf.desc_preferencias': "你希望 Andromeda 如何回答：语言、语气和格式。",
+
+    'memf.desc_perfil': "你是谁：姓名、职业、所在地和学业。",
+
+    'memf.desc_gustos': "你的爱好以及喜欢或不喜欢的东西。",
+
+    'memf.desc_favoritos': "你最喜欢的东西。",
+
+    'memf.desc_objetivos': "你设定的个人和职业目标。",
+
+    'memf.desc_tecnologia': "你的设备、工具和使用的技术。",
+
+    'memf.desc_rutina': "你的日程和日常习惯。",
+
+    'memf.desc_proyectos': "你正在进行的项目。",
+
+    'memf.desc_notas': "你让 Andromeda 记住的事情。",
+
+    'memf.desc_persona': "{name} 是谁以及与你的关系。",
+
+    'err.memory_ai_edit': "AI 无法应用该修改，请尝试直接编辑文本。",
+
+    'err.ollama_offline': "Ollama 不可用",
+
+    'chat.pro_subtitle': "编排器会为每个问题自动选择最合适的专家。",
+
+    'ob.step1_pre': "在侧边栏打开 ",
+
+    'ob.step1_post': "。",
+
+    'ob.step2_pre': "在 ",
+
+    'ob.step2_post': "中下载一个模型。首次使用推荐 qwen3:8b（内存 32 GB 以上可选 gemma3）。",
+
+    'ob.step3': "回到这里即可开始聊天、创建文件和运行代码，全部在本地完成。",
+
+    'code.no_output': "（无输出）",
+
+    'slo.insufficient': "数据不足，暂无法评估质量：{n} / {min} 次请求。",
+
+    'chm.models': "{n} 个模型",
+
+    'chm.active': "{n} 个启用",
+
+    'chm.memories': "{n} 条记忆",
+
+    'chm.empty': "空",
+
+    'chm.docs': "{n} 个文档",
+
+    'chm.skills': "{n} 个技能",
+
+    'chm.connected': "{n} 个已连接",
+
+    'chm.on': "已开启",
+
+    'chm.off': "已关闭",
+
+    'chm.no_prod': "无生产版本",
+
+    'chm.no_exp': "无实验",
+
+    'chm.no_votes': "无评价",
+
+    'chm.satisfaction': "{n}% 满意度",
+
+    'chm.files': "{n} 个文件",
+
+    'ap.accent': "强调色",
+
+    'ap.accent_blue': "蓝色",
+
+    'ap.accent_purple': "紫色",
+
+    'ap.accent_pink': "粉色",
+
+    'ap.accent_red': "红色",
+
+    'ap.accent_orange': "橙色",
+
+    'ap.accent_yellow': "黄色",
+
+    'ap.accent_green': "绿色",
+
+    'ap.accent_graphite': "石墨色",
+
+    'ap.accent_andromeda': "Andromeda 渐变",
+
+    'mcp.risk_high': "高风险",
+
+    'mcp.manual_setup': "需要预先配置",
+
+    'pp.title': "推荐的算力组合",
+
+    'pp.sub': "为这台电脑每个算力等级选择一个模型（可用于模型的内存：{gb} GB）。自动算力会为每条消息在其中选择。",
+
+    'pp.download': "下载缺少的模型（{gb} GB）",
+
+    'pp.downloading': "下载中……",
+
+    'pp.complete': "组合已完整",
+
+    'pp.error': "错误",
+
+    'sug.11': "用 5 点概括什么是 Kubernetes",
+    'sug.12': "用 HTML 做一个作品集网站",
+    'sug.13': "帮我规划一周的学习",
+    'sug.14': "像给 12 岁孩子一样解释什么是大模型",
+    'sug.15': "RAM 和显存有什么区别？",
+    'sug.16': "写一个整理下载文件夹的脚本",
+    'sug.17': "给我 10 个学习 Python 的项目点子",
+    'sug.18': "搜索最新的 AI 新闻",
+    'sug.19': "解释 Git 的分支、合并和变基",
+    'sug.20': "做一张 Python 与 JavaScript 的对比表",
+    'sug.21': "写一封请求会面的邮件",
+    'sug.22': "HTTPS 是如何工作的？",
+    'sug.23': "为我的开支创建一个表格",
+    'sug.24': "解释人工智能、机器学习和深度学习的区别",
+    'sug.25': "帮我准备技术面试",
+    'sug.26': "写一个科幻短篇故事",
+    'sug.27': "Docker 是什么，有什么用？",
+    'sug.28': "生成关于网络的选择题",
+    'sug.29': "用例子解释 REST API",
+    'sug.30': "给我一个 20 分钟的锻炼计划",
   },
   fr: {
     'nav.new_chat': 'Nouvelle conversation',
@@ -3299,8 +5386,6 @@ const DICT = {
     'chat.power': 'Puissance',
     'chat.clean': 'Effacer',
     'chat.attach_images': 'Ajouter des images',
-    'chat.attach_files': 'Joindre des fichiers',
-    'chat.prompts': 'Bibliothèque de prompts',
     'settings.title': 'Paramètres',
     'settings.general': 'Général',
     'settings.appearance': 'Apparence',
@@ -3687,7 +5772,7 @@ const DICT = {
     'ab.by_success': 'Par taux de réussite',
     'ab.by_quality': 'Par qualité (👍/👎)',
 
-    'reg.title': 'Model Registry',
+    'reg.title': 'Registre de modèles',
     'reg.subtitle': 'Versionnez les modèles et promouvez le meilleur en production.',
     'reg.serve_prod': 'Servir le modèle de production',
     'reg.serve_prod_desc': 'Utiliser le modèle de production par défaut.',
@@ -3698,10 +5783,10 @@ const DICT = {
     'reg.empty': 'Aucun modèle enregistré.',
     'reg.score': 'score',
     'reg.to_prod': '→ Production',
-    'reg.to_staging': '→ Staging',
+    'reg.to_staging': '→ Préproduction',
     'reg.to_archived': 'Archiver',
     'reg.stage_production': 'production',
-    'reg.stage_staging': 'staging',
+    'reg.stage_staging': 'préproduction',
     'reg.stage_archived': 'archivé',
     'reg.stage_none': '—',
     'common.delete': 'Supprimer',
@@ -3811,7 +5896,7 @@ const DICT = {
     'trace.degraded': 'dégradé',
     'mdl.record_spec': 'Entraîner une IA spécialisée',
 
-    'settings.registry': 'Model Registry',
+    'settings.registry': 'Registre de modèles',
     'settings.advanced': 'Avancé',
     'ui2.theme_dark': 'Sombre',
     'ui2.theme_light': 'Clair',
@@ -3832,7 +5917,7 @@ const DICT = {
     'onb.retry': 'Réessayer',
     'onb.continue': 'Continuer →',
     'cdx.run': '▶ Exécuter',
-    'cdx.timeout': '⏱ délai',
+    'cdx.timeout': '⏱ délai dépassé',
     'cs.reset': 'Réinitialiser',
     'mdl.remove': 'Retirer',
     'mdl.connect_ollama': 'Connectez Ollama pour activer ce spécialiste',
@@ -3870,7 +5955,7 @@ const DICT = {
     'mdl.deactivate': 'Désactiver',
     'mdl.specialize_topic': 'Spécialiser sur un sujet',
     'mdl.speciality': 'Spécialité',
-    'mdl.vram_est': 'VRAM est.',
+    'mdl.vram_est': 'VRAM approx.',
     'mdl.topic_domain': 'Sujet / domaine',
     'mdl.topic_applies': 'Cette IA orientera toutes ses réponses sur le sujet indiqué. Appliqué instantanément, sans redémarrage.',
     'mdl.save_spec': 'Enregistrer la spécialisation',
@@ -3895,7 +5980,7 @@ const DICT = {
     'mex.fit_no': 'Ne convient pas',
     'mex.spd_muyrapido': 'Très rapide',
     'mex.spd_rapido': 'Rapide',
-    'mex.spd_usable': 'Utilisable',
+    'mex.spd_usable': 'Acceptable',
     'mex.spd_lento': 'Lent',
     'use.Chat general': 'Chat général',
     'use.Razonamiento': 'Raisonnement',
@@ -4006,7 +6091,7 @@ const DICT = {
     'plan.team_observability.desc': 'Télémétrie agrégée pour toute l\'équipe, pas seulement locale.',
     'plan.priority_support.label': 'Support prioritaire et conseil',
     'plan.priority_support.desc': 'Canal de support avec SLA et accompagnement au déploiement.',
-    'plan.white_label.label': 'Marque blanche / branding',
+    'plan.white_label.label': 'Marque blanche',
     'plan.white_label.desc': 'Personnaliser nom, logo et couleurs pour votre organisation.',
 
     'alert.events': 'Événements',
@@ -4029,7 +6114,7 @@ const DICT = {
     'prof.new_pw': 'Nouveau mot de passe',
 
     'sys.lbl_system': 'Système',
-    'sys.lbl_backend': 'Backend',
+    'sys.lbl_backend': 'Serveur',
     'sys.lbl_tier': 'Niveau matériel',
     'sys.lbl_cpu_cores': 'Cœurs CPU',
     'sys.lbl_ram_total': 'RAM totale',
@@ -4082,6 +6167,529 @@ const DICT = {
     'cs.lvl_na_hw': 'indisponible sur ton matériel',
     'cs.parallel_title': 'IA en parallèle',
     'msg.power_tip': 'Puissance choisie selon la complexité du prompt',
+
+    'skills.title': 'Skills',
+    'skills.desc': 'Des paquets d\'instructions qu\'Andromeda active tout seul quand ton message y correspond. Aucune sélection manuelle.',
+    'skills.reload': 'Recharger',
+    'skills.probe_ph': 'Teste une phrase…',
+    'skills.probe_btn': 'Tester',
+    'skills.would_activate': 'Activerait',
+    'skills.no_activation': 'N\'activerait aucune skill.',
+    'skills.used_tip': 'Skill utilisée pour cette réponse',
+    'rag.title': 'Contexte documentaire',
+    'rag.desc': 'Indexe des fichiers texte et le chat les utilisera comme contexte en citant la source. Tout reste sur ta machine.',
+    'rag.docs': 'docs',
+    'rag.drop_hint': 'Dépose des fichiers ici ou clique pour choisir (.txt, .md, code…)',
+    'rag.indexing': 'Indexation…',
+    'rag.indexed_ok': '{ok} fichier(s) indexé(s)',
+    'rag.indexed_some': '{ok} indexé(s), {skip} ignoré(s)',
+    'rag.remove': 'Retirer de l\'index',
+    'rag.query_ph': 'Essaie une recherche…',
+    'rag.query_btn': 'Rechercher',
+    'rag.no_hits': 'Aucun résultat dans l\'index.',
+    'rag.sources_tip': 'Sources utilisées pour cette réponse',
+
+    'skills.create': 'Créer',
+    'skills.mine': 'à moi',
+    'skills.delete': 'Supprimer',
+    'skills.save': 'Enregistrer',
+    'skills.need_fields': 'Le nom et la description sont obligatoires.',
+    'skills.f_name': 'Nom (ex. Mes e-mails)',
+    'skills.f_desc': 'Quand l\'activer (cela décide de l\'usage)',
+    'skills.f_triggers': 'Mots-clés, séparés par des espaces',
+    'skills.f_body': 'Instructions à appliquer…',
+    'chat.compacted': 'Conversation résumée pour tenir dans le contexte',
+
+    'mcp.needs_key': 'CLÉ API REQUISE',
+    'mcp.key_set': 'CLÉ CONFIGURÉE',
+    'mcp.requires': 'Nécessite',
+    'mcp.enabled_not_connected': 'ACTIVÉ (non connecté)',
+    'mcp.key_help': 'Saisis la clé ici. Elle est stockée uniquement sur ta machine et appliquée sans redémarrage.',
+    'mcp.get_key': 'Comment l\'obtenir',
+    'mcp.key_ph': 'Colle ta clé…',
+    'mcp.key_save': 'Enregistrer',
+    'mcp.key_configured': 'Configurée',
+    'mcp.key_remove': 'Retirer',
+    'mcp.key_saved_msg': 'Clé enregistrée. Active le serveur pour connecter.',
+
+    'chat.ph_system_down': 'Système indisponible — vérifie Ollama',
+    'chat.ph_no_ais': 'Aucune IA active — va dans Modèles d\'IA',
+
+    'mb.fb_thanks': 'Merci !',
+    'mb.fb_error': 'Enregistrement impossible',
+    'mb.saved_to_downloads': 'Enregistré dans Téléchargements',
+    'mb.save_error': 'Échec de l\'enregistrement',
+
+    'chat.no_models_installed': 'Tu n\'as encore aucun modèle installé. Andromeda fonctionne avec tes modèles locaux : choisis-en un pour commencer.',
+    'chat.web_off_hint': 'La recherche internet est désactivée.',
+    'chat.web_off_cta': 'Activer dans Réglages',
+
+    'mcp.why_failed': 'Raison',
+    'mcp.runtime_missing': 'Logiciel requis manquant pour les connecteurs MCP :',
+
+    'mcp.installing': 'Installation de {rt}… cela peut prendre une minute.',
+    'mcp.installing_short': 'Installation…',
+    'mcp.install_now': 'Installer',
+    'mcp.reconnected': 'Serveurs reconnectés',
+
+    'chl.try_another_search': 'Essaie une autre recherche',
+    'chl.start_new_convo': 'Démarre une nouvelle conversation',
+    'chl.conversation': 'Conversation',
+    'chl.add_favorite': 'Ajouter aux favoris',
+    'iu.drop_here': 'Dépose ici…',
+    'lab.deterministic_hint': 'Déterministe, pour le code et les données',
+    'mp.assign_model_hint': 'Attribue-lui un modèle Ollama ci-dessous pour commencer',
+    'pp.password_min': 'Le nouveau mot de passe doit faire au moins 8 caractères',
+    'pp.change_password': 'Changer le mot de passe',
+    'me.very_fast': 'Très rapide',
+    'me.fast': 'Rapide',
+
+    'info.how_it_works': 'Comment ça marche',
+
+    'ch.title': 'État des composants',
+    'ch.desc': 'Quelles parties d\'Andromeda sont actives et ce qu\'elles font.',
+    'ch.active': 'actifs',
+    'ch.refresh': 'Actualiser',
+    'ch.info_intro': 'Chaque carte est un sous-système. La couleur du bord indique son état et le texte explique quoi faire.',
+    'ch.st_ok': 'Actif (vert)',
+    'ch.st_ok_d': 'Le composant fonctionne et est utilisé.',
+    'ch.st_degraded': 'Dégradé (ambre)',
+    'ch.st_degraded_d': 'Il répond mais il manque quelque chose.',
+    'ch.st_off': 'Éteint (gris)',
+    'ch.st_off_d': 'Non utilisé. Le texte de la carte indique comment l\'activer.',
+    'ch.st_error': 'Erreur (rouge)',
+    'ch.st_error_d': 'Échec lors du test. Consulte les journaux.',
+    'ch.n_ollama': 'Ollama',
+    'ch.n_specialists': 'Spécialistes',
+    'ch.n_memory': 'Mémoire',
+    'ch.n_rag': 'Documents (RAG)',
+    'ch.n_skills': 'Skills',
+    'ch.n_mcp': 'Connecteurs MCP',
+    'ch.n_web': 'Recherche web',
+    'ch.n_registry': 'Registre de modèles',
+    'ch.n_ab': 'Tests A/B',
+    'ch.n_feedback': 'Retours',
+    'ch.n_workspace': 'Espace de travail',
+
+    'cd.not_init': 'Non initialisé.',
+    'cd.ollama_none': 'Ollama ne répond pas ou aucun modèle n\'est téléchargé.',
+    'cd.ollama_ok': '{list}',
+    'cd.spec_none': 'Aucun spécialiste n\'a de modèle assigné.',
+    'cd.spec_ok': '{list}',
+    'cd.memory_ok': 'Mémoire conversationnelle persistante.',
+    'cd.rag_empty': 'Aucun document indexé pour l\'instant.',
+    'cd.rag_ok': '{chunks} fragments · {terms} termes indexés.',
+    'cd.skills_ok': '{builtin} intégrées · {mine} créées par toi.',
+    'cd.mcp_none': 'Active un connecteur dans l\'onglet MCP.',
+    'cd.mcp_ok': '{tools} outils disponibles pour les IA.',
+    'cd.web_on': 'Les IA peuvent consulter internet.',
+    'cd.web_off': 'Active-la dans Réglages pour autoriser les recherches web.',
+    'cd.reg_none': 'Aucune version promue en production.',
+    'cd.reg_ok': 'Sert {model}.',
+    'cd.ab_none': 'Aucun test A/B en cours.',
+    'cd.ab_ok': 'Compare les variantes avec du trafic réel.',
+    'cd.fb_none': 'Utilise 👍/👎 sur les réponses pour mesurer la qualité.',
+    'cd.fb_ok': '{up} positifs · {down} négatifs.',
+    'cd.ws_none': 'Dossier de travail non configuré.',
+    'cd.ws_ok': '{path}',
+    'cd.probe_error': 'Échec du test : {err}',
+
+    'ch.s_ok': 'Actif',
+    'ch.s_degraded': 'Partiel',
+    'ch.s_off': 'Inactif',
+    'ch.s_error': 'Erreur',
+
+    'ch.what_is': 'Qu\'est-ce que c\'est',
+    'ch.next_step': 'Prochaine étape',
+    'ch.next_ok': 'Fonctionne correctement. Rien à faire.',
+    'ch.about_ollama': 'Le moteur qui exécute les modèles sur ta machine. Andromeda n\'inclut aucun modèle : il passe par Ollama.',
+    'ch.about_specialists': 'Des profils d\'IA avec leurs propres instructions, chacun spécialisé dans un type de tâche.',
+    'ch.about_memory': 'Ce qu\'Andromeda retient entre les conversations : ton nom, tes préférences et les faits que tu lui donnes.',
+    'ch.about_rag': 'Tes documents indexés en local. L\'IA les utilise comme contexte et cite la source.',
+    'ch.about_skills': 'Des paquets d\'instructions qui s\'activent seuls quand ton message y correspond.',
+    'ch.about_mcp': 'Des connecteurs qui donnent de vrais outils aux IA : fichiers, dépôts, bases de données, services.',
+    'ch.about_web': 'Permet aux IA de consulter internet. Désactivé par défaut car Andromeda fonctionne hors ligne.',
+    'ch.about_registry': 'Gestion de versions des modèles : enregistre chaque version, permet de promouvoir ou revenir en arrière.',
+    'ch.about_ab': 'Compare deux modèles sur ton usage réel et tranche par un test statistique.',
+    'ch.about_feedback': 'Tes votes 👍/👎 sur les réponses. Ils mesurent la qualité réelle et alimentent les tests A/B.',
+    'ch.about_workspace': 'Le dossier où les IA peuvent lire et écrire. Le reste est hors limites par sécurité.',
+    'ch.hint_ollama': 'Installe Ollama et télécharge un modèle : ollama pull llama3.2',
+    'ch.hint_specialists': 'Va dans Modèles d\'IA et attribue un modèle à au moins un spécialiste.',
+    'ch.hint_memory': 'Dis-lui quelque chose sur toi et il s\'en souviendra.',
+    'ch.hint_rag': 'Dépose des fichiers texte dans Réglages › Mémoire pour que l\'IA les consulte.',
+    'ch.hint_skills': 'Les skills intégrées sont prêtes. Crée les tiennes dans Réglages › Mémoire.',
+    'ch.hint_mcp': 'Ouvre Réglages › Connecteurs MCP et active celui dont tu as besoin.',
+    'ch.hint_web': 'Active-la dans Réglages › Capacités pour l\'accès internet.',
+    'ch.hint_registry': 'Enregistre une version dans Réglages › Registre et promeus-la en production.',
+    'ch.hint_ab': 'Crée une expérience dans Réglages › Tests A/B.',
+    'ch.hint_feedback': 'Vote 👍 ou 👎 sur les réponses pour mesurer la qualité.',
+    'ch.hint_workspace': 'Configure le dossier dans Réglages › Capacités.',
+
+    'sx.title': 'Moteur de recherche (SearXNG)',
+    'sx.desc': 'Andromeda cherche via SearXNG, un métamoteur open source. Il utilise des instances publiques par défaut. Avec la tienne, tes recherches restent sur ta machine.',
+    'sx.save': 'Enregistrer',
+    'sx.checking': 'Vérification…',
+    'sx.ok': 'Connecté. Ton instance sera utilisée.',
+    'sx.unreachable': 'Pas de réponse. Des instances publiques seront utilisées.',
+    'sx.using_public': 'Aucune instance propre : les publiques seront utilisées.',
+
+    'info.pct.title': 'Latence : p50, p95 et p99',
+    'info.pct.intro': 'La moyenne trompe : une réponse très lente la fausse. Les centiles trient toutes les réponses et regardent des positions précises.',
+    'info.pct.p50h': 'p50 — la moitié',
+    'info.pct.p50d': 'La moitié des réponses sont plus rapides. C\'est l\'expérience typique.',
+    'info.pct.p95h': 'p95 — presque le pire',
+    'info.pct.p95d': '95 réponses sur 100 sont plus rapides. La métrique la plus utile : elle mesure si les mauvais moments sont tolérables.',
+    'info.pct.p99h': 'p99 — le pire cas',
+    'info.pct.p99d': 'Seule 1 réponse sur 100 est plus lente. Utile pour repérer les blocages rares.',
+    'info.pct.whyh': 'Pourquoi c\'est important',
+    'info.pct.whyd': 'Avec des modèles locaux, la latence dépend du matériel. Si le p95 grimpe mais pas le p50, le modèle est rechargé en mémoire.',
+
+    'ka.title': 'Garder le modèle chargé',
+    'ka.desc': 'Évite de recharger le modèle entre les messages (des dizaines de secondes avec les gros modèles). En échange, il occupe de la mémoire vidéo.',
+    'ka.never': 'Ne pas garder',
+    'ka.always': 'Toujours',
+
+    'err.ab_unavailable': 'Tests A/B indisponibles',
+    'err.ab_needs_variants': 'Un identifiant et au moins 2 variantes sont requis',
+    'err.not_found': 'Introuvable',
+    'err.decision_required': 'Une décision est requise',
+    'err.username_format': 'Nom d\'utilisateur : 3 à 32 caractères alphanumériques',
+    'err.password_short': 'Le mot de passe doit faire au moins 8 caractères',
+    'err.user_exists': 'Cet utilisateur existe déjà',
+    'err.bad_credentials': 'Nom d\'utilisateur ou mot de passe incorrect',
+    'err.not_authenticated': 'Non connecté',
+    'err.new_password_short': 'Le nouveau mot de passe doit faire au moins 8 caractères',
+    'err.wrong_current_password': 'Le mot de passe actuel est incorrect',
+    'err.content_required': 'Le contenu est requis',
+    'err.prompt_response_required': 'Le prompt et la réponse sont requis',
+    'err.no_connection': 'Service injoignable. Vérifie ta connexion',
+    'err.sign_in_first': 'Connecte-toi d\'abord',
+    'err.path_required': 'Un chemin est requis',
+    'err.no_project_indexed': 'Aucun projet indexé pour l\'instant',
+    'err.question_required': 'Une question est requise',
+    'err.empty_content': 'Le contenu est vide',
+    'err.delete_needs_confirm': 'La suppression définitive requiert une confirmation',
+    'err.base_model_required': 'Un modèle de base est requis',
+    'err.ollama_unavailable': 'Ollama indisponible',
+    'err.no_data': 'Aucune donnée',
+    'err.registry_unavailable': 'Le registre de modèles est indisponible',
+    'err.specialist_required': 'Un spécialiste est requis',
+    'err.variant_prompt_required': 'La variante et le prompt sont requis',
+    'err.mcp_unavailable': 'Les connecteurs MCP sont indisponibles',
+    'err.tool_required': 'Un outil est requis',
+    'err.prompt_required': 'Un prompt est requis',
+    'err.mcp_not_ready': 'Les connecteurs MCP ne sont pas prêts',
+    'err.value_empty': 'La valeur ne peut pas être vide',
+    'err.profile_unavailable': 'Le profil est indisponible',
+    'err.memory_unavailable': 'La mémoire est indisponible',
+    'err.specialist_unconfigured': 'Ce spécialiste n\'a pas de modèle',
+    'err.mlops_unavailable': 'MLOps est indisponible',
+    'err.model_required': 'Un modèle est requis',
+    'err.topic_required': 'Un sujet est requis',
+    'err.image_required': 'Une image est requise',
+    'err.lab_unavailable': 'Le laboratoire est indisponible',
+
+    'err.generic': 'Une erreur est survenue',
+    'err.server': 'Erreur serveur. Consulte les journaux si ça persiste',
+    'err.too_large': 'Le contenu est trop volumineux',
+
+    'cd.ollama_tune': 'Fonctionne. Gagne en performance en activant dans Ollama : {vars}',
+
+    'mb.download': 'télécharger',
+    'mb.copy': 'copier',
+    'mb.copied': 'copié',
+    'mb.export': 'exporter',
+
+    'sb.click_download': 'clique pour télécharger',
+
+    'nav.diagnostics': 'Diagnostic',
+    'dg.title': 'Console de diagnostic',
+    'dg.desc': 'Ce qu\'Andromeda fait en interne à chaque message : quel prompt reçoit le modèle, s\'il cherche sur le web et pourquoi, et la durée de chaque étape.',
+    'dg.start': 'Démarrer l\'enregistrement',
+    'dg.stop': 'Arrêter',
+    'dg.state': 'État du système',
+    'dg.copy': 'Copier le journal',
+    'dg.download': 'Télécharger',
+    'dg.clear': 'Effacer',
+    'dg.all': 'Tout',
+    'dg.filter': 'Filtrer par catégorie',
+    'dg.copied': 'Copié dans le presse-papiers',
+    'dg.saved': 'Enregistré dans Téléchargements',
+    'dg.copy_error': 'Échec de la copie',
+    'dg.waiting': 'En attente d\'activité',
+    'dg.waiting_d': 'Envoie un message dans le chat et chaque étape d\'Andromeda apparaîtra ici.',
+    'dg.off_explainer': 'L\'enregistrement est désactivé. En l\'activant, les prompts et réponses complets de la session sont gardés en mémoire. Rien n\'est écrit sur le disque.',
+    'dg.cap_red': 'Recherche web',
+    'dg.cap_creacion_archivos': 'Création de fichiers',
+    'dg.cap_memoria_semantica': 'Mémoire sémantique',
+    'dg.cap_perfil_memoria': 'Profil mémoire',
+    'dg.cap_documentos_rag': 'Documents',
+    'dg.cap_skills': 'Skills',
+
+    'dg.temporary': 'Outil de développement — sera retiré avant la version finale. Il expose les prompts complets et les variables d\'environnement.',
+
+    'tr.title': 'Collecter des données d\'entraînement (Apolo)',
+    'tr.desc': 'Enregistre localement tes conversations et votes 👍/👎 pour entraîner ton propre modèle. Jamais en mode incognito. Seules les réponses bien notées sont exportées.',
+    'tr.samples': 'échantillons',
+    'tr.export': 'Exporter pour MLX',
+    'err.training_unavailable': 'Corpus d\'entraînement indisponible',
+
+
+    'chat.new_conversation': 'Nouvelle conversation',
+    'err.invalid_file': 'Fichier non valide',
+    'err.no_conversations': 'Le fichier ne contient aucune conversation',
+
+    'phase.thinking': 'Réflexion…',
+    'phase.searching': 'Recherche sur le web…',
+    'phase.writing': 'Rédaction…',
+
+    'mcp.msg_connected': 'Connecté — {count} outils.',
+    'mcp.msg_disabled': 'Désactivé.',
+    'mcp.msg_failed': 'Connexion impossible.',
+
+    'chat.open_image': "Agrandir l'image",
+
+    'art.view_code': 'Voir le code',
+    'art.view_page': 'Voir la page',
+
+    'proj.files': 'Fichiers du projet',
+    'proj.files_desc': 'Ajoute des fichiers ou des dossiers entiers. L\'IA les utilise dans les conversations de ce projet, et ce qu\'elle crée ou modifie est enregistré ici.',
+    'proj.add_files': 'Ajouter des fichiers',
+    'proj.add_folder': 'Ajouter un dossier',
+    'proj.uploading': 'Envoi',
+    'proj.no_files': 'Aucun fichier dans ce projet pour l\'instant.',
+    'proj.n_files': 'fichiers',
+
+    'cs.lvl_low': 'Rapide',
+    'cs.lvl_mid': 'Équilibrée',
+    'cs.lvl_high': 'Puissante',
+    'cs.lvl_ultra': 'Maximale',
+    'cs.power_explain': 'Choisis quel modèle répond. Plus de puissance donne de meilleures réponses, mais plus lentes. En Auto, Andromeda choisit selon la difficulté et la mémoire libre.',
+
+    'prev.open': "Ouvrir l'aperçu",
+    'prev.close': "Fermer",
+    'prev.load_error': "Impossible de charger le fichier.",
+    'chat.jump_bottom': "Aller en bas",
+
+    'pcat.search': "Rechercher des prompts…",
+    'pcat.all': "Tous",
+    'pcat.none': "Aucun prompt correspondant.",
+    'pcat.use': "Utiliser",
+    'pcat.save': "Enregistrer dans ma bibliothèque",
+    'pcat.saved': "Enregistré",
+    'pcat.catalog': "Catalogue",
+    'pcat.mine': "Mes prompts",
+    'pcat.title': "Bibliothèque de prompts",
+    'pcat.desc': "Plus de cent prompts prêts à l'emploi par catégorie. Complète ce qui est [entre crochets]. Ceux que tu enregistres apparaissent dans « Mes prompts ».",
+
+    'chat.files_context': "J'ai joint ces fichiers comme contexte :",
+    'chat.files_skipped_name': "(fichiers non inclus)",
+    'chat.files_skipped': "Ces fichiers n'ont pas été inclus (binaires, trop gros ou au-delà de la limite) :",
+
+    'settings.prompts': "Bibliothèque de prompts",
+
+    'prof.data_downloaded': "Données téléchargées",
+    'prof.data_download_error': "Impossible de télécharger les données",
+
+    'err.invalid_path': "Chemin de fichier non valide",
+    'err.invalid_url': "Lien non valide",
+    'err.preview_failed': "Impossible d'afficher l'aperçu de ce fichier",
+    'err.project_file': "Impossible de traiter le fichier du projet",
+
+    'dl.saved_to': "Enregistré dans",
+
+    'mem.semantic_pending': "Préparation de la mémoire sémantique…",
+    'mem.semantic_waiting_ollama': "Mémoire sémantique : en attente d'Ollama",
+    'mem.semantic_downloading': "Téléchargement du modèle de mémoire sémantique",
+    'mem.semantic_ready': "Mémoire sémantique active",
+    'mem.semantic_backfilled': "souvenirs mis à jour",
+    'mem.semantic_offline': "Mémoire sémantique désactivée : l'accès réseau est coupé dans Capacités",
+    'mem.semantic_error': "Impossible d'activer la mémoire sémantique ; nouvel essai prévu",
+
+    'memf.search_title': "Rechercher dans les conversations",
+    'memf.search_desc': "Andromeda cherche des détails pertinents dans les anciennes conversations quand tu y fais référence.",
+    'memf.gen_title': "Générer la mémoire à partir des conversations",
+    'memf.gen_desc': "Andromeda retient ce que tu lui dis : qui tu es, tes goûts, projets et objectifs.",
+    'memf.sens_title': "Inclure les sujets sensibles",
+    'memf.sens_desc': "Permet d'enregistrer des sujets sensibles comme la santé, la religion ou la politique. Le désactiver supprime ceux déjà enregistrés.",
+    'memf.imp_title': "Importer la mémoire d'autres assistants IA",
+    'memf.imp_desc': "Récupère ce qu'un autre assistant sait de toi. Nous te donnons un prompt pour le demander.",
+    'memf.imp_start': "Importer",
+    'memf.imp_step1': "Copie ce prompt et envoie-le à l'autre assistant :",
+    'memf.imp_step2': "Colle sa réponse ici :",
+    'memf.imp_placeholder': "- Je m'appelle…\n- Je travaille chez…",
+    'memf.imp_do': "Ajouter à la mémoire",
+    'memf.imported': "{n} éléments importés",
+    'memf.purged': "{n} souvenirs sensibles supprimés",
+    'memf.purge_incomplete': "La suppression n'a pas abouti. Certains souvenirs sensibles peuvent encore être enregistrés.",
+    'memf.confirm_delete': "Supprimer tout ce qu'Andromeda retient de cette section ?",
+    'memf.sec_tu': "Toi",
+    'memf.sec_temas': "Sujets",
+    'memf.sec_areas': "Domaines",
+    'memf.sec_personas': "Personnes",
+    'memf.sec_notas': "Notes",
+    'memf.empty': "Rien pour l'instant.",
+    'memf.col_name': "Nom",
+    'memf.col_summary': "Résumé",
+    'memf.col_updated': "Dernière mise à jour",
+    'memf.col_actions': "Actions",
+    'memf.edit': "Modifier",
+    'memf.today': "aujourd'hui",
+    'memf.days_ago': "il y a {n} jours",
+    'memf.file_preferencias': "Préférences",
+    'memf.file_perfil': "Profil",
+    'memf.file_gustos': "Goûts",
+    'memf.file_favoritos': "Favoris",
+    'memf.file_objetivos': "Objectifs",
+    'memf.file_tecnologia': "Technologie",
+    'memf.file_rutina': "Routine",
+    'memf.file_proyectos': "Projets",
+    'memf.file_notas': "Notes",
+
+    'ui2.theme_macos': "macOS",
+
+    'err.invalid_request': "Requête non valide",
+
+    'ap.design': "Design",
+
+    'ap.mode': "Mode",
+
+    'memf.updated': "Mis à jour",
+
+    'memf.empty_all': "Andromeda ne se souvient encore de rien. Il apprendra au fil des conversations.",
+
+    'memf.describe_change': "Décris ce que tu veux modifier…",
+
+    'memf.apply': "Appliquer",
+
+    'memf.edit_text': "Modifier le texte",
+
+    'memf.save': "Enregistrer",
+
+    'memf.desc_preferencias': "Comment tu veux qu'Andromeda réponde : langue, ton et format.",
+
+    'memf.desc_perfil': "Qui tu es : nom, métier, lieu et études.",
+
+    'memf.desc_gustos': "Tes loisirs et ce que tu aimes ou non.",
+
+    'memf.desc_favoritos': "Tes choses préférées.",
+
+    'memf.desc_objetivos': "Objectifs personnels et professionnels.",
+
+    'memf.desc_tecnologia': "Ton matériel, tes outils et technologies.",
+
+    'memf.desc_rutina': "Ton emploi du temps et tes habitudes.",
+
+    'memf.desc_proyectos': "Projets sur lesquels tu travailles.",
+
+    'memf.desc_notas': "Ce que tu as demandé à Andromeda de retenir.",
+
+    'memf.desc_persona': "Qui est {name} et son lien avec toi.",
+
+    'err.memory_ai_edit': "Impossible d'appliquer la modification. Essaie de modifier le texte.",
+
+    'err.ollama_offline': "Ollama n'est pas disponible",
+
+    'chat.pro_subtitle': "L'orchestrateur choisit automatiquement les meilleurs spécialistes pour chaque question.",
+
+    'ob.step1_pre': "Ouvre ",
+
+    'ob.step1_post': " dans la barre latérale.",
+
+    'ob.step2_pre': "Télécharge un modèle dans ",
+
+    'ob.step2_post': ". Pour commencer, qwen3:8b est un bon choix (ou gemma3 avec 32 Go de mémoire ou plus).",
+
+    'ob.step3': "Reviens ici pour discuter, créer des fichiers et exécuter du code, le tout en local.",
+
+    'code.no_output': "(aucune sortie)",
+
+    'slo.insufficient': "Pas encore assez de données pour évaluer la qualité : {n} sur {min} requêtes.",
+
+    'chm.models': "{n} modèles",
+
+    'chm.active': "{n} actifs",
+
+    'chm.memories': "{n} souvenirs",
+
+    'chm.empty': "vide",
+
+    'chm.docs': "{n} documents",
+
+    'chm.skills': "{n} skills",
+
+    'chm.connected': "{n} connectés",
+
+    'chm.on': "activée",
+
+    'chm.off': "désactivée",
+
+    'chm.no_prod': "pas de production",
+
+    'chm.no_exp': "aucune expérience",
+
+    'chm.no_votes': "aucun vote",
+
+    'chm.satisfaction': "{n}% de satisfaction",
+
+    'chm.files': "{n} fichiers",
+
+    'ap.accent': "Couleur d'accentuation",
+
+    'ap.accent_blue': "Bleu",
+
+    'ap.accent_purple': "Violet",
+
+    'ap.accent_pink': "Rose",
+
+    'ap.accent_red': "Rouge",
+
+    'ap.accent_orange': "Orange",
+
+    'ap.accent_yellow': "Jaune",
+
+    'ap.accent_green': "Vert",
+
+    'ap.accent_graphite': "Graphite",
+
+    'ap.accent_andromeda': "Dégradé Andromeda",
+
+    'mcp.risk_high': "Risque élevé",
+
+    'mcp.manual_setup': "Configuration requise",
+
+    'pp.title': "Pack de puissance recommandé",
+
+    'pp.sub': "Un modèle par niveau de puissance, choisi pour cet ordinateur ({gb} Go disponibles). La puissance automatique choisit parmi eux à chaque message.",
+
+    'pp.download': "Télécharger ce qui manque ({gb} Go)",
+
+    'pp.downloading': "Téléchargement…",
+
+    'pp.complete': "Pack complet",
+
+    'pp.error': "Erreur",
+
+    'sug.11': "Résume ce qu'est Kubernetes en 5 points",
+    'sug.12': "Crée un site portfolio en HTML",
+    'sug.13': "Planifie-moi une semaine d'étude",
+    'sug.14': "Explique-moi ce qu'est un LLM comme si j'avais 12 ans",
+    'sug.15': "Quelle différence entre RAM et VRAM ?",
+    'sug.16': "Écris un script qui range mes téléchargements",
+    'sug.17': "Donne-moi 10 idées de projets pour apprendre Python",
+    'sug.18': "Cherche les dernières actualités sur l'IA",
+    'sug.19': "Explique Git branch, merge et rebase",
+    'sug.20': "Fais un tableau comparant Python et JavaScript",
+    'sug.21': "Écris un e-mail pour demander un rendez-vous",
+    'sug.22': "Comment fonctionne HTTPS ?",
+    'sug.23': "Crée un tableur pour mes dépenses",
+    'sug.24': "Explique IA, ML et deep learning",
+    'sug.25': "Aide-moi à préparer un entretien technique",
+    'sug.26': "Écris une courte histoire de science-fiction",
+    'sug.27': "Qu'est-ce que Docker et à quoi ça sert ?",
+    'sug.28': "Génère un QCM sur les réseaux",
+    'sug.29': "Explique une API REST avec un exemple",
+    'sug.30': "Donne-moi une séance de sport de 20 minutes",
   },
 }
 

@@ -52,7 +52,7 @@ export default function ChatSettings(props) {
         if (r?.status === 'fulfilled' && r.value?.data) lvlMap[s.id] = r.value.data
       })
       setLevelData(lvlMap)
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
   })
 
   function notify(newParallel, newLevels) {
@@ -141,13 +141,19 @@ export default function ChatSettings(props) {
                     onClick={() => !dis() && setLevel('generalist', lvl.id)}
                     title={dis() ? `${lvl.label} · ${t('cs.lvl_na_hw')}` : `${lvl.label} · ${lvl.hint || t('cs.lvl_auto_hint')}`}
                   >
-                    {lvl.label}
+                    <span>{lvl.id === 'auto' ? 'Auto' : t('cs.lvl_' + lvl.id)}</span>
+                    {/* El modelo concreto de cada nivel: sin él, "Low/Mid/High"
+                        era abstracto y no se entendía para qué servía. */}
+                    <Show when={lvl.id !== 'auto' && levelData().generalist?.levels?.[lvl.id]?.model_name}>
+                      <span class="ias-seg-model">{levelData().generalist.levels[lvl.id].model_name}</span>
+                    </Show>
                   </button>
                 )
               }}
             </For>
           </div>
-          <div class="ias-hint" style="margin-top:10px">
+          <div class="ias-hint" style="margin-top:10px;line-height:1.55">{t('cs.power_explain')}</div>
+          <div class="ias-hint" style="margin-top:6px">
             <Show when={vram() !== null}><b style="color:var(--text-2)">{vram().toFixed(1)} {t('cs.gb_free')}</b> </Show>
             <b style="color:var(--text-2)">Auto</b> · {t('cs.power_auto_hint')}
           </div>
@@ -155,10 +161,10 @@ export default function ChatSettings(props) {
           {/* Selector de modelo concreto (antes estaba suelto en la barra inferior) */}
           <Show when={(props.ollamaModels || []).length > 0}>
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--hairline)">
-              <div style="font-size:12px;color:var(--text-3);margin-bottom:7px">{t('chat.force_model')}</div>
+              <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:7px">{t('chat.force_model')}</div>
               <select
                 onChange={(e) => props.setForceModel?.(e.currentTarget.value)}
-                style={`width:100%;font-size:13px;padding:8px 10px;border-radius:9px;background:var(--inset-surface);color:${props.forceModel ? 'var(--text-1)' : 'var(--text-3)'};border:1px solid var(--glass-border);cursor:pointer`}
+                style={`width:100%;font-size:var(--fs-base);padding:8px 10px;border-radius:10px;background:var(--inset-surface);color:${props.forceModel ? 'var(--text-1)' : 'var(--text-3)'};border:1px solid var(--glass-border);cursor:pointer`}
               >
                 <option value="" selected={!props.forceModel}>{t('chat.auto_power')}</option>
                 <For each={props.ollamaModels || []}>

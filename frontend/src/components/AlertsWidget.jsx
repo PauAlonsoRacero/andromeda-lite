@@ -5,7 +5,6 @@
  */
 import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
 import axios from 'axios'
-import { hardware, health } from '../stores/hardware.js'
 import { t } from '../stores/i18n.js'
 
 // Preferencias de notificación (persistidas en memoria de sesión)
@@ -23,7 +22,7 @@ let _prefs = { ...defaultPrefs }
 try {
   const saved = sessionStorage.getItem(PREFS_KEY)
   if (saved) _prefs = { ...defaultPrefs, ...JSON.parse(saved) }
-} catch {}
+} catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
 
 export function getAlertPrefs() { return _prefs }
 export function notifyComplete(latencyMs) {
@@ -43,7 +42,7 @@ function _playSound() {
     osc.connect(gain); gain.connect(ctx.destination)
     osc.frequency.value = 880; gain.gain.value = 0.1
     osc.start(); osc.stop(ctx.currentTime + 0.15)
-  } catch {}
+  } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
 }
 
 export default function AlertsWidget() {
@@ -55,7 +54,7 @@ export default function AlertsWidget() {
     const next = { ...prefs(), [key]: val }
     setPrefs(next)
     _prefs = next
-    try { sessionStorage.setItem(PREFS_KEY, JSON.stringify(next)) } catch {}
+    try { sessionStorage.setItem(PREFS_KEY, JSON.stringify(next)) } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
     // Pedir permiso de notificaciones del navegador si se activa
     if (key === 'browserNotif' && val && typeof Notification !== 'undefined') {
       Notification.requestPermission()
@@ -66,7 +65,7 @@ export default function AlertsWidget() {
     try {
       const r = await axios.get('/api/alerts')
       setAlerts(r.data.alerts || [])
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
   }
 
   onMount(() => {
@@ -77,25 +76,25 @@ export default function AlertsWidget() {
 
   return (
     <div class="panel-page" style="max-width:760px">
-      <div style="font-size:22px;font-weight:700;margin-bottom:6px">{t('ui2.alerts_notif')}</div>
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:24px">{t('alert.subtitle')}</div>
+      <div style="font-size:var(--fs-lg);font-weight:700;margin-bottom:6px">{t('ui2.alerts_notif')}</div>
+      <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:24px">{t('alert.subtitle')}</div>
 
       {/* Alertas activas ahora mismo */}
       <Show when={alerts().length > 0}>
         <div style="margin-bottom:24px">
-          <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">{t('ui2.active_now')}</div>
+          <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">{t('ui2.active_now')}</div>
           <For each={alerts()}>
             {(a) => (
               <div class="banner banner-warn" style="margin-bottom:8px">
                 <span>{a.level === 'critical' ? '🔴' : a.level === 'warning' ? '🟡' : '🔵'}</span>
-                <div style="font-size:13px">{a.message}</div>
+                <div style="font-size:var(--fs-base)">{a.message}</div>
               </div>
             )}
           </For>
         </div>
       </Show>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px">{t('alert.events')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px">{t('alert.events')}</div>
       <Row title={t('alert.resp_done')} desc={t('alert.resp_done_d')}>
         <Toggle checked={prefs().onComplete} onChange={v => update('onComplete', v)} />
       </Row>
@@ -109,7 +108,7 @@ export default function AlertsWidget() {
         <Toggle checked={prefs().onError} onChange={v => update('onError', v)} />
       </Row>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('alert.how')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('alert.how')}</div>
       <Row title={t('alert.sys_notif')} desc={t('alert.sys_notif_d')}>
         <Toggle checked={prefs().browserNotif} onChange={v => update('browserNotif', v)} />
       </Row>
@@ -124,8 +123,8 @@ function Row(props) {
   return (
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:16px 0;border-bottom:1px solid var(--glass-border)">
       <div style="flex:1">
-        <div style="font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:3px">{props.title}</div>
-        <div style="font-size:12px;color:var(--text-3);line-height:1.5">{props.desc}</div>
+        <div style="font-size:var(--fs-base);font-weight:600;color:var(--text-1);margin-bottom:3px">{props.title}</div>
+        <div style="font-size:var(--fs-sm);color:var(--text-3);line-height:1.5">{props.desc}</div>
       </div>
       <div style="flex-shrink:0;padding-top:2px">{props.children}</div>
     </div>

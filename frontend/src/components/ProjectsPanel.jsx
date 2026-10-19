@@ -2,6 +2,8 @@
  * ProjectsPanel.jsx — Proyectos funcionales estilo Claude.
  * Crear, entrar, añadir instrucciones de contexto, ver conversaciones, eliminar.
  */
+import axios from 'axios'
+import { openPreview } from '../stores/preview.js'
 import { createSignal, For, Show } from 'solid-js'
 import { conversations, loadConversation } from '../stores/chat.js'
 import { t } from '../stores/i18n.js'
@@ -15,7 +17,7 @@ function load() {
   catch { return [] }
 }
 function persist(list) {
-  try { localStorage.setItem('andromeda_projects', JSON.stringify(list)) } catch {}
+  try { localStorage.setItem('andromeda_projects', JSON.stringify(list)) } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
 }
 
 export default function ProjectsPanel(props) {
@@ -41,6 +43,7 @@ export default function ProjectsPanel(props) {
     save([proj, ...projects()])
     setName(''); setCreating(false)
     setOpenId(proj.id)   // entrar directamente al crear
+    setPfiles([])
   }
   function remove(id) {
     save(projects().filter(p => p.id !== id))
@@ -54,6 +57,7 @@ export default function ProjectsPanel(props) {
     setSchedConditions(p.schedule?.conditions || '')
     setSchedEnabled(p.schedule?.enabled || false)
     setMemory(p.memory || '')
+    cargarArchivos(p.id)
   }
   function saveInstructions() {
     save(projects().map(p => p.id === openId() ? {
@@ -62,6 +66,45 @@ export default function ProjectsPanel(props) {
       schedule: { enabled: schedEnabled(), date: schedDate(), time: schedTime(), conditions: schedConditions() },
       memory: memory(),
     } : p))
+  }
+
+  // ── Archivos del proyecto (en disco, en el backend) ──────────────────────
+  const [pfiles, setPfiles] = createSignal([])
+  const [subiendo, setSubiendo] = createSignal('')
+  const [fileErr, setFileErr] = createSignal('')
+
+  async function cargarArchivos(pid) {
+    try { setPfiles((await axios.get(`/api/projects/${pid}/files`)).data.files || []) }
+    catch { setPfiles([]) }
+  }
+
+  /** Sube archivos sueltos o una carpeta entera, conservando las subcarpetas. */
+  async function subir(fileList) {
+    const lista = [...(fileList || [])]
+    if (!lista.length) return
+    setFileErr('')
+    const leer = (f) => new Promise(res => {
+      const r = new FileReader()
+      r.onload = () => res({ path: f.webkitRelativePath || f.name,
+                             content_b64: String(r.result).split(',')[1] || '' })
+      r.onerror = () => res(null)
+      r.readAsDataURL(f)
+    })
+    try {
+      for (let i = 0; i < lista.length; i += 20) {
+        setSubiendo(`${Math.min(i + 20, lista.length)} / ${lista.length}`)
+        const lote = (await Promise.all(lista.slice(i, i + 20).map(leer))).filter(Boolean)
+        const r = await axios.post(`/api/projects/${openId()}/files`, { files: lote })
+        if (r.data.files) setPfiles(r.data.files)
+        if (r.data.errors?.length) setFileErr(r.data.errors.map(e => `${e.path}: ${e.error}`).join(' · '))
+      }
+    } catch (e) { setFileErr(e?.response?.data?.message || e.message) }
+    setSubiendo('')
+  }
+
+  async function borrarArchivo(path) {
+    try { setPfiles((await axios.delete(`/api/projects/${openId()}/files`, { params: { path } })).data.files || []) }
+    catch { /* la lista se queda como estaba */ }
   }
 
   const current = () => projects().find(p => p.id === openId())
@@ -73,12 +116,60 @@ export default function ProjectsPanel(props) {
         <button class="btn btn-ghost" onClick={() => setOpenId(null)} style="margin-bottom:18px">← Proyectos</button>
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">
           <div class="app-icon" style="width:48px;height:48px"><IconFolder /></div>
-          <div style="font-size:24px;font-weight:700">{current()?.name}</div>
+          <div style="font-size:var(--fs-xl);font-weight:700">{current()?.name}</div>
+        </div>
+
+        {/* Archivos y carpetas del proyecto: el modelo los ve en cada mensaje y
+            su carpeta es el espacio de trabajo de las conversaciones del proyecto. */}
+        <div class="card" style="margin-top:20px">
+          <div class="card-title">{t('proj.files')}</div>
+          <div style="font-size:var(--fs-sm);color:var(--text-3);margin:4px 0 12px;line-height:1.5">{t('proj.files_desc')}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+            <label class="btn btn-glass" style="cursor:pointer">
+              📄 {t('proj.add_files')}
+              <input type="file" multiple style="display:none"
+                     onChange={e => { subir(e.currentTarget.files); e.currentTarget.value = '' }} />
+            </label>
+            <label class="btn btn-glass" style="cursor:pointer">
+              📁 {t('proj.add_folder')}
+              <input type="file" multiple style="display:none"
+                     ref={el => el && el.setAttribute('webkitdirectory', '')}
+                     onChange={e => { subir(e.currentTarget.files); e.currentTarget.value = '' }} />
+            </label>
+            <Show when={subiendo()}>
+              <span style="font-size:var(--fs-xs);color:var(--text-3)">{t('proj.uploading')} {subiendo()}</span>
+            </Show>
+          </div>
+          <Show when={fileErr()}>
+            <div style="font-size:var(--fs-xs);color:var(--amber);margin-bottom:8px">{fileErr()}</div>
+          </Show>
+          <Show when={pfiles().length} fallback={
+            <div style="font-size:var(--fs-sm);color:var(--text-3)">{t('proj.no_files')}</div>
+          }>
+            <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:6px">
+              {pfiles().length} {t('proj.n_files')}
+            </div>
+            <div style="max-height:280px;overflow-y:auto;border:1px solid var(--glass-border);border-radius:10px">
+              <For each={pfiles()}>
+                {(f) => (
+                  <div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--glass-border);font-size:var(--fs-sm)">
+                    <span role="button" title={t('prev.open')} onClick={() => openPreview(f.path, openId())}
+                          style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:var(--fs-xs);cursor:pointer">{f.path}</span>
+                    <span style="color:var(--text-3);font-size:var(--fs-micro);flex-shrink:0">
+                      {f.size < 1024 ? `${f.size} B` : `${(f.size / 1024).toFixed(1)} KB`}
+                    </span>
+                    <button class="btn btn-ghost" style="padding:2px 8px" aria-label={t('art.delete')}
+                            onClick={() => borrarArchivo(f.path)}>✕</button>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
 
         <div class="card" style="margin-top:20px">
           <div class="card-title">{t('ui2.proj_instructions')}</div>
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">
+          <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:12px">
             Contexto que se añadirá a todas las conversaciones de este proyecto (como los Projects de Claude).
           </div>
           <textarea
@@ -96,30 +187,30 @@ export default function ProjectsPanel(props) {
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div class="card-title" style="margin:0"><IconClock />{t('proj.schedule')}</div>
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-3);cursor:pointer">
+            <label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--text-3);cursor:pointer">
               <input type="checkbox" checked={schedEnabled()} onChange={e => { setSchedEnabled(e.target.checked); saveInstructions() }} />
               Activar ejecución programada
             </label>
           </div>
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">
+          <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:14px">
             Ejecuta el proyecto automáticamente en una fecha/hora o cuando se cumplan condiciones.
           </div>
           <Show when={schedEnabled()}>
             <div class="anim-slide" style="display:flex;flex-direction:column;gap:12px">
               <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <div style="flex:1;min-width:140px">
-                  <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Fecha</label>
+                  <label style="font-size:var(--fs-xs);color:var(--text-3);display:block;margin-bottom:4px">Fecha</label>
                   <input type="date" value={schedDate()} onInput={e => setSchedDate(e.target.value)} onBlur={saveInstructions}
                     class="g-input" style="width:100%" />
                 </div>
                 <div style="flex:1;min-width:140px">
-                  <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Hora</label>
+                  <label style="font-size:var(--fs-xs);color:var(--text-3);display:block;margin-bottom:4px">Hora</label>
                   <input type="time" value={schedTime()} onInput={e => setSchedTime(e.target.value)} onBlur={saveInstructions}
                     class="g-input" style="width:100%" />
                 </div>
               </div>
               <div>
-                <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{t('proj.exec_cond')}</label>
+                <label style="font-size:var(--fs-xs);color:var(--text-3);display:block;margin-bottom:4px">{t('proj.exec_cond')}</label>
                 <textarea value={schedConditions()} onInput={e => setSchedConditions(e.target.value)} onBlur={saveInstructions}
                   placeholder={t('proj.ph_schedule')}
                   class="g-input" style="width:100%;min-height:70px;resize:vertical;font-family:var(--font);line-height:1.5" />
@@ -131,7 +222,7 @@ export default function ProjectsPanel(props) {
         {/* Memoria exclusiva del proyecto */}
         <div class="card">
           <div class="card-title"><IconMemory />{t('ui2.proj_memory')}</div>
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">
+          <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:12px">
             Información que solo este proyecto recordará. Separada de la memoria global y de otros proyectos.
           </div>
           <textarea
@@ -151,7 +242,7 @@ export default function ProjectsPanel(props) {
             <button class="btn btn-primary" onClick={() => { props.onNewChat?.(openId()); }}>{t('proj.new_conv')}</button>
           </div>
           <Show when={(current()?.conversationIds || []).length > 0} fallback={
-            <div style="text-align:center;padding:32px;color:var(--text-3);font-size:13px">
+            <div style="text-align:center;padding:32px;color:var(--text-3);font-size:var(--fs-base)">
               Sin conversaciones todavía. Crea una con el botón de arriba.
             </div>
           }>
@@ -160,7 +251,7 @@ export default function ProjectsPanel(props) {
                 const conv = conversations().find(c => c.id === cid)
                 return (
                   <div onClick={() => { loadConversation(cid); props.onOpenChat?.() }}
-                    style="padding:12px 14px;border-radius:12px;cursor:pointer;transition:all 0.15s;font-size:14px;color:var(--text-2)"
+                    style="padding:12px 14px;border-radius:14px;cursor:pointer;transition:all 0.15s;font-size:var(--fs-base);color:var(--text-2)"
                     onMouseEnter={e => e.currentTarget.style.background='var(--hover-surface)'}
                     onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                     {conv?.title || 'Conversación'}
@@ -184,7 +275,7 @@ export default function ProjectsPanel(props) {
         <Show when={creating()}>
           <div class="card">
             <div class="card-title">{t('ui2.create_project')}</div>
-            <input class="g-input" placeholder={t('proj.ph_name')} value={name()}
+            <input aria-label={t('proj.ph_name')} class="g-input" placeholder={t('proj.ph_name')} value={name()}
               onInput={e => setName(e.target.value)} onKeyDown={e => e.key==='Enter' && create()}
               style="margin-bottom:12px" autofocus />
             <div style="display:flex;gap:8px">
@@ -198,8 +289,8 @@ export default function ProjectsPanel(props) {
           <Show when={!creating()}>
             <div class="card" style="text-align:center;padding:48px">
               <div style="opacity:0.25;margin-bottom:16px;display:flex;justify-content:center"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
-              <div style="font-size:16px;font-weight:600;margin-bottom:8px">{t('proj.no_projects')}</div>
-              <div style="font-size:13px;color:var(--text-3);max-width:380px;margin:0 auto;line-height:1.6">
+              <div style="font-size:var(--fs-md);font-weight:600;margin-bottom:8px">{t('proj.no_projects')}</div>
+              <div style="font-size:var(--fs-base);color:var(--text-3);max-width:380px;margin:0 auto;line-height:1.6">
                 Los proyectos agrupan conversaciones relacionadas y comparten contexto e instrucciones.
               </div>
             </div>
@@ -213,10 +304,10 @@ export default function ProjectsPanel(props) {
                   onMouseEnter={e => e.currentTarget.style.transform='translateY(-2px)'}
                   onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}>
                   <div class="app-icon" style="width:42px;height:42px;margin-bottom:12px"><IconFolder /></div>
-                  <div style="font-size:15px;font-weight:600;margin-bottom:4px">{p.name}</div>
-                  <div style="font-size:12px;color:var(--text-3)">{(p.conversationIds||[]).length} conversaciones</div>
+                  <div style="font-size:var(--fs-md);font-weight:600;margin-bottom:4px">{p.name}</div>
+                  <div style="font-size:var(--fs-sm);color:var(--text-3)">{(p.conversationIds||[]).length} conversaciones</div>
                   <button onClick={(e) => { e.stopPropagation(); remove(p.id) }}
-                    style="position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:15px">×</button>
+                    style="position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:var(--fs-md)">×</button>
                 </div>
               )}
             </For>

@@ -143,7 +143,7 @@ export function BarSeries(props) {
           const pct = () => Math.max(2, Math.round((it.value || 0) * 100 / max()))
           return (
             <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:130px;font-family:var(--mono);font-size:11px;color:var(--text-2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={it.label}>{it.label}</div>
+              <div style="width:130px;font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={it.label}>{it.label}</div>
               <div class="chart-bar-track" style="border-radius:99px;overflow:hidden">
                 <div class="chart-bar-fill" style={`width:${entered() ? pct() : 0}%;background:${it.color || 'var(--grad-primary)'};border-radius:99px;transition:width .9s cubic-bezier(0.34,1.3,0.5,1) ${idx() * 70}ms`}>
                   <span class="chart-bar-val">{it.display ?? it.value}</span>
@@ -191,8 +191,8 @@ export function Donut(props) {
       <div style="display:flex;flex-direction:column;gap:9px">
         <For each={segs()}>
           {(s) => (
-            <div style="display:flex;align-items:center;gap:9px;font-size:12.5px">
-              <span style={`width:10px;height:10px;border-radius:3px;background:${s.color};flex-shrink:0`} />
+            <div style="display:flex;align-items:center;gap:9px;font-size:var(--fs-sm)">
+              <span style={`width:10px;height:10px;border-radius:4px;background:${s.color};flex-shrink:0`} />
               <span style="color:var(--text-2)">{s.label}</span>
               <span style="color:var(--text-1);font-weight:700;margin-left:auto;font-family:var(--mono)">{Math.round(s.value / total() * 100)}%</span>
             </div>
@@ -228,7 +228,7 @@ export function GaugeRing(props) {
       </svg>
       <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
         <span style={`font-size:28px;font-weight:700;letter-spacing:-0.02em;color:${color()}`}>{noData() ? '—' : Math.round(frac() * 100) + '%'}</span>
-        <Show when={props.sublabel}><span style="font-size:10px;color:var(--text-3)">{props.sublabel}</span></Show>
+        <Show when={props.sublabel}><span style="font-size:var(--fs-micro);color:var(--text-3)">{props.sublabel}</span></Show>
       </div>
     </div>
   )
@@ -236,8 +236,144 @@ export function GaugeRing(props) {
 
 function EmptyChart(props) {
   return (
-    <div style={`height:${props.h}px;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:12.5px;text-align:center;line-height:1.5`}>
+    <div style={`height:${props.h}px;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:var(--fs-sm);text-align:center;line-height:1.5`}>
       {props.label}
+    </div>
+  )
+}
+
+/**
+ * StackedArea — series apiladas en el tiempo.
+ * Para ver la composición de un total (p. ej. peticiones por modelo) y no solo
+ * su suma: revela si un pico lo causó un modelo concreto.
+ */
+export function StackedArea(props) {
+  const W = () => props.width || 520
+  const H = () => props.height || 160
+  const PAD = 4
+  const series = () => props.series || []          // [{name, color, values:[]}]
+
+  const totals = () => {
+    const s = series()
+    if (!s.length) return []
+    const n = Math.max(...s.map(x => x.values.length))
+    return Array.from({ length: n }, (_, i) =>
+      s.reduce((acc, x) => acc + (x.values[i] || 0), 0))
+  }
+  const max = () => Math.max(1, ...totals())
+
+  const paths = () => {
+    const s = series()
+    if (!s.length) return []
+    const n = Math.max(...s.map(x => x.values.length))
+    if (n < 2) return []
+    const stepX = (W() - PAD * 2) / (n - 1)
+    const base = new Array(n).fill(0)
+    return s.map(serie => {
+      const top = serie.values.map((v, i) => base[i] + (v || 0))
+      const up = top.map((v, i) =>
+        `${PAD + i * stepX},${H() - PAD - (v / max()) * (H() - PAD * 2)}`).join(' L')
+      const down = base.map((v, i) =>
+        `${PAD + i * stepX},${H() - PAD - (v / max()) * (H() - PAD * 2)}`)
+        .reverse().join(' L')
+      top.forEach((v, i) => { base[i] = v })
+      return { d: `M${up} L${down} Z`, color: serie.color, name: serie.name }
+    })
+  }
+
+  return (
+    <div>
+      <svg width="100%" height={H()} viewBox={`0 0 ${W()} ${H()}`} preserveAspectRatio="none">
+        <For each={paths()}>
+          {p => <path d={p.d} fill={p.color} opacity="0.75" />}
+        </For>
+      </svg>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+        <For each={series()}>
+          {s => (
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--text-3)">
+              <span style={`width:9px;height:9px;border-radius:2px;background:${s.color};display:inline-block`} />
+              {s.name}
+            </span>
+          )}
+        </For>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Histogram — distribución de valores.
+ * La media de latencia engaña: dos sistemas con la misma media pueden tener
+ * experiencias muy distintas. El histograma muestra la forma real.
+ */
+export function Histogram(props) {
+  const W = () => props.width || 520
+  const H = () => props.height || 130
+  const bins = () => props.bins || []              // [{label, count}]
+  const max = () => Math.max(1, ...bins().map(b => b.count))
+
+  return (
+    <div>
+      <div style={`display:flex;align-items:flex-end;gap:2px;height:${H()}px`}>
+        <For each={bins()}>
+          {b => (
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%"
+                 title={`${b.label}: ${b.count}`}>
+              <div style={`height:${Math.max(2, (b.count / max()) * 100)}%;background:${props.color || 'var(--accent)'};border-radius:4px 3px 0 0;opacity:${0.45 + 0.55 * (b.count / max())};transition:height .3s ease`} />
+            </div>
+          )}
+        </For>
+      </div>
+      <div style="display:flex;gap:2px;margin-top:5px">
+        <For each={bins()}>
+          {(b, i) => (
+            <div style="flex:1;text-align:center;font-size:var(--fs-micro);color:var(--text-3);overflow:hidden;white-space:nowrap">
+              {i() % 2 === 0 ? b.label : ''}
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * HeatStrip — intensidad a lo largo del tiempo (estilo mapa de calor).
+ * Útil para ver patrones de uso por hora sin ocupar espacio vertical.
+ */
+export function HeatStrip(props) {
+  const cells = () => props.values || []
+  const max = () => Math.max(1, ...cells())
+  const color = (v) => {
+    const r = v / max()
+    if (r === 0) return 'var(--inset-surface)'
+    if (r < 0.25) return 'rgba(91,120,245,0.25)'
+    if (r < 0.5) return 'rgba(91,120,245,0.45)'
+    if (r < 0.75) return 'rgba(91,120,245,0.7)'
+    return 'rgba(91,120,245,0.95)'
+  }
+  return (
+    <div>
+      <div style="display:flex;gap:2px">
+        <For each={cells()}>
+          {(v, i) => (
+            <div title={`${props.labels?.[i()] ?? i()}: ${v}`}
+                 style={`flex:1;height:26px;border-radius:4px;background:${color(v)};transition:background .3s ease`} />
+          )}
+        </For>
+      </div>
+      <Show when={props.labels}>
+        <div style="display:flex;gap:2px;margin-top:4px">
+          <For each={props.labels}>
+            {(l, i) => (
+              <div style="flex:1;text-align:center;font-size:var(--fs-micro);color:var(--text-3)">
+                {i() % 4 === 0 ? l : ''}
+              </div>
+            )}
+          </For>
+        </div>
+      </Show>
     </div>
   )
 }

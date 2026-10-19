@@ -27,6 +27,15 @@ async def submit_feedback(request: Request) -> JSONResponse:
         except Exception as e:
             logger.warning(f"feedback.record falló: {e}")
 
+    # El voto convierte una muestra del corpus en ejemplo de entrenamiento:
+    # solo se exportan las respuestas marcadas como buenas.
+    corpus = getattr(request.app.state, "training_corpus", None)
+    if corpus is not None:
+        try:
+            corpus.rate(request_id, positive)
+        except Exception as e:
+            logger.warning(f"corpus.rate falló: {e}")
+
     # Si la respuesta formó parte de un experimento A/B, este voto es señal de
     # CALIDAD para la variante que la sirvió.
     exp = body.get("ab_experiment")

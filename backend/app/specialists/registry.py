@@ -59,6 +59,12 @@ class SpecialistRegistry:
     """
 
     def __init__(self, config_path: str) -> None:
+        # El lock se crea AQUÍ, no bajo demanda. Crearlo con un `hasattr` dentro
+        # del método no es seguro entre hilos: dos hilos simultáneos pueden
+        # pasar la comprobación a la vez y crear cada uno el suyo, con lo que el
+        # bloqueo deja de proteger nada.
+        import threading
+        self._overrides_lock = threading.Lock()
         self._profiles: dict[str, SpecialistProfile] = {
             k: v.model_copy(deep=True)
             for k, v in SPECIALIST_PROFILES.items()
@@ -162,6 +168,12 @@ class SpecialistRegistry:
 
     # ── Resolución de modelo según hardware ──────────────────────────────────
 
+    @property
+    def available_models(self) -> list[str]:
+        """Modelos descargados en Ollama. Pública: el diagnóstico y la elección
+        del modelo de visión la leían sin existir y obtenían siempre []."""
+        return list(getattr(self, "_available_models", None) or [])
+
     def set_available_models(self, models: list[str]) -> None:
         """Guarda la lista de modelos realmente descargados en Ollama.
 
@@ -204,6 +216,13 @@ class SpecialistRegistry:
     # ── Auto-asignación de niveles de potencia (zero-config) ─────────────────
 
     _AUTO_DESC = "asignado automáticamente"
+    _MANUAL_DESC = "asignado manualmente"
+    _CODE_HINTS = ("coder", "codellama", "starcoder", "codestral", "codegemma",
+                   "deepseek-code", "wizardcoder", "sqlcoder", "codeqwen")
+
+    @classmethod
+    def _es_de_codigo(cls, modelo: str) -> bool:
+        return any(h in (modelo or "").lower() for h in cls._CODE_HINTS)
     _NON_CHAT_HINTS = ("embed", "embedding", "bge", "nomic", "minilm", "e5-",
                        "reranker", "llava", "bakllava", "moondream")
     _LEVEL_TARGETS = {"low": 3.0, "mid": 7.0, "high": 22.0, "ultra": 70.0}
@@ -277,12 +296,21 @@ class SpecialistRegistry:
             changed = []
             for level, target in self._LEVEL_TARGETS.items():
                 existing = getattr(tiers, level, None)
+                # Solo se respeta una asignación marcada explícitamente como
+                # manual. Antes se respetaba todo lo que no llevara la marca de
+                # automática, y eso incluía asignaciones heredadas de versiones
+                # antiguas (p. ej. deepseek-coder en todos los niveles): nunca se
+                # sustituían, aunque el usuario descargara los modelos recomendados.
                 if existing and existing.model_name and \
                         existing.model_name in self._available_models and \
-                        existing.description != self._AUTO_DESC:
-                    continue  # asignación manual del usuario válida → se respeta
+                        existing.description == self._MANUAL_DESC:
+                    continue
+                # Los modelos de programación (deepseek-coder, codellama…) solo
+                # para conversación general si no hay otro: ante una pregunta
+                # normal responden con fórmulas e ignoran el contexto.
                 best = min(chat_models,
-                           key=lambda m: (abs(est[m] - target),
+                           key=lambda m: (1 if self._es_de_codigo(m) else 0,
+                                          abs(est[m] - target),
                                           0 if m == _anchor else 1,
                                           0 if supports_tools(m) else 1, m))
                 params = est[best]
@@ -332,9 +360,6 @@ class SpecialistRegistry:
         evitar corrupción si llegan dos asignaciones a la vez."""
         import json
         import os
-        import threading
-        if not hasattr(self, "_overrides_lock"):
-            self._overrides_lock = threading.Lock()
         with self._overrides_lock:
             ov = dict(self._load_overrides())  # copia para no mutar la caché compartida
             if model_name:
@@ -346,7 +371,7 @@ class SpecialistRegistry:
             try:
                 path = self._overrides_path()
                 tmp = path.with_suffix(".json.tmp")
-                tmp.write_text(json.dumps(ov, indent=2))
+                tmp.write_text(json.dumps(ov, indent=2), encoding="utf-8")
                 os.replace(tmp, path)  # rename atómico: nunca deja el archivo a medias
             except OSError as exc:
                 logger.warning(f"No se pudo persistir overrides: {exc}")
@@ -362,7 +387,7 @@ class SpecialistRegistry:
         if getattr(self, "_overrides_cache", None) is not None:
             return self._overrides_cache
         try:
-            self._overrides_cache = json.loads(self._overrides_path().read_text())
+            self._overrides_cache = json.loads(self._overrides_path().read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             self._overrides_cache = {}
         return self._overrides_cache
@@ -484,6 +509,16 @@ class SpecialistRegistry:
 
     def get_eligible_for_tier(self, tier: int) -> list[SpecialistProfile]:
         return [p for p in self.get_active() if p.min_tier <= tier]
+
+    def fallback_specialists(self, tier: int) -> list[SpecialistProfile]:
+        """Especialistas utilizables aunque estén desactivados: el general (o el
+        primero) cuyo modelo esté instalado. Lista vacía si no hay ninguno."""
+        disponibles = set(self.available_models)
+        candidatos = [p for p in self._profiles.values()
+                      if p.model_name and p.model_name != _PENDIENTE
+                      and (not disponibles or p.model_name in disponibles)]
+        candidatos.sort(key=lambda p: p.id != "generalist")
+        return candidatos[:1]
 
     def get_by_id(self, specialist_id: str) -> SpecialistProfile:
         if specialist_id not in self._profiles:

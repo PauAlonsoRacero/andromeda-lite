@@ -55,7 +55,7 @@ async def generate_adr(request: Request) -> JSONResponse:
     adr_num  = body.get("number", 1)
 
     if not decision:
-        return JSONResponse(status_code=400, content={"error": "decision requerida"})
+        return JSONResponse(status_code=400, content={"error_key": "err.decision_required"})
 
     settings = request.app.state.settings
     registry = request.app.state.registry

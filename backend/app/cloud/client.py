@@ -43,14 +43,14 @@ def _ensure_dir() -> None:
 # ── Sesión local ──────────────────────────────────────────────────────────────
 def load_session() -> dict | None:
     try:
-        return json.loads(_SESSION_FILE.read_text())
+        return json.loads(_SESSION_FILE.read_text(encoding="utf-8"))
     except Exception:
         return None
 
 
 def save_session(data: dict) -> None:
     _ensure_dir()
-    _SESSION_FILE.write_text(json.dumps(data))
+    _SESSION_FILE.write_text(json.dumps(data), encoding="utf-8")
 
 
 def clear_session() -> None:
@@ -68,8 +68,8 @@ def verify_local_license() -> dict | None:
     if jwt is None:
         return None
     try:
-        token = _LICENSE_FILE.read_text().strip()
-        pub = _PUBKEY_FILE.read_text()
+        token = _LICENSE_FILE.read_text(encoding="utf-8").strip()
+        pub = _PUBKEY_FILE.read_text(encoding="utf-8")
         payload = jwt.decode(token, pub, algorithms=["RS256"], issuer="andromeda-cloud")
         return payload
     except Exception:
@@ -140,7 +140,7 @@ def sync_license(token: str | None = None) -> str:
             data = r.json()
             if data.get("license"):
                 _ensure_dir()
-                _LICENSE_FILE.write_text(data["license"])
+                _LICENSE_FILE.write_text(data["license"], encoding="utf-8")
             else:
                 # Sin licencia activa → borrar la local (volvió a free)
                 try:

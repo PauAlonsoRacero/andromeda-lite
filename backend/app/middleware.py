@@ -43,6 +43,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         ip = self._get_ip(request)
+        # Consultar el progreso de una respuesta (/api/chat/jobs/<id>) es una
+        # lectura barata que la interfaz hace cada ~100 ms. Contarla contra el
+        # límite del chat (20/min) lo agotaba en dos segundos y la app mostraba
+        # "Demasiadas peticiones". Crear el trabajo (POST) sí cuenta como chat.
+        if request.url.path.startswith("/api/chat/jobs/"):
+            return await call_next(request)
+
+        # La llamada interna que hace el propio backend para generar en
+        # streaming no es una petición nueva del usuario: ya se contó al crear
+        # el trabajo. Se identifica con un token que solo conoce este proceso.
+        _interno = request.headers.get("x-andromeda-internal")
+        if _interno and _interno == getattr(request.app.state, "internal_token", None):
+            return await call_next(request)
+
         path_key = self._get_path_key(request.url.path)
         limit, window = self.LIMITS.get(path_key, self.LIMITS["default"])
 
@@ -106,6 +120,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        # Las vistas previas se muestran en un iframe dentro de la app; ya van
+        # aisladas por su propia cabecera CSP "sandbox".
+        if "/view/" not in request.url.path:
+            response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         return response

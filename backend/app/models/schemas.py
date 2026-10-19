@@ -113,6 +113,7 @@ class ChatRequest(BaseModel):
         ...,
         min_length=1,
         description="Texto de la pregunta o tarea del usuario",
+        max_length=100000,
     )
     strategy: str = Field(
         default="auto",
@@ -121,6 +122,7 @@ class ChatRequest(BaseModel):
             "Opciones: single | iterative_refine | verifier_pass | "
             "confidence_weighted | hardware_aware_fallback | latency_first | quality_first"
         ),
+        max_length=50,
     )
     specialists: list[str] = Field(
         default_factory=list,
@@ -136,7 +138,7 @@ class ChatRequest(BaseModel):
         description="Temperatura de generación (0=determinista, 1=creativo)",
     )
     max_tokens: int = Field(
-        default=2048,
+        default=8192,
         ge=64,
         le=32768,
         description="Número máximo de tokens a generar",
@@ -145,6 +147,11 @@ class ChatRequest(BaseModel):
         default=True,
         description="Si True: respuesta por SSE token a token. Si False: JSON completo al final.",
     )
+    # Proyecto al que pertenece la conversación. Sus instrucciones y archivos
+    # se incluyen en el contexto, y su carpeta pasa a ser el espacio de trabajo.
+    project_id: str | None = Field(default=None, max_length=64)
+    project_name: str | None = Field(default=None, max_length=200)
+    project_instructions: str | None = Field(default=None, max_length=20_000)
     incognito: bool = Field(
         default=False,
         description=(
@@ -192,6 +199,7 @@ class ChatRequest(BaseModel):
             "'max1' = solo 1 IA (máxima velocidad), "
             "'max_hardware' = todas las que quepan en el hardware."
         ),
+        max_length=50,
     )
     @field_validator('prompt')
     @classmethod
@@ -215,6 +223,7 @@ class ChatRequest(BaseModel):
     image_detail: str = Field(
         default="auto",
         description="Nivel de detalle para análisis de imágenes: auto | low | high",
+        max_length=20,
     )
     # ── Contexto de conversación ─────────────────────────────────────────────
     conversation_history: list[dict] = Field(
@@ -292,6 +301,13 @@ class ChatResponse(BaseModel):
         default=None,
         description="Explicación de por qué se degradó (si degraded=True)",
     )
+    # Lo que se usó para responder. El camino streaming lo enviaba en sus
+    # metadatos, pero este no, así que en la app de escritorio (que usa este
+    # camino) los indicadores de skill, fuentes y búsqueda web no aparecían.
+    skill_used: str | None = Field(default=None)
+    rag_sources: list[str] | None = Field(default=None)
+    web_used: bool = Field(default=False)
+    file_actions: list[dict] | None = Field(default=None)
     trace_id: str = Field(description="Referencia al TraceRecord en la base de datos")
     power_tier: int | None = Field(
         default=None, description="Nivel de potencia aplicado por el orquestador lineal (1-4)")
@@ -324,6 +340,7 @@ class SpecialistProfile(BaseModel):
             "Cambiar en config/specialists.yaml. "
             "El sistema no activará este especialista mientras sea 'PENDIENTE_CONFIGURAR'."
         ),
+        max_length=200,
     )
     domain: str = Field(description="Dominio principal (ej: 'Software development')")
     description: str = Field(description="Descripción de una línea del especialista")

@@ -83,7 +83,7 @@ export default function ModelExplorer() {
 
   return (
     <div>
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+      <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:16px;line-height:1.5">
         {t('mex.intro')}
       </div>
 
@@ -105,18 +105,18 @@ export default function ModelExplorer() {
 
       {/* Buscador iOS */}
       <div class="ios-search" style="margin-bottom:14px">
-        <span style="color:var(--text-3);font-size:15px">⌕</span>
-        <input placeholder={t('mex.ph_search')} value={query()}
+        <span style="color:var(--text-3);font-size:var(--fs-md)">⌕</span>
+        <input aria-label={t('mex.ph_search')} placeholder={t('mex.ph_search')} value={query()}
           onInput={e => onSearch(e.target.value)} />
       </div>
 
       {/* Filtros: categoría (tier) y espacio (VRAM) */}
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:20px">
-        <span style="font-size:11px;color:var(--text-3);font-weight:600;margin-right:2px">{t('mex.category')}</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-3);font-weight:600;margin-right:2px">{t('mex.category')}</span>
         <For each={[1,2,3,4]}>
           {(tn) => (
             <button onClick={() => setTierFilter(tierFilter()===tn ? null : tn)}
-              style={`font-size:11px;font-weight:600;padding:5px 11px;border-radius:9px;cursor:pointer;font-family:var(--font);transition:all .14s;
+              style={`font-size:var(--fs-xs);font-weight:600;padding:5px 11px;border-radius:10px;cursor:pointer;font-family:var(--font);transition:all .14s;
                 border:1px solid ${tierFilter()===tn ? TIER_COLOR[tn] : 'var(--glass-border)'};
                 background:${tierFilter()===tn ? TIER_COLOR[tn]+'22' : 'var(--hover-surface)'};
                 color:${tierFilter()===tn ? TIER_COLOR[tn] : 'var(--text-2)'}`}>
@@ -125,11 +125,11 @@ export default function ModelExplorer() {
           )}
         </For>
         <span style="width:1px;height:18px;background:var(--glass-border);margin:0 4px" />
-        <span style="font-size:11px;color:var(--text-3);font-weight:600;margin-right:2px">{t('mex.max_space')}</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-3);font-weight:600;margin-right:2px">{t('mex.max_space')}</span>
         <For each={[8,16,24,48]}>
           {(gb) => (
             <button onClick={() => setVramFilter(vramFilter()===gb ? null : gb)}
-              style={`font-size:11px;font-weight:600;padding:5px 11px;border-radius:9px;cursor:pointer;font-family:var(--font);transition:all .14s;
+              style={`font-size:var(--fs-xs);font-weight:600;padding:5px 11px;border-radius:10px;cursor:pointer;font-family:var(--font);transition:all .14s;
                 border:1px solid ${vramFilter()===gb ? 'var(--blue)' : 'var(--glass-border)'};
                 background:${vramFilter()===gb ? 'var(--blue)22' : 'var(--hover-surface)'};
                 color:${vramFilter()===gb ? 'var(--blue)' : 'var(--text-2)'}`}>
@@ -139,7 +139,7 @@ export default function ModelExplorer() {
         </For>
         <span style="width:1px;height:18px;background:var(--glass-border);margin:0 4px" />
         <button onClick={() => setFitsOnly(!fitsOnly())}
-          style={`font-size:11px;font-weight:600;padding:5px 11px;border-radius:9px;cursor:pointer;font-family:var(--font);transition:all .14s;
+          style={`font-size:var(--fs-xs);font-weight:600;padding:5px 11px;border-radius:10px;cursor:pointer;font-family:var(--font);transition:all .14s;
             border:1px solid ${fitsOnly() ? 'var(--green)' : 'var(--glass-border)'};
             background:${fitsOnly() ? 'var(--green)22' : 'var(--hover-surface)'};
             color:${fitsOnly() ? 'var(--green)' : 'var(--text-2)'}`}>
@@ -147,7 +147,7 @@ export default function ModelExplorer() {
         </button>
         <Show when={tierFilter() || vramFilter() || fitsOnly()}>
           <button onClick={() => { setTierFilter(null); setVramFilter(null); setFitsOnly(false) }}
-            style="font-size:11px;color:var(--text-3);background:none;border:none;cursor:pointer;text-decoration:underline">
+            style="font-size:var(--fs-xs);color:var(--text-3);background:none;border:none;cursor:pointer;text-decoration:underline">
             Limpiar
           </button>
         </Show>
@@ -157,7 +157,7 @@ export default function ModelExplorer() {
         <div style="text-align:center;padding:40px;color:var(--text-3)">{t('mex.loading')}</div>
       }>
         <Show when={filtered().length > 0} fallback={
-          <div style="text-align:center;padding:40px;color:var(--text-3);font-size:13px">{t('mex.no_match')}</div>
+          <div style="text-align:center;padding:40px;color:var(--text-3);font-size:var(--fs-base)">{t('mex.no_match')}</div>
         }>
         <div class="stagger" style="display:flex;flex-direction:column;gap:14px">
           <For each={filtered()}>
@@ -167,7 +167,7 @@ export default function ModelExplorer() {
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
                   <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
-                      <span style="font-size:16px;font-weight:700;font-family:var(--font-mono);letter-spacing:-0.01em">{m.name}</span>
+                      <span style="font-size:var(--fs-md);font-weight:700;font-family:var(--font-mono);letter-spacing:-0.01em">{m.name}</span>
                       <span class="ios-tier-badge" style={`color:${TIER_COLOR[m.tier]};border-color:${TIER_COLOR[m.tier]}33`}>
                         {TIER_LABEL[m.tier]}
                       </span>
@@ -176,7 +176,7 @@ export default function ModelExplorer() {
                           style="color:var(--green);border-color:var(--green)33">🔧 {t('mex.tools')}</span>
                       </Show>
                     </div>
-                    <div style="font-size:12px;color:var(--text-3);margin-top:4px">{m.family} · {m.params_b}B · {(m.context/1024).toFixed(0)}k {t('mex.context')}</div>
+                    <div style="font-size:var(--fs-sm);color:var(--text-3);margin-top:4px">{m.family} · {m.params_b}B · {(m.context/1024).toFixed(0)}k {t('mex.context')}</div>
                   </div>
 
                   {/* Estado "apto" — lo más prominente */}
@@ -185,14 +185,14 @@ export default function ModelExplorer() {
                       m.fits_status === 'apto'       ? 'background:rgba(52,211,153,0.14);color:var(--green)' :
                       m.fits_status === 'apto_justo' ? 'background:rgba(240,164,140,0.16);color:var(--pink)' :
                                                        'background:rgba(255,107,107,0.14);color:var(--red)'}>
-                      <span style="font-size:13px">{m.fits_status === 'no_apto' ? '✕' : '✓'}</span>
+                      <span style="font-size:var(--fs-base)">{m.fits_status === 'no_apto' ? '✕' : '✓'}</span>
                       {m.fits_status === 'apto' ? t('mex.fit_apto') : m.fits_status === 'apto_justo' ? t('mex.fit_justo') : t('mex.fit_no')}
                     </div>
                   </Show>
                 </div>
 
                 {/* Descripción */}
-                <div style="font-size:13px;color:var(--text-2);line-height:1.55;margin:12px 0">{m.description}</div>
+                <div style="font-size:var(--fs-base);color:var(--text-2);line-height:1.55;margin:12px 0">{m.description}</div>
 
                 {/* Métricas en píldoras iOS */}
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
@@ -229,14 +229,14 @@ export default function ModelExplorer() {
 
                 {/* Acciones */}
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
-                  <button class="btn btn-primary" style="font-size:13px;padding:9px 18px"
+                  <button class="btn btn-primary" style="font-size:var(--fs-base);padding:9px 18px"
                     disabled={pulling()[m.name] === 'descargando'}
                     onClick={() => pull(m.name)}>
                     <Show when={pulling()[m.name] === 'descargando'} fallback={
                       <Show when={pulling()[m.name] === 'completado'} fallback={t('mex.download')}>{t('mex.redownload')}</Show>
                     }>{t('mex.downloading')}</Show>
                   </button>
-                  <button class="btn btn-glass" style="font-size:13px;padding:9px 16px"
+                  <button class="btn btn-glass" style="font-size:var(--fs-base);padding:9px 16px"
                     disabled={pulling()[m.name] === 'grabando'}
                     onClick={() => bakeIdentity(m.name)}
                     title={t('mex.variant_hint')}>

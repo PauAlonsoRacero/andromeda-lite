@@ -48,7 +48,7 @@ export default function Login(props) {
       <div class="login-card anim-slide" style="position:relative">
         <Show when={props.canClose}>
           <button onClick={() => props.onClose?.()} title={t('login.close')}
-            style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:var(--hover-surface);color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;font-family:var(--font)">×</button>
+            style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:var(--hover-surface);color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:var(--fs-lg);font-family:var(--font)">×</button>
         </Show>
         <img src="/andromeda-logo.png" alt="" style="width:54px;height:54px;object-fit:contain;margin:0 auto 14px;display:block" />
         <h1 class="login-title">Andromeda</h1>
@@ -57,21 +57,21 @@ export default function Login(props) {
         </div>
 
         <Show when={mode() === 'register'}>
-          <input class="g-input login-input" placeholder={t('login.ph_name')} value={name()}
+          <input aria-label={t('login.ph_name')} class="g-input login-input" placeholder={t('login.ph_name')} value={name()}
             onInput={e => setName(e.target.value)} autocomplete="name"
             onKeyDown={e => e.key === 'Enter' && submit()} />
         </Show>
 
-        <input class="g-input login-input" type="email" placeholder={t('login.ph_email')} value={email()}
+        <input aria-label={t('login.ph_email')} class="g-input login-input" type="email" placeholder={t('login.ph_email')} value={email()}
           onInput={e => setEmail(e.target.value)} autocomplete="email"
           onKeyDown={e => e.key === 'Enter' && submit()} />
-        <input class="g-input login-input" type="password" placeholder={t('login.ph_pass')} value={password()}
+        <input aria-label={t('login.ph_pass')} class="g-input login-input" type="password" placeholder={t('login.ph_pass')} value={password()}
           onInput={e => setPassword(e.target.value)}
           autocomplete={mode() === 'login' ? 'current-password' : 'new-password'}
           onKeyDown={e => e.key === 'Enter' && submit()} />
 
         <Show when={mode() === 'login'}>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:2px 2px 4px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-base);color:var(--text-2);cursor:pointer;margin:2px 2px 4px">
             <input type="checkbox" checked={remember()} onChange={e => setRemember(e.target.checked)}
               style="width:16px;height:16px;accent-color:var(--blue);cursor:pointer" />
             Recordarme en este dispositivo (30 días)
@@ -79,7 +79,7 @@ export default function Login(props) {
         </Show>
 
         <Show when={mode() === 'register'}>
-          <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-2);cursor:pointer;margin:2px 2px 4px;line-height:1.5">
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:var(--fs-sm);color:var(--text-2);cursor:pointer;margin:2px 2px 4px;line-height:1.5">
             <input type="checkbox" checked={accept()} onChange={e => setAccept(e.target.checked)}
               style="width:16px;height:16px;accent-color:var(--blue);cursor:pointer;margin-top:1px;flex-shrink:0" />
             <span>Acepto los <a href="https://andromeda.app/terms" target="_blank" style="color:var(--blue)">{t('login.terms')}</a> y la <a href="https://andromeda.app/privacy" target="_blank" style="color:var(--blue)">{t('login.privacy_policy')}</a>.</span>

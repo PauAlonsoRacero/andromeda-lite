@@ -114,12 +114,24 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with: { path: artifacts }
+
+      # Notas escritas de la versión (docs/releases/<tag>.md). Si no existen,
+      # se usa un texto mínimo y GitHub añade la lista de cambios automática.
+      - name: Release notes
+        shell: bash
+        run: |
+          f="docs/releases/${GITHUB_REF_NAME}.md"
+          if [ -f "$f" ]; then cp "$f" release-notes.md
+          else echo "Andromeda Lite ${GITHUB_REF_NAME}" > release-notes.md; fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           files: |
             artifacts/andromeda-windows/*.exe
             artifacts/andromeda-macos/*.zip

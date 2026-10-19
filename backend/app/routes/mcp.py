@@ -54,7 +54,7 @@ async def call_tool(request: Request) -> JSONResponse:
     """
     manager = getattr(request.app.state, 'mcp_manager', None)
     if not manager:
-        return JSONResponse(status_code=503, content={"error": "MCP no disponible"})
+        return JSONResponse(status_code=503, content={"error_key": "err.mcp_unavailable"})
 
     body      = await request.json()
     tool_name = body.get("tool")
@@ -62,7 +62,7 @@ async def call_tool(request: Request) -> JSONResponse:
     server_id = body.get("server_id")
 
     if not tool_name:
-        return JSONResponse(status_code=400, content={"error": "Campo 'tool' requerido"})
+        return JSONResponse(status_code=400, content={"error_key": "err.tool_required"})
 
     result = await manager.call_tool(tool_name, arguments, server_id)
 
@@ -104,7 +104,7 @@ async def mcp_chat(request: Request) -> JSONResponse:
     specialist_id = body.get("specialist", "generalist")
 
     if not prompt:
-        return JSONResponse(status_code=400, content={"error": "Campo 'prompt' requerido"})
+        return JSONResponse(status_code=400, content={"error_key": "err.prompt_required"})
 
     try:
         specialist = registry.get_by_id(specialist_id)
@@ -139,7 +139,7 @@ async def reload_mcp(request: Request) -> JSONResponse:
     """Reconecta todos los servidores MCP."""
     manager = getattr(request.app.state, 'mcp_manager', None)
     if not manager:
-        return JSONResponse(status_code=503, content={"error": "MCP no inicializado"})
+        return JSONResponse(status_code=503, content={"error_key": "err.mcp_not_ready"})
 
     await manager.shutdown()
     await manager.initialize()
@@ -155,6 +155,8 @@ async def list_servers(request: Request) -> JSONResponse:
     """
     import yaml
     from pathlib import Path
+
+    from app.mcp import secrets_store
 
     settings = request.app.state.settings
     manager  = getattr(request.app.state, 'mcp_manager', None)
@@ -184,7 +186,7 @@ async def list_servers(request: Request) -> JSONResponse:
     if path and path.exists():
         try:
             with path.open("r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
+                data = __import__('app.mcp.state', fromlist=['apply']).apply(yaml.safe_load(f) or {})
             connected = {}
             if manager:
                 summary = manager.get_tools_summary()
@@ -198,10 +200,21 @@ async def list_servers(request: Request) -> JSONResponse:
                     "description": cfg.get("description", ""),
                     "install": cfg.get("install", ""),
                     "requires_key": cfg.get("requires_key", []),
+                    # Qué claves ya están configuradas, para que la UI muestre
+                    # el estado real en vez de pedirlas siempre. Nunca se
+                    # devuelve el valor de una clave, solo si existe.
+                    "keys_status": secrets_store.status(cfg.get("requires_key", []) or []),
                     "docs": cfg.get("docs", ""),
+                    # Conectores que necesitan preparación fuera de Andromeda
+                    # (Gmail, WhatsApp) y los de riesgo alto (WhatsApp no oficial).
+                    "setup": cfg.get("setup", "auto"),
+                    "risk": cfg.get("risk", "normal"),
                     "connected": conn.get("connected", False),
                     "tools": conn.get("tools", []),
                     "tool_count": conn.get("count", 0),
+                    # Motivo del fallo, si lo hubo: sin esto el usuario solo ve
+                    # "sin conectar" y no sabe qué hacer al respecto.
+                    "error": (manager.last_error(sid) if manager else ""),
                 })
         except Exception as exc:
             logger.error(f"Error leyendo mcp_servers.yaml: {exc}")
@@ -234,45 +247,186 @@ async def toggle_server(server_id: str, request: Request) -> JSONResponse:
 
     try:
         with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+            data = __import__('app.mcp.state', fromlist=['apply']).apply(yaml.safe_load(f) or {})
         if server_id not in (data.get("servers", {}) or {}):
             return JSONResponse(status_code=404, content={
                 "error": True, "message": f"Servidor '{server_id}' no existe"
             })
         data["servers"][server_id]["enabled"] = enabled
-        with path.open("w", encoding="utf-8") as f:
-            yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        # Estado en la carpeta de datos del usuario, no en el YAML de la app
+        # (en Windows está en Program Files y no se puede escribir).
+        from app.mcp import state as _mcp_state
+        _mcp_state.set_enabled(server_id, enabled)
 
         # Aplicar AL INSTANTE: al activar, conectamos ese servidor (npx/uvx lo
         # descarga solo la primera vez); al desactivar, lo desconectamos. Sin
         # necesidad de pulsar "Reconectar".
         manager = getattr(request.app.state, 'mcp_manager', None)
         result = {}
+        install_note = ""
         if manager:
             if enabled:
+                # Plug and play: si al servidor le falta su runtime (npx/uvx),
+                # se intenta instalar antes de conectar en lugar de fallar y
+                # dejar al usuario con instrucciones de terminal.
+                from app.mcp import runtime_installer as ri
+                ri.ensure_path_in_environ()
+                srv_cfg = (data.get("servers", {}) or {}).get(server_id, {}) or {}
+                runtime = ri.runtime_for_command(srv_cfg.get("command", []))
+                if runtime and not ri.is_available(runtime):
+                    logger.info(f"MCP [{server_id}]: falta '{runtime}', instalando…")
+                    outcome = await ri.install_runtime(runtime)
+                    install_note = outcome["message"]
+                    if not outcome["ok"]:
+                        # No se pudo instalar solo: se informa con la instrucción
+                        # exacta y no se intenta conectar (fallaría igualmente).
+                        return JSONResponse(content={
+                            "success": True, "server_id": server_id, "enabled": enabled,
+                            "connected": False, "tools": [], "tool_count": 0,
+                            "needs_runtime": runtime, "manual_install": outcome["manual"],
+                            "message": outcome["message"],
+                        })
                 result = await manager.connect_one(server_id)
             else:
                 result = await manager.disconnect_one(server_id)
 
         ok = result.get("connected", False)
+
+        # Si se pidió activar pero no conectó, revertir el flag en el YAML: un
+        # servidor marcado como "activado" que en realidad no funciona es un
+        # estado mentiroso que confunde en cada arranque posterior.
         if enabled and not ok:
-            message = result.get("error") or "Activado, pero no se pudo conectar."
+            try:
+                from app.mcp import state as _mcp_state
+                _mcp_state.set_enabled(server_id, False)
+            except Exception as exc:                       # noqa: BLE001
+                logger.warning(f"No se pudo revertir 'enabled' de {server_id}: {exc}")
+
+        # Clave traducible además del texto: la interfaz mostraba siempre
+        # "Conectado — N herramientas." en español, fuera cual fuera el idioma.
+        if enabled and not ok:
+            message = result.get("error") or "No se pudo conectar."
+            message_key = None if result.get("error") else "mcp.msg_failed"
         elif enabled:
             message = f"Conectado — {result.get('count', 0)} herramientas."
+            message_key = "mcp.msg_connected"
         else:
             message = "Desactivado."
+            message_key = "mcp.msg_disabled"
+        if install_note and enabled:
+            message = f"{install_note} {message}"
 
         return JSONResponse(content={
             "success": True,
             "server_id": server_id,
-            "enabled": enabled,
+            # Refleja el estado REAL tras el intento, no lo que se pidió.
+            "enabled": enabled and ok if enabled else False,
             "connected": ok,
             "tools": result.get("tools", []),
             "tool_count": result.get("count", 0),
             "needs_key": result.get("needs_key", []),
             "message": message,
+            "message_key": message_key,
+            "message_args": {"count": result.get("count", 0)},
         })
     except Exception as exc:
         return JSONResponse(status_code=500, content={
             "error": True, "message": f"Error: {exc}"
         })
+
+
+# ── Claves de API de los servidores MCP ─────────────────────────────────────
+
+@router.get("/keys")
+async def list_keys() -> JSONResponse:
+    """Nombres de las claves configuradas. Nunca devuelve sus valores."""
+    from app.mcp import secrets_store
+    return JSONResponse(content={"configured": secrets_store.list_configured()})
+
+
+@router.put("/keys/{key_name}")
+async def set_key(key_name: str, request: Request) -> JSONResponse:
+    """Guarda una clave de API y la aplica al proceso en curso.
+
+    Se guarda en el directorio de datos del usuario con permisos 0600, de modo
+    que no hace falta exportar variables de entorno antes de abrir la app.
+    """
+    from app.mcp import secrets_store
+    body = await request.json()
+    value = (body.get("value") or "").strip()
+    if not value:
+        return JSONResponse(status_code=400, content={"error_key": "err.value_empty"})
+    try:
+        secrets_store.set_key(key_name, value)
+    except (ValueError, RuntimeError) as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    return JSONResponse(content={"saved": True, "key": key_name})
+
+
+@router.delete("/keys/{key_name}")
+async def delete_key(key_name: str) -> JSONResponse:
+    """Elimina una clave guardada."""
+    from app.mcp import secrets_store
+    return JSONResponse(content={"deleted": secrets_store.delete_key(key_name)})
+
+
+@router.get("/diagnose")
+async def diagnose(request: Request) -> JSONResponse:
+    """Diagnóstico de por qué los servidores MCP no conectan.
+
+    La mayoría de fallos tienen una de tres causas: falta el runtime (Node/uv),
+    falta una clave de API, o el paquete concreto no se pudo descargar. Este
+    endpoint las distingue para no dejar al usuario adivinando.
+    """
+    import shutil
+    import os
+
+    # Mismo PATH ampliado que usa el cliente MCP: las apps empaquetadas
+    # arrancan sin el PATH del shell del usuario.
+    extra = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin",
+             os.path.expanduser("~/.local/bin"), os.path.expanduser("~/.cargo/bin"),
+             os.path.expanduser("~/.nvm/current/bin"), os.path.expanduser("~/.volta/bin"),
+             os.path.expanduser("~/.bun/bin"), "/usr/local/sbin"]
+    search_path = os.pathsep.join(
+        [p for p in extra if os.path.isdir(p)] + [os.environ.get("PATH", "")])
+
+    runtimes = {}
+    for name, tool, install in (
+        ("node", "npx", "https://nodejs.org  (o: brew install node)"),
+        ("python-uv", "uvx", "https://docs.astral.sh/uv  (o: brew install uv)"),
+    ):
+        found = shutil.which(tool, path=search_path)
+        runtimes[name] = {"tool": tool, "available": bool(found),
+                          "path": found or "", "install_hint": install}
+
+    manager = getattr(request.app.state, "mcp_manager", None)
+    errors = dict(getattr(manager, "_last_errors", {})) if manager else {}
+    connected = []
+    if manager:
+        summary = manager.get_tools_summary()
+        connected = [sid for sid, s in (summary.get("servers", {}) or {}).items()
+                     if s.get("connected")]
+
+    return JSONResponse(content={
+        "runtimes": runtimes,
+        "connected_servers": connected,
+        "errors": errors,
+        "path_searched": search_path,
+    })
+
+
+@router.post("/install-runtime/{runtime}")
+async def install_runtime(runtime: str) -> JSONResponse:
+    """Instala un runtime necesario para los conectores MCP ('uv' o 'node')."""
+    from app.mcp import runtime_installer as ri
+    if runtime not in ("uv", "node"):
+        return JSONResponse(status_code=400,
+                            content={"error": f"Runtime no soportado: {runtime}"})
+    outcome = await ri.install_runtime(runtime)
+    return JSONResponse(content={
+        "runtime": runtime,
+        "installed": outcome["ok"],
+        "manual": outcome["manual"],
+        "message": outcome["message"],
+        "available_now": ri.is_available(runtime),
+    })

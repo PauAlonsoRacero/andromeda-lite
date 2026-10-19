@@ -39,6 +39,37 @@ from app.specialists.identity import with_identity
 
 logger = logging.getLogger("andromeda.streaming")
 
+try:
+    from app.observability import diagnostics as diag
+except Exception:                                        # pragma: no cover
+    class _Nulo:
+        @staticmethod
+        def log(*a, **k): pass
+    diag = _Nulo()
+
+
+def _tuned_options(base: dict, config: dict | None) -> dict:
+    """Añade a las opciones los parámetros ajustados al hardware detectado."""
+    try:
+        from app.core.inference_tuning import options_from_hardware
+        return options_from_hardware(base, (config or {}).get("hardware"))
+    except Exception:
+        return base          # ante cualquier duda, los valores de siempre
+
+
+
+def _keep_alive() -> str:
+    """Cuánto tiempo mantiene Ollama el modelo en memoria tras responder.
+
+    Configurable con ANDROMEDA_KEEP_ALIVE (formato de Ollama: "30m", "1h",
+    "-1" para indefinido, "0" para descargar al terminar). Por defecto 30
+    minutos: suficiente para una sesión de trabajo sin retener VRAM toda la
+    noche.
+    """
+    import os
+    return (os.environ.get("ANDROMEDA_KEEP_ALIVE") or "30m").strip()
+
+
 
 async def staircase_stream(
     specialists: list[SpecialistProfile],
@@ -98,22 +129,108 @@ async def staircase_stream(
         """
         t0 = time.perf_counter()
         accumulated = ""
+        # Quita la frase "Hoy es…, y son las HH:MM" que algunos modelos recitan.
+        from app.core.output_filters import DateEchoFilter
+        _filtro_fecha = DateEchoFilter()
+
+        # ── Herramientas MCP ──────────────────────────────────────────────
+        # Si hay herramientas conectadas y el modelo sabe usarlas, se resuelve
+        # el bucle de herramientas (mismo que el camino sin streaming) y la
+        # respuesta final se emite a trozos. Antes el streaming no tenía este
+        # paso: en el navegador las herramientas MCP no funcionaban nunca.
+        _mcp = config.get("mcp_manager")
+        if _mcp is not None:
+            try:
+                from app.core.model_catalog import supports_tools as _st
+                _sel = []
+                # Con imágenes no se entra en el bucle de herramientas: construye
+                # sus propios mensajes sin ellas, y en un registro real el modelo
+                # de visión nunca llegó a recibirlas ("no puedo ver imágenes").
+                if (_st(specialist.model_name) and getattr(_mcp, "has_external_tools", False)
+                        and not config.get("images")):
+                    from app.mcp.executor import select_tools
+                    # Solo el mensaje del usuario: el prompt completo incluye historial
+                    # y resultados web, y sus palabras activaban herramientas sin motivo.
+                    _sel = select_tools(_mcp.tools, config.get("user_prompt") or prompt)
+                    diag.log("mcp", f"herramientas relevantes: {len(_sel)} de {len(_mcp.tools)}",
+                             data={"elegidas": [t.name for t in _sel]},
+                             level="info" if _sel else "warn")
+                if _sel:
+                    from app.mcp.executor import MCPExecutor
+                    async def _emitir(trozo: str) -> None:
+                        _l = _filtro_fecha.feed(trozo)
+                        if _l:
+                            await queue.put((specialist.id, _l, False))
+
+                    # En streaming: el texto aparece a medida que se genera y
+                    # solo se retiene lo que pueda ser una llamada a herramienta.
+                    final_text, tool_log = await MCPExecutor(
+                        _mcp, metrics=config.get("metrics"), tools=_sel).stream_with_tools(
+                        prompt=prompt,
+                        model_name=specialist.model_name,
+                        system_prompt=with_identity(
+                            specialist.system_prompt, specialist.id,
+                            specialist.model_name, user_prompt=prompt),
+                        ollama_url=config.get("ollama_url"),
+                        on_token=_emitir,
+                        options=_tuned_options(
+                            {"temperature": temperature, "num_predict": max_tokens}, config),
+                        keep_alive=_keep_alive(),
+                    )
+                    diag.log("mcp", f"respuesta con herramientas: {len(tool_log or [])} llamadas",
+                             data={"herramientas": [t.get("tool") for t in (tool_log or [])]},
+                             level="success")
+                    _resto = _filtro_fecha.flush()
+                    if _resto:
+                        await queue.put((specialist.id, _resto, False))
+                    await queue.put((specialist.id, None, True))
+                    return
+            except Exception as exc:                      # noqa: BLE001
+                logger.warning(f"Herramientas MCP fallaron en streaming, sigo sin ellas: {exc}")
+                diag.log("mcp", "bucle de herramientas falló", detail=str(exc), level="warn")
 
         payload = {
             "model": specialist.model_name,
             "messages": [
-                {"role": "system", "content": with_identity(specialist.system_prompt, specialist.id, specialist.model_name)},
-                {"role": "user",   "content": prompt},
+                {"role": "system", "content": with_identity(specialist.system_prompt, specialist.id, specialist.model_name,
+                                     user_prompt=prompt)},
+                _mensaje_usuario(prompt, config),
             ],
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-            },
-            "stream": True,   # ← modo streaming de Ollama: NDJSON
+            # Opciones ajustadas al hardware real (contexto, hilos, capas en
+            # GPU). Ollama usa valores conservadores porque no sabe en qué
+            # máquina corre; Andromeda sí lo sabe.
+            "options": _tuned_options(
+                {"temperature": temperature, "num_predict": max_tokens}, config),
+            "stream": True,
+            # keep_alive: mantiene el modelo en memoria entre mensajes. Sin
+            # esto Ollama lo descarga a los 5 minutos y la siguiente pregunta
+            # paga la recarga completa desde disco: con un modelo de 14-27B eso
+            # son decenas de segundos, y es la causa principal de que el p95 se
+            # dispare mientras el p50 parece razonable.
+            "keep_alive": _keep_alive(),   # ← modo streaming de Ollama: NDJSON
         }
+        # Mismo modelo, más o menos cómputo: el nivel de potencia decide si
+        # razona antes de responder (qwen3, gpt-oss, deepseek-r1…).
+        from app.core import reasoning as _reasoning
+        _reasoning.apply(payload, specialist.model_name, config.get("power_level"))
+        if "think" in payload:
+            diag.log("power", f"razonamiento: {payload['think']}",
+                     data={"modelo": specialist.model_name,
+                           "nivel": config.get("power_level")})
 
         try:
             async with httpx.AsyncClient(trust_env=False) as client:
+                diag.log("ollama", f"petición a {specialist.model_name}",
+                         data={
+                             "url": ollama_url,
+                             "opciones": payload.get("options", {}),
+                             "keep_alive": payload.get("keep_alive"),
+                             "mensajes": len(payload.get("messages", [])),
+                             "system_chars": len(payload.get("messages", [{}])[0].get("content", "")),
+                             "prompt_chars": len(prompt or ""),
+                             "timeout_s": timeout_s,
+                         },
+                         detail=(payload.get("messages", [{}])[0].get("content", "")[:1500]))
                 async with client.stream(
                     "POST",
                     f"{ollama_url}/api/chat",
@@ -122,6 +239,9 @@ async def staircase_stream(
                 ) as response:
                     response.raise_for_status()
 
+                    en_razonamiento = False
+                    _tok_n, _t_inicio = 0, __import__("time").perf_counter()
+                    _ttft = None
                     async for line in response.aiter_lines():
                         if not line.strip():
                             continue
@@ -136,15 +256,35 @@ async def staircase_stream(
 
                         if token:
                             accumulated += token
+                            _tok_n += 1
+                            if _ttft is None:
+                                import time as _t
+                                # Desde que se envió la petición (t0), no desde que
+                                # llegaron las cabeceras: así incluye la carga del
+                                # modelo y el procesado del prompt, que es la espera real.
+                                _ttft = (_t.perf_counter() - t0) * 1000
+                                diag.log("ollama", "primer token recibido",
+                                         data={"modelo": specialist.model_name},
+                                         duration_ms=_ttft,
+                                         level="success" if _ttft < 5000 else "warn")
                             # No emitir en vivo el monólogo interno de modelos de
-                            # razonamiento: si estamos dentro de <think>…</think>,
-                            # acumulamos pero no enviamos al usuario.
-                            if "<think>" in accumulated and "</think>" not in accumulated:
-                                pass  # dentro del bloque de razonamiento: silenciar
-                            elif token.strip() in ("<think>", "</think>"):
-                                pass  # no mostrar las etiquetas
+                            # razonamiento (<think>…</think>): se acumula pero no
+                            # se envía al usuario.
+                            #
+                            # Se usa un indicador de estado en vez de buscar en
+                            # todo lo acumulado por cada token: eso era
+                            # cuadrático y costaba ~31 ms en una respuesta de
+                            # 5.000 tokens, retrasando cada token que se muestra.
+                            limpio = token.strip()
+                            if "<think>" in token:
+                                en_razonamiento = True
+                            if en_razonamiento or limpio in ("<think>", "</think>"):
+                                if "</think>" in token:
+                                    en_razonamiento = False
                             else:
-                                await queue.put((specialist.id, token, False))
+                                _limpio = _filtro_fecha.feed(token)
+                                if _limpio:
+                                    await queue.put((specialist.id, _limpio, False))
 
                         if done:
                             break
@@ -180,7 +320,30 @@ async def staircase_stream(
         except Exception as exc:
             errors[specialist.id] = str(exc)
             logger.error(f"[{request_id[:8]}] Error en stream {specialist.id}: {exc}")
+            diag.log("ollama", f"error generando con {specialist.id}",
+                     detail=f"{type(exc).__name__}: {exc}", level="error")
         finally:
+            # Rendimiento real de la generación: tokens por segundo y tiempo
+            # hasta el primer token son las dos métricas que explican si la
+            # espera viene de cargar el modelo o de generar.
+            try:
+                import time as _tf
+                _dur = _tf.perf_counter() - _t_inicio
+                diag.log("ollama", f"generación terminada: {_tok_n} tokens",
+                         data={
+                             "modelo": getattr(specialist, "model_name", "?"),
+                             "tokens": _tok_n,
+                             "tokens_por_segundo": round(_tok_n / _dur, 1) if _dur > 0 else 0,
+                             "ttft_ms": round(_ttft, 1) if _ttft else None,
+                             "respuesta_chars": len(accumulated),
+                         },
+                         detail=accumulated[:2000],
+                         duration_ms=_dur * 1000, level="success")
+            except Exception:                             # noqa: BLE001
+                pass
+            _resto = _filtro_fecha.flush()
+            if _resto:
+                await queue.put((specialist.id, _resto, False))
             # Señal de fin para este especialista
             await queue.put((specialist.id, None, True))
 
@@ -449,15 +612,32 @@ async def _run_single(specialist, model_name, prompt, config,
     payload = {
         "model": model_name,
         "messages": [
-            {"role": "system", "content": with_identity(specialist.system_prompt, specialist.id, specialist.model_name)},
+            {"role": "system", "content": with_identity(specialist.system_prompt, specialist.id, specialist.model_name,
+                                     user_prompt=prompt)},
             {"role": "user",   "content": prompt},
         ],
-        "options": {"temperature": temperature, "num_predict": max_tokens},
+        "options": _tuned_options(
+            {"temperature": temperature, "num_predict": max_tokens}, config),
         "stream": False,
+        # keep_alive: mantiene el modelo en memoria entre mensajes. Sin
+        # esto Ollama lo descarga a los 5 minutos y la siguiente pregunta
+        # paga la recarga completa desde disco: con un modelo de 14-27B eso
+        # son decenas de segundos, y es la causa principal de que el p95 se
+        # dispare mientras el p50 parece razonable.
+        "keep_alive": _keep_alive(),
     }
     try:
         async with httpx.AsyncClient(trust_env=False) as client:
+            diag.log("ollama", f"petición (sin streaming) a {payload.get('model')}",
+                     data={"opciones": payload.get("options", {}),
+                           "keep_alive": payload.get("keep_alive"),
+                           "timeout_s": timeout_s})
+            import time as _tt
+            _tp = _tt.perf_counter()
             r = await client.post(f"{ollama_url}/api/chat", json=payload, timeout=timeout_s)
+            diag.log("ollama", f"respuesta HTTP {r.status_code}",
+                     duration_ms=(_tt.perf_counter() - _tp) * 1000,
+                     level="success" if r.status_code == 200 else "error")
             r.raise_for_status()
             data = r.json()
             text = data.get("message", {}).get("content", "") or ""
@@ -466,3 +646,14 @@ async def _run_single(specialist, model_name, prompt, config,
             return text
     except Exception:
         return ""
+
+
+
+def _mensaje_usuario(prompt: str, config: dict) -> dict:
+    """Mensaje del usuario, con las imágenes si el modelo las ve por sí mismo."""
+    msg = {"role": "user", "content": prompt}
+    imagenes = config.get("images")
+    if imagenes:
+        from app.core.vision import strip_data_url
+        msg["images"] = [strip_data_url(i) for i in imagenes[:3]]
+    return msg

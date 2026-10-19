@@ -1,172 +1,126 @@
 /**
- * ContextPanel.jsx — Pipeline de contexto de proyecto.
- * Indexa un proyecto de código y permite hacer preguntas sobre él.
+ * ContextPanel — RAG local (Pro).
+ *
+ * Indexa documentos de texto en el índice BM25 local (/api/rag/*) para que el
+ * chat los use como contexto y cite las fuentes. Todo ocurre en tu máquina.
+ * QoL: arrastrar y soltar archivos, prueba de búsqueda en vivo, borrado por doc.
  */
-import { createSignal, Show } from 'solid-js'
+import { createSignal, createResource, For, Show } from 'solid-js'
 import axios from 'axios'
 import { t } from '../stores/i18n.js'
+import { notifyChange } from '../stores/events.js'
+
+const MAX_KB = 500
+const TEXT_EXT = /\.(txt|md|markdown|py|js|jsx|ts|tsx|json|yaml|yml|toml|csv|html|css|sh|ps1|sql|ini|cfg|log)$/i
 
 export default function ContextPanel() {
-  const [path, setPath]         = createSignal('')
-  const [indexing, setIndexing] = createSignal(false)
-  const [indexed, setIndexed]   = createSignal(null)
-  const [question, setQuestion] = createSignal('')
-  const [answer, setAnswer]     = createSignal(null)
-  const [asking, setAsking]     = createSignal(false)
-  const [error, setError]       = createSignal(null)
+  const [docs, { refetch }] = createResource(async () => {
+    const r = await axios.get('/api/rag/documents')
+    return r.data.documents || []
+  })
+  const [stats, { refetch: refetchStats }] = createResource(async () =>
+    (await axios.get('/api/rag/stats')).data)
+  const [busy, setBusy] = createSignal(false)
+  const [drag, setDrag] = createSignal(false)
+  const [msg, setMsg] = createSignal('')
+  const [q, setQ] = createSignal('')
+  const [hits, setHits] = createSignal(null)
 
-  async function indexProject() {
-    if (!path().trim()) return
-    setIndexing(true); setError(null); setIndexed(null)
-    try {
-      const r = await axios.post('/api/context/index', { path: path() })
-      setIndexed(r.data)
-    } catch (e) {
-      setError(e.response?.data?.error || e.message)
+  async function indexFiles(files) {
+    setBusy(true); setMsg('')
+    let ok = 0, skipped = 0
+    for (const f of files) {
+      if (!TEXT_EXT.test(f.name) || f.size > MAX_KB * 1024) { skipped++; continue }
+      const text = await f.text()
+      if (!text.trim()) { skipped++; continue }
+      await axios.post('/api/rag/documents', {
+        id: f.name, text, meta: { name: f.name, size: f.size },
+      })
+      ok++
     }
-    setIndexing(false)
+    setBusy(false)
+    setMsg(skipped ? t('rag.indexed_some').replace('{ok}', ok).replace('{skip}', skipped)
+                   : t('rag.indexed_ok').replace('{ok}', ok))
+    refetch(); refetchStats(); notifyChange('rag')
   }
 
-  async function askQuestion() {
-    if (!question().trim()) return
-    setAsking(true); setAnswer(null)
-    try {
-      const r = await axios.post('/api/context/query', { question: question() })
-      setAnswer(r.data)
-    } catch (e) {
-      setError(e.response?.data?.error || e.message)
-    }
-    setAsking(false)
+  async function removeDoc(id) {
+    await axios.delete(`/api/rag/documents/${encodeURIComponent(id)}`)
+    refetch(); refetchStats(); notifyChange('rag')
   }
 
-  async function clearContext() {
-    await axios.delete('/api/context')
-    setIndexed(null); setAnswer(null); setPath('')
+  async function testQuery() {
+    if (!q().trim()) return
+    const r = await axios.get('/api/rag/query', { params: { q: q(), k: 3 } })
+    setHits(r.data.results || [])
   }
-
-  const EXAMPLE_QUESTIONS = [
-    '¿Qué hace este proyecto?',
-    '¿Cuál es la arquitectura del sistema?',
-    '¿Dónde se manejan los errores?',
-    '¿Cómo se conecta con la base de datos?',
-    '¿Qué tests existen?',
-    'Genera un README completo para este proyecto',
-  ]
 
   return (
-    <div class="panel-page">
-      <div class="panel-page-header">
-        <div>
-          <div class="panel-page-title">{t('ui2.proj_context')}</div>
-          <div class="panel-page-sub">
-            {t('ctx.subtitle')}
-          </div>
-        </div>
-        <Show when={indexed()}>
-          <button class="btn btn-danger" onClick={clearContext}>{t('ui2.clear_context')}</button>
+    <div class="card" style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h3 style="margin:0;font-size:var(--fs-base)">📚 {t('rag.title')}</h3>
+        <Show when={stats()}>
+          <span style="font-size:var(--fs-xs);color:var(--text-3)">
+            {stats().documents} {t('rag.docs')} · {stats().chunks} chunks
+          </span>
         </Show>
       </div>
+      <p style="font-size:var(--fs-sm);color:var(--text-3);margin:0 0 10px">{t('rag.desc')}</p>
 
-      <Show when={error()}>
-        <div class="banner banner-error">{error()}</div>
+      {/* Zona de subida: click o arrastrar */}
+      <label
+        onDragOver={e => { e.preventDefault(); setDrag(true) }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={e => { e.preventDefault(); setDrag(false); indexFiles([...e.dataTransfer.files]) }}
+        style={`display:block;border:1.5px dashed ${drag() ? 'var(--accent)' : 'var(--border)'};
+                border-radius:10px;padding:18px;text-align:center;cursor:pointer;
+                font-size:var(--fs-sm);color:var(--text-3);transition:border-color .15s`}>
+        <input type="file" multiple style="display:none"
+               onChange={e => { indexFiles([...e.target.files]); e.target.value = '' }} />
+        {busy() ? t('rag.indexing') : t('rag.drop_hint')}
+      </label>
+      <Show when={msg()}>
+        <div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:6px">{msg()}</div>
       </Show>
 
-      {/* Indexar proyecto */}
-      <Show when={!indexed()}>
-        <div class="card">
-          <div class="card-title">{t('ui2.index_project')}</div>
-          <div style="font-size:13px;color:var(--text-2);margin-bottom:14px;line-height:1.7">
-            {t('ctx.index_desc')}
-          </div>
-          <div style="display:flex;gap:8px">
-            <input
-              class="g-input"
-              value={path()}
-              onInput={e => setPath(e.target.value)}
-              placeholder={t('ctx.ph_path')}
-              onKeyDown={e => e.key === 'Enter' && indexProject()}
-              style="flex:1"
-            />
-            <button class="btn btn-primary" onClick={indexProject} disabled={indexing() || !path().trim()}>
-              <Show when={indexing()} fallback={t('ctx.index_btn')}>
-                <span class="spin" style="width:12px;height:12px;border-width:2px" /> {t('ctx.indexing')}
-              </Show>
-            </button>
-          </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:8px">
-            {t('ctx.index_note')}
-          </div>
-        </div>
-      </Show>
-
-      {/* Proyecto indexado */}
-      <Show when={indexed()}>
-        <div class="card" style="background:rgba(52,211,153,.04);border-color:rgba(52,211,153,.2)">
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:24px">📂</span>
-            <div style="flex:1">
-              <div style="font-size:14px;font-weight:700;color:var(--text-1)">{indexed().project}</div>
-              <div style="font-size:12px;color:var(--text-3);margin-top:2px">
-                {indexed().files_indexed} archivos · ~{indexed().total_tokens?.toLocaleString()} tokens
-                <Show when={indexed().skipped_count > 0}>
-                  {' · '}{indexed().skipped_count} omitidos
-                </Show>
-              </div>
-            </div>
-            <span style="color:var(--green);font-size:12px;font-weight:600">✓ Indexado</span>
-          </div>
-        </div>
-
-        {/* Preguntas rápidas */}
-        <div class="card">
-          <div class="card-title">{t('ui2.proj_questions')}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-            {EXAMPLE_QUESTIONS.map(q => (
-              <button
-                class="quick-btn"
-                onClick={() => { setQuestion(q); }}
-                style="font-size:11px"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-          <div style="display:flex;gap:8px">
-            <textarea
-              class="g-input"
-              value={question()}
-              onInput={e => setQuestion(e.target.value)}
-              placeholder={t('ctx.ph_question')}
-              rows={3}
-              style="flex:1;resize:vertical"
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askQuestion() } }}
-            />
-          </div>
-          <button
-            class="btn btn-primary"
-            onClick={askQuestion}
-            disabled={asking() || !question().trim()}
-            style="margin-top:8px"
-          >
-            <Show when={asking()} fallback="Preguntar con contexto del proyecto">
-              <span class="spin" style="width:12px;height:12px;border-width:2px" /> Analizando...
-            </Show>
-          </button>
-        </div>
-
-        <Show when={answer()}>
-          <div class="card">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-              <div class="card-title" style="margin-bottom:0">Respuesta</div>
-              <span style="font-size:10px;color:var(--text-3);font-family:var(--mono)">
-                {answer().files_used} archivos · ~{answer().tokens_sent?.toLocaleString()} tokens · {answer().model}
+      {/* Documentos indexados */}
+      <Show when={docs()?.length}>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:4px">
+          <For each={docs()}>{d => (
+            <div style="display:flex;justify-content:space-between;align-items:center;
+                        background:var(--bg-2);border-radius:10px;padding:6px 10px;font-size:var(--fs-sm)">
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                {d.meta?.name || d.id}
+                <span style="color:var(--text-3)"> · {d.chunks} chunks</span>
               </span>
+              <button class="btn btn-ghost" style="font-size:var(--fs-xs);padding:2px 8px"
+                      title={t('rag.remove')} onClick={() => removeDoc(d.id)}>✕</button>
             </div>
-            <div style="font-size:13px;color:var(--text-1);line-height:1.8;white-space:pre-wrap">
-              {answer().response}
+          )}</For>
+        </div>
+      </Show>
+
+      {/* Prueba de búsqueda */}
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <input value={q()} onInput={e => setQ(e.target.value)}
+               onKeyDown={e => e.key === 'Enter' && testQuery()}
+               placeholder={t('rag.query_ph')}
+               style="flex:1;background:var(--bg-2);border:1px solid var(--border);
+                      border-radius:10px;padding:7px 10px;font-size:var(--fs-sm);color:var(--text-1)" />
+        <button class="btn btn-glass" style="font-size:var(--fs-sm)" onClick={testQuery}>{t('rag.query_btn')}</button>
+      </div>
+      <Show when={hits() !== null}>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+          <Show when={!hits().length}>
+            <div style="font-size:var(--fs-xs);color:var(--text-3)">{t('rag.no_hits')}</div>
+          </Show>
+          <For each={hits()}>{h => (
+            <div style="background:var(--bg-2);border-radius:10px;padding:8px 10px;font-size:var(--fs-xs)">
+              <div style="color:var(--accent);margin-bottom:3px">[{h.doc_id}] · score {h.score}</div>
+              <div style="color:var(--text-2);max-height:60px;overflow:hidden">{h.text}</div>
             </div>
-          </div>
-        </Show>
+          )}</For>
+        </div>
       </Show>
     </div>
   )

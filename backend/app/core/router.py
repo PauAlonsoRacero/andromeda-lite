@@ -55,6 +55,8 @@ async def process_request(
     memory_store=None,
     mcp_manager=None,
     memory_profile=None,
+    rag_index=None,
+    skill_registry=None,
 ) -> ChatResponse:
     """
     Pipeline completo de procesamiento de un ChatRequest.
@@ -86,7 +88,8 @@ async def process_request(
         trace_id=trace_id,
         request_id=request_id,
         timestamp=datetime.now(timezone.utc).isoformat(),
-        prompt_preview=request.prompt[:100],
+        # Incógnito: nunca escribir el texto del usuario en disco.
+        prompt_preview="" if request.incognito else request.prompt[:100],
         strategy=request.strategy,
     )
 
@@ -106,6 +109,12 @@ async def process_request(
     try:
         # ── PASO 3: Verificar especialistas disponibles ───────────────────────
         active_specialists = registry.get_eligible_for_tier(hardware.max_tier)
+        # Si no queda ninguna IA activa pero hay modelos instalados (p. ej. se pulsó
+        # "Desactivar" en Modelos), se usa la general: en Lite hay una sola, y
+        # desactivarla dejaba el chat inservible con un aviso engañoso
+        # ("descarga un modelo" teniendo diez instalados).
+        if not active_specialists:
+            active_specialists = registry.fallback_specialists(hardware.max_tier)
 
         if not active_specialists:
             status = registry.get_status_summary()
@@ -142,52 +151,37 @@ async def process_request(
             "degraded": runtime_policy.degraded,
             "vram_free_gb": runtime_policy.vram_free_gb,
         })
+        # Construcción del prompt: un único constructor compartido con el camino
+        # streaming. Antes esta lógica estaba duplicada y se desincronizó (la
+        # compactación y el perfil de memoria solo existían aquí).
+        from app.core import prompt_builder as pb
 
-        # ── PASO 4b: Memoria semántica + historial ───────────────────────────
-        effective_prompt = request.prompt
-
-        # Inyectar memorias guardadas (preferencias del usuario, contexto). En
-        # Lite son pocas y son preferencias persistentes ("habla en X", "uso
-        # Python"...), así que las anteponemos al prompt para que el modelo las
-        # respete. Sin esto, guardar una memoria no tendría ningún efecto.
-        # CONTEXTO DEL USUARIO: el perfil de memoria unificado (un solo bloque
-        # de texto cohesivo, estilo Claude), no una lista de declaraciones
-        # sueltas. Así "prefiere catalán" no convive con un "alemán" antiguo.
-        if memory_profile is not None and not request.incognito:
-            try:
-                _mem_block = memory_profile.render()
-                if _mem_block:
-                    effective_prompt = (
-                        "CONTEXTO DEL USUARIO (tenlo en cuenta SIEMPRE en tu respuesta):\n"
-                        f"{_mem_block}\n\n"
-                        f"MENSAJE:\n{request.prompt}"
-                    )
-            except Exception as _exc:
-                logger.warning(f"No se pudo cargar el perfil de memoria: {_exc}")
-
-        # Inyectar contexto del workspace: qué archivos existen y el contenido
-        # de los recientes. Así la IA puede MODIFICAR archivos ya creados en vez
-        # de crear duplicados ("mejora el index.html" → ve el index.html actual).
-        if not request.incognito:
-            try:
-                _kw = ("archivo", "fichero", "documento", "html", "página", "pagina",
-                       "txt", "modifica", "edita", "mejora", "cambia", "actualiza",
-                       "añade", "agrega", "borra", "elimina", "crea", "guarda",
-                       ".docx", ".xlsx", ".pdf", "carpeta", "web")
-                if any(k in request.prompt.lower() for k in _kw):
-                    from app.core.workspace import Workspace
-                    _ctx = Workspace().context_block()
-                    if _ctx:
-                        effective_prompt = f"{_ctx}\n\n{effective_prompt}"
-            except Exception as _wexc:
-                logger.warning(f"No se pudo cargar contexto del workspace: {_wexc}")
-
-        if request.conversation_history:
-            hist = "\n".join(
-                f"{'Usuario' if m['role']=='user' else 'Asistente'}: {m['content'][:400]}"
-                for m in request.conversation_history[-request.context_window:]
-            )
-            effective_prompt = f"HISTORIAL:\n{hist}\n\nMENSAJE ACTUAL:\n{effective_prompt}"
+        parts = pb.PromptParts(message=pb.expand_slash(request.prompt))
+        pb.add_skill(parts, request.prompt, skill_registry)
+        await pb.handle_memory_commands(parts, request.prompt, memory_profile,
+                                        memory_store, request.incognito)
+        await pb.add_memory_async(parts, request.prompt, memory_profile,
+                                  memory_store, request.incognito)
+        pb.add_past_chats(parts, request.prompt, settings, request.conversation_history,
+                          request.incognito)
+        pb.add_documents(parts, request.prompt, rag_index, request.incognito)
+        if not pb.add_project(parts, request):
+            pb.add_workspace(parts, request.prompt, request.incognito)
+        # Búsqueda web y lectura de URLs. Este es el camino que usa la app de
+        # ESCRITORIO, y aquí no existía: en macOS/Windows nunca se buscaba en
+        # internet por mucho que se mejorase el buscador.
+        _web_used = await pb.add_web_context(
+            parts, prompt=request.prompt, settings=settings,
+            incognito=request.incognito, web_search=request.web_search,
+            history=request.conversation_history,
+            model=getattr(request, "force_model", None) or "",
+        )
+        await pb.add_history(
+            parts, request.conversation_history, request.context_window,
+            ollama_url=getattr(settings, "ollama_base_url", "") or "",
+            model=getattr(registry, "orchestrator_model", "") or "",
+        )
+        effective_prompt = parts.render()
 
         # ── PASO 5: Seleccionar especialistas para este request ───────────────
         from app.editions import orchestration_enabled
@@ -324,8 +318,12 @@ async def process_request(
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,
             "timeout": settings.ollama_timeout_seconds,
-            "mcp_manager": mcp_manager,
+            # En incógnito no se ofrecen herramientas: fetch saldría a internet.
+            "user_prompt": request.prompt,
+            "mcp_manager": (None if request.incognito or parts.meta.get("memory_command")
+                            else mcp_manager),
             "metrics": metrics,
+            "hardware": hardware,
         }
 
         t_first_token = time.perf_counter()  # TTFT aproximado (sin streaming real en F0)
@@ -480,8 +478,22 @@ async def process_request(
                         _power_tier = _ti
                         break
 
+        from app.core.output_filters import strip_date_echo
+        final_response = strip_date_echo(final_response or "")
+
+        # Acciones de archivo: en este camino (el de escritorio) no se ejecutaban
+        # nunca, así que la creación de archivos no funcionaba en la app.
+        from app.core.file_actions import run_for_response
+        _file_actions = run_for_response(final_response, settings=settings,
+                                         incognito=request.incognito,
+                                         project_id=getattr(request, "project_id", None))
+
         return ChatResponse(
             request_id=request_id,
+            file_actions=_file_actions or None,
+            skill_used=parts.meta.get("skill_used"),
+            rag_sources=parts.meta.get("rag_sources"),
+            web_used=_web_used,
             response=final_response,
             specialists_used=specialists_used,
             strategy_used=effective_strategy,

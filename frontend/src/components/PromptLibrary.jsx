@@ -3,6 +3,7 @@
  * Modal que permite guardar, buscar y reutilizar prompts favoritos.
  * Los prompts se persisten en el backend (SQLite).
  */
+import PromptCatalog from './PromptCatalog.jsx'
 import { Portal } from 'solid-js/web'
 import { createSignal, onMount, For, Show } from 'solid-js'
 import axios from 'axios'
@@ -12,6 +13,9 @@ export default function PromptLibrary({ onSelect, onClose }) {
   const [prompts, setPrompts]     = createSignal([])
   const [loading, setLoading]     = createSignal(true)
   const [filter, setFilter]       = createSignal('')
+  // El catálogo va primero: la biblioteca propia empieza vacía y antes el
+  // usuario abría una lista sin nada.
+  const [tab, setTab]             = createSignal('catalog')
   const [showAdd, setShowAdd]     = createSignal(false)
   const [newTitle, setNewTitle]   = createSignal('')
   const [newContent, setNewContent] = createSignal('')
@@ -24,7 +28,7 @@ export default function PromptLibrary({ onSelect, onClose }) {
     try {
       const r = await axios.get('/api/chat/prompts')
       setPrompts(r.data.prompts || [])
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
     finally { setLoading(false) }
   }
 
@@ -38,7 +42,7 @@ export default function PromptLibrary({ onSelect, onClose }) {
       })
       await loadPrompts()
       setNewTitle(''); setNewContent(''); setShowAdd(false)
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
     finally { setSaving(false) }
   }
 
@@ -69,12 +73,22 @@ export default function PromptLibrary({ onSelect, onClose }) {
         {/* Header */}
         <div class="settings-title">
           <span>{t('ui2.prompt_lib')}</span>
-          <button onClick={onClose} style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:18px;line-height:1">✕</button>
+          <button onClick={onClose} style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:var(--fs-lg);line-height:1" aria-label="cerrar">✕</button>
         </div>
 
+        <div class="pcat-tabs" role="tablist">
+          <button role="tab" class="pcat-chip" classList={{ on: tab() === 'catalog' }}
+                  onClick={() => setTab('catalog')}>{t('pcat.catalog')}</button>
+          <button role="tab" class="pcat-chip" classList={{ on: tab() === 'mine' }}
+                  onClick={() => setTab('mine')}>{t('pcat.mine')}</button>
+        </div>
+        <Show when={tab() === 'catalog'}>
+          <PromptCatalog onUse={(body) => onSelect?.(body)} maxHeight="55vh" />
+        </Show>
+        <Show when={tab() === 'mine'}>
         {/* Search + Add */}
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <input
+          <input aria-label={t('pl.ph_search')}
             class="g-input"
             placeholder={t('pl.ph_search')}
             value={filter()}
@@ -89,7 +103,7 @@ export default function PromptLibrary({ onSelect, onClose }) {
         {/* New prompt form */}
         <Show when={showAdd()}>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px">
-            <input
+            <input aria-label={t('pl.ph_title')}
               class="g-input"
               placeholder={t('pl.ph_title')}
               value={newTitle()}
@@ -123,7 +137,7 @@ export default function PromptLibrary({ onSelect, onClose }) {
           <div style="text-align:center;padding:40px;color:var(--text-3)">
             <div style="margin-bottom:8px;opacity:.3;display:flex;justify-content:center"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
             <div>{filter() ? 'Sin resultados' : 'Sin prompts guardados'}</div>
-            <div style="font-size:11px;margin-top:4px">
+            <div style="font-size:var(--fs-xs);margin-top:4px">
               {!filter() && 'Guarda tus prompts frecuentes para reutilizarlos'}
             </div>
           </div>
@@ -139,21 +153,21 @@ export default function PromptLibrary({ onSelect, onClose }) {
                 onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
               >
                 <div style="flex:1;min-width:0">
-                  <div style="font-size:12px;font-weight:600;color:var(--text-1);margin-bottom:3px">
+                  <div style="font-size:var(--fs-sm);font-weight:600;color:var(--text-1);margin-bottom:3px">
                     {p.title || p.content.slice(0, 40)}
                   </div>
-                  <div style="font-size:11px;color:var(--text-3);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                  <div style="font-size:var(--fs-xs);color:var(--text-3);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                     {p.content}
                   </div>
                   <Show when={p.use_count > 0}>
-                    <div style="font-size:10px;color:var(--text-3);margin-top:4px">
+                    <div style="font-size:var(--fs-micro);color:var(--text-3);margin-top:4px">
                       Usado {p.use_count} {p.use_count === 1 ? 'vez' : 'veces'}
                     </div>
                   </Show>
                 </div>
                 <button
                   onClick={e => deletePrompt(p.id, e)}
-                  style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;opacity:.4;padding:2px;flex-shrink:0;transition:opacity .12s"
+                  style="background:none;border:none;color:var(--red);cursor:pointer;font-size:var(--fs-sm);opacity:.4;padding:2px;flex-shrink:0;transition:opacity .12s"
                   onMouseEnter={e => e.target.style.opacity = '1'}
                   onMouseLeave={e => e.target.style.opacity = '.4'}
                   title={t('pl.delete')}
@@ -162,6 +176,7 @@ export default function PromptLibrary({ onSelect, onClose }) {
             )}
           </For>
         </div>
+        </Show>
       </div>
     </div>
     </Portal>

@@ -5,9 +5,11 @@
  */
 import { createSignal, onMount, Show } from 'solid-js'
 import axios from 'axios'
-import { session, setSession, logout } from '../stores/auth'
-import { editionLabel, isPro } from '../stores/edition'
+import { session, logout } from '../stores/auth'
+import { editionLabel } from '../stores/edition'
 import { t } from '../stores/i18n.js'
+import { errorMessage } from '../services/errors.js'
+import { saveTextFile } from '../services/download.js'
 
 export default function ProfilePanel(props) {
   const [name, setName]       = createSignal('')
@@ -33,13 +35,10 @@ export default function ProfilePanel(props) {
     try {
       const r = await axios.get('/api/cloud/export')
       const blob = new Blob([JSON.stringify(r.data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = 'andromeda-mis-datos.json'; a.click()
-      URL.revokeObjectURL(url)
-      setGdprMsg('✓ Datos descargados')
+      await saveTextFile('andromeda-mis-datos.json', await blob.text(), 'application/json')
+      setGdprMsg('✓ ' + t('prof.data_downloaded'))
     } catch (e) {
-      setGdprMsg('No se pudieron descargar los datos')
+      setGdprMsg(t('prof.data_download_error'))
     }
     setGdprBusy(false)
   }
@@ -80,13 +79,13 @@ export default function ProfilePanel(props) {
       setMsg('✓ Datos guardados')
       setTimeout(() => setMsg(null), 3000)
     } catch (e) {
-      setMsg('Error: ' + (e.response?.data?.error || e.message))
+      setMsg('Error: ' + (errorMessage(e)))
     }
     setSaving(false)
   }
 
   async function changePassword() {
-    if (newPw().length < 8) { setPwMsg('La nueva contraseña debe tener al menos 8 caracteres'); return }
+    if (newPw().length < 8) { setPwMsg(t('pp.password_min')); return }
     setPwBusy(true); setPwMsg(null)
     try {
       await axios.post('/api/auth/change-password', { current_password: curPw(), new_password: newPw() })
@@ -104,12 +103,12 @@ export default function ProfilePanel(props) {
   return (
     <div class="panel-page" style="max-width:760px">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px">
-        <div style="width:56px;height:56px;border-radius:50%;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:#fff;flex-shrink:0">
+        <div style="width:56px;height:56px;border-radius:50%;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:var(--fs-lg);color:#fff;flex-shrink:0">
           {(name() || session()?.username || '?')[0].toUpperCase()}
         </div>
         <div>
-          <div style="font-size:22px;font-weight:700">{name() || session()?.username}</div>
-          <div style="font-size:12px;color:var(--text-3)">
+          <div style="font-size:var(--fs-lg);font-weight:700">{name() || session()?.username}</div>
+          <div style="font-size:var(--fs-sm);color:var(--text-3)">
             Plan <span style={`font-weight:700;${plan()==='PRO'?'color:var(--purple)':'color:var(--text-2)'}`}>{plan()}</span> · {editionLabel()}
           </div>
         </div>
@@ -117,7 +116,7 @@ export default function ProfilePanel(props) {
 
       <Show when={!loading()}>
         {/* Datos de la cuenta */}
-        <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 12px">{t('ui2.account_data')}</div>
+        <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 12px">{t('ui2.account_data')}</div>
         <div style="display:flex;flex-direction:column;gap:14px">
           <Field label={t('prof.display_name')} value={name()} onInput={setName} placeholder={t('prof.ph_yourname')} />
           <Field label="Email" value={email()} onInput={setEmail} placeholder={t('prof.ph_email')} type="email" />
@@ -128,46 +127,46 @@ export default function ProfilePanel(props) {
           <button class="btn btn-primary" onClick={save} disabled={saving()}>
             {saving() ? '…' : 'Guardar cambios'}
           </button>
-          <Show when={msg()}><span style="font-size:13px;color:var(--text-2)">{msg()}</span></Show>
+          <Show when={msg()}><span style="font-size:var(--fs-base);color:var(--text-2)">{msg()}</span></Show>
         </div>
 
         {/* Cambiar contraseña */}
-        <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:32px 0 12px">{t('prof.security')}</div>
+        <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:32px 0 12px">{t('prof.security')}</div>
         <div style="display:flex;flex-direction:column;gap:14px;max-width:420px">
           <Field label={t('prof.cur_pw')} value={curPw()} onInput={setCurPw} type="password" placeholder="••••••••" />
           <Field label={t('prof.new_pw')} value={newPw()} onInput={setNewPw} type="password" placeholder={t('prof.ph_min8')} />
         </div>
         <div style="display:flex;align-items:center;gap:14px;margin-top:16px">
           <button class="btn btn-glass" onClick={changePassword} disabled={pwBusy()}>
-            {pwBusy() ? '…' : 'Cambiar contraseña'}
+            {pwBusy() ? '…' : t('pp.change_password')}
           </button>
-          <Show when={pwMsg()}><span style="font-size:13px;color:var(--text-2)">{pwMsg()}</span></Show>
+          <Show when={pwMsg()}><span style="font-size:var(--fs-base);color:var(--text-2)">{pwMsg()}</span></Show>
         </div>
 
         {/* Plan */}
         <Show when={plan() !== 'PRO'}>
           <div style="margin-top:32px;padding:16px;border-radius:14px;background:var(--inset-surface);border:1px solid var(--glass-border)">
-            <div style="font-size:14px;font-weight:700;margin-bottom:4px">{t('prof.want_more')}</div>
-            <div style="font-size:12.5px;color:var(--text-3);line-height:1.6">
+            <div style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">{t('prof.want_more')}</div>
+            <div style="font-size:var(--fs-sm);color:var(--text-3);line-height:1.6">
               Andromeda Pro añade orquestación multi-IA, MLOps, fine-tuning y multiusuario. La suscripción estará disponible próximamente.
             </div>
           </div>
         </Show>
 
         <div style="margin-top:28px">
-          <button class="btn btn-ghost" style="font-size:13px;color:var(--red)" onClick={logout}>{t('prof.logout')}</button>
+          <button class="btn btn-ghost" style="font-size:var(--fs-base);color:var(--red)" onClick={logout}>{t('prof.logout')}</button>
         </div>
 
         {/* Privacidad / RGPD */}
-        <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:32px 0 12px">{t('ui2.privacy_data')}</div>
-        <div style="font-size:12.5px;color:var(--text-3);line-height:1.6;margin-bottom:14px">
+        <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:32px 0 12px">{t('ui2.privacy_data')}</div>
+        <div style="font-size:var(--fs-sm);color:var(--text-3);line-height:1.6;margin-bottom:14px">
           Puedes descargar todos tus datos o eliminar tu cuenta en cualquier momento. Tus conversaciones y modelos nunca salen de tu equipo; solo tu cuenta se guarda en la nube.
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap">
           <button class="btn btn-glass" onClick={exportData} disabled={gdprBusy()}>{t('ui2.download_data')}</button>
           <button class="btn btn-ghost" style="color:var(--red)" onClick={deleteAccount} disabled={gdprBusy()}>{t('ui2.delete_account')}</button>
         </div>
-        <Show when={gdprMsg()}><div style="font-size:13px;color:var(--text-2);margin-top:10px">{gdprMsg()}</div></Show>
+        <Show when={gdprMsg()}><div style="font-size:var(--fs-base);color:var(--text-2);margin-top:10px">{gdprMsg()}</div></Show>
       </Show>
     </div>
   )
@@ -176,14 +175,14 @@ export default function ProfilePanel(props) {
 function Field(props) {
   return (
     <label style="display:flex;flex-direction:column;gap:6px">
-      <span style="font-size:12.5px;color:var(--text-2);font-weight:600">{props.label}</span>
-      <input
+      <span style="font-size:var(--fs-sm);color:var(--text-2);font-weight:600">{props.label}</span>
+      <input aria-label={props.placeholder}
         class="g-input"
         type={props.type || 'text'}
         value={props.value}
         placeholder={props.placeholder}
         onInput={e => props.onInput(e.target.value)}
-        style="padding:10px 12px;border-radius:10px;background:var(--field-bg);border:1px solid var(--glass-border);color:var(--text-1);font-family:var(--font);font-size:14px"
+        style="padding:10px 12px;border-radius:10px;background:var(--field-bg);border:1px solid var(--glass-border);color:var(--text-1);font-family:var(--font);font-size:var(--fs-base)"
       />
     </label>
   )

@@ -22,20 +22,113 @@ Para escalar: migrar a ChromaDB o pgvector (Fase 1 del roadmap).
 """
 
 import json
+import math
+import re
 import logging
 import sqlite3
 import time
 import uuid
+from array import array
 from pathlib import Path
 
 import httpx
 
 logger = logging.getLogger("andromeda.memory")
 
+
+# ── Búsqueda rápida: vectores unitarios en caché ─────────────────────────────
+# Cada mensaje compara la consulta con TODAS las memorias. Antes se hacía
+# json.loads + 3 sumas en Python puro por memoria (~0,2 ms c/u). Ahora cada
+# embedding se parsea y normaliza UNA vez, y el producto escalar usa
+# math.sumprod (Python ≥3.12; con fallback). Resultado idéntico, ~7× más rápido.
+def _sumprod_fallback(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+_SUMPROD = getattr(math, "sumprod", _sumprod_fallback)
+_VEC_CACHE: dict = {}
+_VEC_CACHE_MAX = 12000
+
+
+def _dot(a, b) -> float:
+    """Producto escalar de dos vectores de igual longitud."""
+    return _SUMPROD(a, b)
+
+
+def _unit(vec) -> "array | None":
+    """Vector normalizado a norma 1; None si está vacío.
+
+    Un vector de ceros se devuelve como ceros (no None): el algoritmo original
+    lo trataba como semántico con similitud 0.0, no como "sin embedding".
+    """
+    if not vec:
+        return None
+    norm = math.sqrt(_SUMPROD(vec, vec))
+    if norm == 0:
+        return array("d", [0.0] * len(vec))
+    return array("d", [x / norm for x in vec])
+
+
+def _unit_from_text(texto: str) -> "array | None":
+    """Parsea un embedding guardado (JSON) y lo devuelve normalizado, con caché.
+
+    La clave es (longitud, hash) del texto: si la memoria cambia, la clave
+    cambia. Un JSON roto lanza excepción (la búsqueda salta esa fila).
+    """
+    key = (len(texto), hash(texto))
+    hit = _VEC_CACHE.get(key)
+    if hit is not None or key in _VEC_CACHE:
+        return hit
+    unit = _unit(json.loads(texto))
+    if len(_VEC_CACHE) >= _VEC_CACHE_MAX:
+        _VEC_CACHE.clear()          # tope simple: nunca crece sin límite
+    _VEC_CACHE[key] = unit
+    return unit
+
+
+try:
+    from app.observability import diagnostics as diag
+except Exception:                                        # pragma: no cover
+    class _Nulo:                                         # el registro nunca es obligatorio
+        @staticmethod
+        def log(*a, **k): pass
+        @staticmethod
+        def is_enabled(): return False
+    diag = _Nulo()
+
+
 MEMORY_DB_PATH = "data/memory.db"
 EMBED_MODEL    = "nomic-embed-text"   # Modelo de embeddings de Ollama (ligero, ~500MB)
 EMBED_DIM      = 768                   # Dimensión de nomic-embed-text
-SIMILARITY_THRESHOLD = 0.72            # Mínimo cosine similarity para considerar relevante
+# Con nomic-embed-text y prefijos de tarea, frases relacionadas pero redactadas
+# distinto ("¿qué coche me gustaba?" / "Me gusta el Audi TT") suelen puntuar por
+# debajo de 0,7: con el umbral anterior (0,72) la búsqueda semántica casi nunca
+# devolvía nada. Se combina además con un extra por palabras en común.
+SIMILARITY_THRESHOLD = 0.55
+# Similitud mínima cuando la pregunta y el recuerdo no comparten ninguna palabra.
+SEMANTIC_ONLY_MIN = 0.72
+# Versión del modo de cálculo de vectores: si cambia, se recalculan una vez.
+EMBED_SCHEME = "nomic-prefix-v1"
+# El fallback por texto NO produce valores comparables al coseno: cuenta qué
+# fracción de las palabras de la consulta aparece en el recuerdo. Exigirle 0.72
+# significa pedir que coincidan casi todas las palabras, y en la práctica no
+# devolvía nunca nada cuando Ollama no estaba disponible.
+TEXT_MATCH_THRESHOLD = 0.34            # ~1 de cada 3 palabras con contenido
+
+
+# Cliente HTTP compartido para los embeddings. Se recrea si cambia el bucle de
+# eventos (los tests usan uno nuevo en cada asyncio.run).
+_cliente = None
+_cliente_loop = None
+
+
+def _cliente_http():
+    import asyncio as _asyncio
+    global _cliente, _cliente_loop
+    loop = _asyncio.get_running_loop()
+    if _cliente is None or _cliente_loop is not loop or _cliente.is_closed:
+        _cliente = httpx.AsyncClient(trust_env=False)
+        _cliente_loop = loop
+    return _cliente
 
 
 class SemanticMemoryStore:
@@ -166,32 +259,6 @@ class SemanticMemoryStore:
         self._backup()   # snapshot last-known-good tras escribir
         return mem_id
 
-    async def save_conversation_turn(
-        self,
-        user_msg: str,
-        assistant_msg: str,
-        metadata: dict | None = None,
-    ) -> list[str]:
-        """
-        Guarda un turno de conversación como memorias.
-        Solo guarda fragmentos con información factual, no saludos ni trivialidades.
-        """
-        saved = []
-        # Solo guardar si la respuesta es sustancial
-        if len(assistant_msg) > 100:
-            # Guardar la respuesta del asistente como memoria
-            mem_id = await self.save(
-                content=f"Q: {user_msg[:200]}\nA: {assistant_msg[:500]}",
-                source="conversation",
-                category=self._classify_category(user_msg),
-                importance=self._estimate_importance(user_msg, assistant_msg),
-            )
-            if mem_id:
-                saved.append(mem_id)
-        return saved
-
-    # ── Buscar memorias relevantes ───────────────────────────────────────────
-
     async def search(
         self,
         query: str,
@@ -206,7 +273,7 @@ class SemanticMemoryStore:
             Lista de dicts [{id, content, similarity, category, source, ...}]
             ordenados por similitud descendente.
         """
-        query_embedding = await self._embed(query)
+        query_embedding = await self._embed(query, kind="query")
 
         # Cargar todas las memorias. Dos queries explícitas (sin concatenar SQL)
         # para que el análisis estático no marque falso positivo de inyección.
@@ -222,13 +289,29 @@ class SemanticMemoryStore:
             return []
 
         q_lower = (query or "").lower().strip()
+        palabras = re.findall(r"\w{4,}", q_lower)       # una vez, no por memoria
+        q_unit = _unit(query_embedding) if query_embedding else None
         results = []
         for row in rows:
             try:
-                mem_embedding = json.loads(row["embedding"]) if row["embedding"] else []
-                if query_embedding and mem_embedding:
-                    # Búsqueda semántica
-                    sim = self._cosine_similarity(query_embedding, mem_embedding)
+                mem_unit = _unit_from_text(row["embedding"]) if row["embedding"] else None
+                semantic = bool(q_unit is not None and mem_unit is not None)
+                if semantic:
+                    # Híbrida: significado + un extra por palabras exactas en común
+                    # (nombres propios como "Aritex" que un embedding infravalora).
+                    if len(q_unit) != len(mem_unit):
+                        sim = 0.0
+                    else:
+                        sim = _dot(q_unit, mem_unit)
+                    texto_m = (row["content"] or "").lower()
+                    comunes = sum(1 for w in palabras if w in texto_m)
+                    if palabras and comunes:
+                        sim = min(1.0, sim + 0.15 * comunes / len(palabras))
+                    elif sim < SEMANTIC_ONLY_MIN:
+                        # Sin ninguna palabra en común solo cuenta una similitud
+                        # alta: con 0,55 entraba "me gusta el color negro" al
+                        # preguntar "¿qué puedes hacer?".
+                        continue
                 else:
                     # Fallback por texto: coincidencia de subcadena / palabras
                     text = (row["content"] or "").lower()
@@ -240,7 +323,11 @@ class SemanticMemoryStore:
                         words = [w for w in q_lower.split() if len(w) > 2]
                         hits = sum(1 for w in words if w in text)
                         sim = (hits / len(words)) if words else 0.0
-                if sim >= min_similarity:
+                # Cada método tiene su propia escala: aplicar el umbral del
+                # coseno a un recuento de palabras descarta todo.
+                threshold = min_similarity if semantic else min(min_similarity,
+                                                                TEXT_MATCH_THRESHOLD)
+                if sim >= threshold:
                     results.append({
                         "id":         row["id"],
                         "content":    row["content"],
@@ -275,16 +362,6 @@ class SemanticMemoryStore:
             conn.close()
 
         return results[:k]
-
-    def build_memory_context(self, memories: list[dict]) -> str:
-        """Construye el bloque de contexto de memoria para inyectar en el system prompt."""
-        if not memories:
-            return ""
-        lines = ["MEMORIAS RELEVANTES DE CONVERSACIONES ANTERIORES:"]
-        for i, mem in enumerate(memories, 1):
-            lines.append(f"{i}. [{mem['category']}] {mem['content'][:300]}")
-        lines.append("(Usa estas memorias como contexto adicional si son relevantes.)")
-        return "\n".join(lines)
 
     def get_stats(self) -> dict:
         """Estadísticas del memory store: total, categorías, fuentes, tamaño
@@ -348,17 +425,103 @@ class SemanticMemoryStore:
 
     # ── Helpers internos ─────────────────────────────────────────────────────
 
-    async def _embed(self, text: str) -> list[float] | None:
-        """Genera un embedding usando Ollama."""
+    async def purge(self, predicado) -> int:
+        """Elimina los recuerdos para los que predicado(texto) es True."""
+        n = 0
+        for rec in await self.list_all(limit=100000):
+            if predicado(rec.get("content") or "") and await self.delete(rec["id"]):
+                n += 1
+        return n
+
+    async def delete_texts(self, textos: list[str]) -> int:
+        """Borra los recuerdos cuyo texto coincide con alguno de estos (normalizado)."""
+        norm = lambda t: re.sub(r"[^\w]+", " ", (t or "").lower()).strip()
+        objetivos = {norm(t) for t in textos if t}
+        return await self.purge(lambda c: norm(c) in objetivos) if objetivos else 0
+
+    def ensure_embed_scheme(self) -> int:
+        """Si los vectores se calcularon con otro modo (p. ej. sin prefijos),
+        se marcan para recalcular. Devuelve cuántos se marcaron."""
+        conn = sqlite3.connect(self.db_path)
         try:
-            async with httpx.AsyncClient(trust_env=False) as client:
-                r = await client.post(
-                    f"{self.ollama_url}/api/embeddings",
-                    json={"model": EMBED_MODEL, "prompt": text[:2000]},
-                    timeout=10.0,
-                )
-                r.raise_for_status()
-                return r.json().get("embedding")
+            with conn:
+                conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+                fila = conn.execute("SELECT value FROM meta WHERE key='embed_scheme'").fetchone()
+                if fila and fila[0] == EMBED_SCHEME:
+                    return 0
+                n = conn.execute("UPDATE memories SET embedding='[]' WHERE embedding NOT IN ('[]','')").rowcount
+                conn.execute("INSERT OR REPLACE INTO meta VALUES ('embed_scheme', ?)", (EMBED_SCHEME,))
+                return n
+        finally:
+            conn.close()
+
+    async def backfill_embeddings(self, limite: int = 2000) -> int:
+        """Calcula el vector de los recuerdos guardados sin él.
+
+        Los recuerdos creados mientras no había modelo de embeddings se guardan
+        con vector vacío y solo se encontraban por palabras. En cuanto el modelo
+        está disponible, se completan. Devuelve cuántos se completaron.
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            filas = conn.execute(
+                "SELECT id, content FROM memories WHERE embedding IN ('[]', '') LIMIT ?",
+                (limite,)).fetchall()
+        finally:
+            conn.close()
+        hechos = 0
+        for mem_id, contenido in filas:
+            vec = await self._embed(contenido)
+            if not vec:
+                break                                    # el modelo dejó de responder
+            conn = sqlite3.connect(self.db_path)
+            try:
+                with conn:
+                    conn.execute("UPDATE memories SET embedding = ? WHERE id = ?",
+                                 (json.dumps(vec), mem_id))
+            finally:
+                conn.close()
+            hechos += 1
+        return hechos
+
+    async def _embed(self, text: str, kind: str = "document") -> list[float] | None:
+        """Genera un embedding usando Ollama.
+
+        Se ejecuta en CADA mensaje, antes de generar la respuesta. Dos mejoras:
+          • un solo cliente HTTP reutilizado: crear uno nuevo costaba ~20 ms por
+            llamada (httpx prepara un contexto TLS aunque sea localhost);
+          • si el modelo de embeddings no está instalado, se deja de preguntar
+            durante 5 minutos. Antes se hacía una petición fallida en cada
+            mensaje, que además esperaba en cola si Ollama estaba generando.
+        """
+        import time as _time
+        if _time.monotonic() < getattr(self, "_embed_off_until", 0.0):
+            return None
+        try:
+            r = await _cliente_http().post(
+                f"{self.ollama_url}/api/embeddings",
+                # keep_alive: sin él Ollama descarga el modelo a los 5 min y el
+                # siguiente mensaje paga la recarga antes de empezar a responder.
+                # nomic-embed-text está entrenado con prefijos de tarea: sin ellos
+                # separa peor lo relacionado de lo que no lo es.
+                json={"model": EMBED_MODEL,
+                      "prompt": (("search_query: " if kind == "query" else "search_document: ")
+                                 if EMBED_MODEL.startswith("nomic") else "") + text[:2000],
+                      "keep_alive": __import__("os").environ.get("ANDROMEDA_KEEP_ALIVE") or "30m"},
+                timeout=10.0,
+            )
+            if r.status_code == 404:
+                # Modelo no instalado: no insistir en un rato.
+                self._embed_off_until = _time.monotonic() + 300
+                logger.info(f"Modelo de embeddings {EMBED_MODEL} no instalado; "
+                            "memoria por palabras clave durante 5 min")
+                return None
+            r.raise_for_status()
+            return r.json().get("embedding")
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            self._embed_off_until = _time.monotonic() + 30   # Ollama apagado
+            logger.debug(f"Embedding no disponible: {exc}")
+            return None
         except Exception as exc:
             logger.debug(f"Embedding falló: {exc}")
             return None
@@ -368,12 +531,11 @@ class SemanticMemoryStore:
         """Cosine similarity entre dos vectores."""
         if len(a) != len(b):
             return 0.0
-        dot   = sum(x * y for x, y in zip(a, b))
-        norm_a = sum(x * x for x in a) ** 0.5
-        norm_b = sum(x * x for x in b) ** 0.5
+        norm_a = math.sqrt(_SUMPROD(a, a))
+        norm_b = math.sqrt(_SUMPROD(b, b))
         if norm_a == 0 or norm_b == 0:
             return 0.0
-        return dot / (norm_a * norm_b)
+        return _dot(a, b) / (norm_a * norm_b)
 
     @staticmethod
     def _classify_category(text: str) -> str:

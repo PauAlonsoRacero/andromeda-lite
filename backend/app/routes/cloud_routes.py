@@ -41,7 +41,7 @@ async def register(request: Request) -> JSONResponse:
     except cloud.CloudError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
     except Exception:
-        return JSONResponse(status_code=503, content={"error": "No se pudo conectar con el servicio. ¿Tienes conexión?"})
+        return JSONResponse(status_code=503, content={"error_key": "err.no_connection"})
 
 
 @router.post("/login")
@@ -53,7 +53,7 @@ async def login(request: Request) -> JSONResponse:
     except cloud.CloudError as e:
         return JSONResponse(status_code=401, content={"error": str(e)})
     except Exception:
-        return JSONResponse(status_code=503, content={"error": "No se pudo conectar con el servicio. ¿Tienes conexión?"})
+        return JSONResponse(status_code=503, content={"error_key": "err.no_connection"})
 
 
 @router.post("/logout")
@@ -74,7 +74,7 @@ async def upgrade() -> JSONResponse:
     """Devuelve la URL de pago de Stripe para suscribirse a Pro."""
     url = cloud.start_checkout()
     if not url:
-        return JSONResponse(status_code=400, content={"error": "Inicia sesión primero"})
+        return JSONResponse(status_code=400, content={"error_key": "err.sign_in_first"})
     return JSONResponse(content={"checkout_url": url})
 
 
@@ -83,7 +83,7 @@ async def export_data() -> JSONResponse:
     """Exporta todos los datos del usuario (RGPD)."""
     data = cloud.export_data()
     if data is None:
-        return JSONResponse(status_code=401, content={"error": "Inicia sesión primero"})
+        return JSONResponse(status_code=401, content={"error_key": "err.sign_in_first"})
     return JSONResponse(content=data, headers={"Content-Disposition": "attachment; filename=andromeda-mis-datos.json"})
 
 

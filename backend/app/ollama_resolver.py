@@ -54,13 +54,47 @@ def probe_sync(url: str, timeout: float = 2.5) -> dict | None:
     return None
 
 
-async def _probe(url: str, timeout: float = 2.5) -> dict | None:
-    return await asyncio.to_thread(probe_sync, url, timeout)
+def _default_timeout() -> float:
+    """Timeout al sondear Ollama.
+
+    En los tests no hay Ollama, así que cada sondeo agota su tiempo completo y
+    el arranque de la aplicación tardaba ~2,6 s. Con 300 tests que crean la app,
+    eso son minutos de espera pura. En producción se mantiene el margen amplio
+    porque Ollama puede tardar en responder si está cargando un modelo.
+    """
+    import os
+    if os.environ.get("ANDROMEDA_ENVIRONMENT") == "test":
+        return 0.25
+    return 2.5
+
+
+async def _probe(url: str, timeout: float | None = None) -> dict | None:
+    return await asyncio.to_thread(probe_sync, url, timeout or _default_timeout())
+
+
+# Cuándo se comprobó por última vez sin éxito. Sin esto, cada llamada reprueba
+# TODAS las URLs candidatas: con Ollama apagado eso son ~260 ms por petición, y
+# la interfaz consulta el estado cada 3 segundos.
+_last_failure: float = 0.0
+_FAILURE_CACHE_S = 5.0
 
 
 async def resolve_ollama_url(preferred: str | None = None) -> str | None:
-    """Devuelve la primera URL de Ollama que responde a /api/tags."""
-    global _resolved_url
+    """Devuelve la primera URL de Ollama que responde a /api/tags.
+
+    Si la última búsqueda falló hace poco, se devuelve None sin volver a
+    sondear: Ollama no aparece de un segundo a otro, y reprobar en cada
+    petición hace que toda la interfaz vaya lenta cuando está apagado.
+    """
+    global _resolved_url, _last_failure
+
+    import time as _t
+    # Si la última búsqueda falló hace menos de _FAILURE_CACHE_S, no se vuelve a
+    # sondear: Ollama no aparece de un segundo a otro, y reprobar todas las URLs
+    # en cada petición hace que la interfaz vaya lenta cuando está apagado.
+    # `reset_cache()` la invalida cuando el usuario cambia la configuración.
+    if not _resolved_url and (_t.monotonic() - _last_failure) < _FAILURE_CACHE_S:
+        return None
 
     urls = []
     if _resolved_url:
@@ -77,6 +111,7 @@ async def resolve_ollama_url(preferred: str | None = None) -> str | None:
             return url
 
     _resolved_url = None
+    _last_failure = _t.monotonic()
     logger.warning("Ollama no encontrado en ninguna URL candidata")
     return None
 
@@ -104,3 +139,14 @@ async def resolve_with_models(preferred: str | None = None) -> tuple[str | None,
 
 def get_cached_url() -> str | None:
     return _resolved_url
+
+
+def reset_cache() -> None:
+    """Olvida la URL resuelta y el último fallo.
+
+    Necesario cuando cambia la configuración de Ollama o entre pruebas: sin
+    esto, un fallo cacheado hace que no se detecte un servidor que sí está.
+    """
+    global _resolved_url, _last_failure
+    _resolved_url = None
+    _last_failure = 0.0

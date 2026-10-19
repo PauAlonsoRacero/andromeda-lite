@@ -10,6 +10,11 @@ Toma el resultado de la fusión (etapa 3) y hace una pasada final que:
 Solo se ejecuta cuando hubo 2+ IAs (decisión del orquestador). Si la IA de
 salida falla o no responde, se devuelve el texto fusionado tal cual (nunca
 deja al usuario sin respuesta).
+
+NOTA: en Andromeda Lite este módulo no llega a ejecutarse, porque la IA de
+salida solo tiene sentido cuando responden 2+ modelos y Lite usa uno solo.
+streaming.py ya acepta `use_output_ai`/`output_model`, así que la edición Pro
+lo activa sin tocar el pipeline. No es código muerto: es el punto de extensión.
 """
 from __future__ import annotations
 

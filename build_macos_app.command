@@ -42,7 +42,25 @@ if ! python -m pip install --only-binary=pydantic-core,uvloop,httptools,watchfil
     python -m pip install --prefer-binary -r backend/requirements.txt pywebview pyinstaller
 fi
 
+# pyobjc: recomendado en macOS (pywebview lo usa para su backend "cocoa"), pero
+# se instala en un paso APARTE y sin bloquear el build. Si tu pywebview ya
+# funciona sin él, o el wheel falla en tu combinación de macOS/Python, el
+# build debe seguir adelante igualmente — instalarlo aquí nunca debe ser motivo
+# de abortar algo que antes funcionaba.
+if [[ "$(uname)" == "Darwin" ]]; then
+  echo "  Instalando pyobjc (opcional, no bloqueante)..."
+  python -m pip install --prefer-binary \
+      pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-framework-Quartz \
+      2>/dev/null || echo "  [!] pyobjc no se instaló; se continúa igualmente."
+fi
+
 echo "[4/5] Empaquetando con PyInstaller (varios minutos)..."
+if [[ "$(uname)" == "Darwin" ]]; then
+  python -c "import objc, Cocoa, WebKit" 2>/dev/null \
+    && echo "  pyobjc OK (objc, Cocoa, WebKit importan correctamente)" \
+    || echo "  [!] pyobjc no disponible; se compila igualmente. Si la app no abre después, instala:
+      pip install pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-framework-Quartz"
+fi
 python -m PyInstaller build_desktop.spec --noconfirm --clean
 deactivate
 

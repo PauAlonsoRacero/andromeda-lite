@@ -59,7 +59,7 @@ async def index_project(request: Request) -> JSONResponse:
     path = body.get("path", "")
 
     if not path:
-        return JSONResponse(status_code=400, content={"error": "path requerido"})
+        return JSONResponse(status_code=400, content={"error_key": "err.path_required"})
 
     project_path = Path(path)
     if not project_path.exists():
@@ -75,7 +75,7 @@ async def index_project(request: Request) -> JSONResponse:
         if not file_path.is_file(): continue
         if not _should_index(file_path): continue
         if len(files_indexed) >= MAX_FILES:
-            skipped.append(str(file_path.relative_to(project_path)))
+            skipped.append(file_path.relative_to(project_path).as_posix())
             continue
 
         try:
@@ -91,7 +91,7 @@ async def index_project(request: Request) -> JSONResponse:
                 skipped.append(f"{file_path.relative_to(project_path)} (límite tokens)")
                 continue
 
-            rel_path = str(file_path.relative_to(project_path))
+            rel_path = file_path.relative_to(project_path).as_posix()
             files_indexed.append({
                 "path":    rel_path,
                 "content": content,
@@ -166,11 +166,11 @@ async def query_with_context(request: Request) -> JSONResponse:
 
     if not ctx:
         return JSONResponse(status_code=400, content={
-            "error": "Ningún proyecto indexado. Usa POST /api/context/index primero."
+            "error_key": "err.no_project_indexed"
         })
 
     if not question:
-        return JSONResponse(status_code=400, content={"error": "question requerida"})
+        return JSONResponse(status_code=400, content={"error_key": "err.question_required"})
 
     # Seleccionar archivos
     selected = ctx["files"]

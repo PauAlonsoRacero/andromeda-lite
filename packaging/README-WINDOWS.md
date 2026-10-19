@@ -95,3 +95,25 @@ Andromeda es la app; **Ollama es el motor** que ejecuta los modelos.
 - [ ] Firmar el `.exe` y el instalador (certificado de código)
 - [ ] CI con GitHub Actions que compile en `windows-latest` y publique el Setup
 - [ ] Probar en una VM Windows limpia (sin Python/Node) que el instalador funciona
+
+
+## La app abre una versión antigua de la interfaz
+
+Desde la 1.1 la app borra sola las cachés del navegador interno cuando cambia la
+interfaz. Si aun así ocurre, cierra la app y borra a mano la carpeta
+`%APPDATA%\Andromeda\webview` (perderás solo los ajustes guardados en el
+navegador; conversaciones y memoria están en el servidor local y se conservan).
+
+
+Desde la 1.1 no debería pasar: la app comprueba que el servidor que responde es
+ella misma. Si ves el aviso "Otra copia de Andromeda está usando el puerto…":
+
+1. Abre el **Administrador de tareas** (Ctrl + Mayús + Esc).
+2. Finaliza todos los procesos llamados **Andromeda**.
+3. Si tenías instalada una versión anterior, desinstálala desde
+   *Configuración → Aplicaciones*.
+4. Vuelve a abrir la app.
+
+Comprueba también que no existe la variable de entorno `ANDROMEDA_FRONTEND_DIST`
+(*Configuración → Sistema → Información → Configuración avanzada → Variables de
+entorno*). Desde la 1.1 se ignora, pero conviene borrarla.

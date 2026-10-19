@@ -15,8 +15,16 @@ jobs:
 
   # ── Backend tests ──────────────────────────────────────────────────────────
   test-backend:
-    name: Backend Tests
-    runs-on: ubuntu-latest
+    name: Backend Tests (${{ matrix.os }})
+    # Andromeda es una app de ESCRITORIO para macOS y Windows, pero el CI solo
+    # probaba en Linux. Todos los fallos de empaquetado (Gatekeeper, pyobjc, la
+    # app relanzándose sola, las descargas navegando la ventana) aparecieron en
+    # la máquina del usuario porque en Linux ni siquiera existen.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false          # que un sistema no cancele los demás
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v5
@@ -41,7 +49,10 @@ jobs:
           echo "--- pytest ---"
           pytest --version
 
+      # `| tee` no existe en PowerShell: se usa bash explícitamente en los tres
+      # sistemas para que el comando sea idéntico en todos.
       - name: Run tests with coverage
+        shell: bash
         run: pytest tests/ -v --tb=long --cov=backend/app --cov-report=term-missing --cov-report=xml 2>&1 | tee pytest-output.txt
         env:
           ANDROMEDA_ENVIRONMENT: test
@@ -51,7 +62,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-output
+          name: pytest-output-${{ matrix.os }}
           path: pytest-output.txt
           if-no-files-found: ignore
 
@@ -59,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.python || '3.12' }}
+          name: coverage-${{ matrix.os }}
           path: coverage.xml
           if-no-files-found: ignore
 
@@ -101,6 +112,12 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+        working-directory: frontend
+
+      # Vite compila aunque falte un import; el análisis estático lo detecta
+      # antes de que llegue a la app ("Can't find variable: PromptCatalog").
+      - name: Lint (variables y componentes sin definir)
+        run: npm run lint
         working-directory: frontend
 
       - name: Build
@@ -151,6 +168,17 @@ jobs:
         run: |
           pip install pip-audit
           pip-audit -r backend/requirements.txt || true   # informativo de momento
+
+      # Las dependencias del frontend no se auditaban: una vulnerabilidad alta
+      # en axios pasó desapercibida hasta una revisión manual.
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: npm audit
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high || true   # informativo
       - name: Bandit (análisis estático de seguridad)
         run: |
           pip install bandit
@@ -170,10 +198,71 @@ jobs:
         run: kubeconform -summary -ignore-missing-schemas deploy/k8s/
 
   # ── Summary ───────────────────────────────────────────────────────────────
+  # ── Empaquetado de escritorio ──────────────────────────────────────────────
+  # Verifica que PyInstaller produce un ejecutable en macOS y Windows. No firma
+  # ni publica nada: solo comprueba que el build no revienta, que es justo lo
+  # que fallaba y solo se descubría al intentar generar la app a mano.
+  build-desktop:
+    name: Desktop Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install packaging dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pywebview pyinstaller
+          # pyobjc es lo que permite a pywebview abrir la ventana en macOS. Sin
+          # el la app se genera pero no abre, y falla en silencio.
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            pip install pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-framework-Quartz
+          fi
+
+      - name: Verify pyobjc imports (macOS)
+        if: runner.os == 'macOS'
+        run: python -c "import objc, Cocoa, WebKit; print('pyobjc OK')"
+
+      - name: Package with PyInstaller
+        run: python -m PyInstaller build_desktop.spec --noconfirm --clean
+
+      - name: Check the bundle exists
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            test -d dist/Andromeda.app || { echo "No se genero Andromeda.app"; ls -la dist; exit 1; }
+            echo "Andromeda.app generado correctamente"
+          else
+            test -f dist/Andromeda/Andromeda.exe || test -f dist/Andromeda.exe || { echo "No se genero el ejecutable"; ls -la dist; exit 1; }
+            echo "Ejecutable generado correctamente"
+          fi
+
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [test-backend, lint, build-frontend, k8s-validate, security]
+    needs: [test-backend, lint, build-frontend, k8s-validate, security, build-desktop]
     if: always()
 
     steps:
@@ -184,3 +273,12 @@ jobs:
           echo "Frontend:      ${{ needs.build-frontend.result }}"
           echo "K8s manifests: ${{ needs.k8s-validate.result }}"
           echo "Security:      ${{ needs.security.result }}"
+          echo "Desktop build: ${{ needs.build-desktop.result }}"
+
+          # El empaquetado de escritorio es el producto principal: si falla, el
+          # CI debe fallar aunque todo lo demás esté en verde.
+          if [ "${{ needs.test-backend.result }}" != "success" ] || \
+             [ "${{ needs.build-desktop.result }}" != "success" ]; then
+            echo "::error::Fallo en tests o en el empaquetado de escritorio"
+            exit 1
+          fi

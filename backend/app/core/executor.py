@@ -36,6 +36,40 @@ from app.specialists.identity import with_identity
 
 logger = logging.getLogger("andromeda.executor")
 
+try:
+    from app.observability import diagnostics as diag
+except Exception:                                        # pragma: no cover
+    class _Nulo:                                         # el registro nunca es obligatorio
+        @staticmethod
+        def log(*a, **k): pass
+        @staticmethod
+        def is_enabled(): return False
+    diag = _Nulo()
+
+
+
+def _tuned_options(base: dict, config: dict | None) -> dict:
+    """Añade a las opciones los parámetros ajustados al hardware detectado."""
+    try:
+        from app.core.inference_tuning import options_from_hardware
+        return options_from_hardware(base, (config or {}).get("hardware"))
+    except Exception:
+        return base          # ante cualquier duda, los valores de siempre
+
+
+
+def _keep_alive() -> str:
+    """Cuánto tiempo mantiene Ollama el modelo en memoria tras responder.
+
+    Configurable con ANDROMEDA_KEEP_ALIVE (formato de Ollama: "30m", "1h",
+    "-1" para indefinido, "0" para descargar al terminar). Por defecto 30
+    minutos: suficiente para una sesión de trabajo sin retener VRAM toda la
+    noche.
+    """
+    import os
+    return (os.environ.get("ANDROMEDA_KEEP_ALIVE") or "30m").strip()
+
+
 
 async def execute_specialists(
     specialists: list[SpecialistProfile],
@@ -210,14 +244,19 @@ async def _call_specialist(
     from app.core.model_catalog import supports_tools as _supports_tools
     if mcp_manager is not None and _supports_tools(specialist.model_name):
         try:
-            _tools = mcp_manager.tools
-            if _tools:
+            # Solo con conectores reales: las herramientas integradas de archivos
+            # están siempre y duplicarían los bloques andromeda:write.
+            from app.mcp.executor import select_tools as _sel_tools
+            _elegidas = (_sel_tools(mcp_manager.tools, config.get("user_prompt") or prompt)
+                         if getattr(mcp_manager, "has_external_tools", False) else [])
+            if _elegidas:
                 from app.mcp.executor import MCPExecutor
-                _execu = MCPExecutor(mcp_manager, metrics=config.get("metrics"))
+                _execu = MCPExecutor(mcp_manager, metrics=config.get("metrics"), tools=_elegidas)
                 final_text, tool_log = await _execu.run_with_tools(
                     prompt=prompt,
                     model_name=specialist.model_name,
-                    system_prompt=with_identity(specialist.system_prompt, specialist.id, specialist.model_name),
+                    system_prompt=with_identity(specialist.system_prompt, specialist.id, specialist.model_name,
+                                     user_prompt=prompt),
                     ollama_url=ollama_url,
                 )
                 return {
@@ -239,21 +278,28 @@ async def _call_specialist(
             {
                 "role": "system",
                 # El system prompt del especialista + identidad de Andromeda
-                "content": with_identity(specialist.system_prompt, specialist.id, specialist.model_name),
+                "content": with_identity(specialist.system_prompt, specialist.id, specialist.model_name,
+                                     user_prompt=prompt),
             },
             {
                 "role": "user",
                 "content": prompt,
             },
         ],
-        "options": {
+        "options": _tuned_options({
             "temperature": temperature,
             # num_predict es el nombre de Ollama para max_tokens
             "num_predict": max_tokens,
-        },
+        }, config),
         # stream=False: esperamos la respuesta completa
         # (staircase streaming se implementa en streaming.py en Fase 1)
         "stream": False,
+        # keep_alive: mantiene el modelo en memoria entre mensajes. Sin
+        # esto Ollama lo descarga a los 5 minutos y la siguiente pregunta
+        # paga la recarga completa desde disco: con un modelo de 14-27B eso
+        # son decenas de segundos, y es la causa principal de que el p95 se
+        # dispare mientras el p50 parece razonable.
+        "keep_alive": _keep_alive(),
     }
 
     try:

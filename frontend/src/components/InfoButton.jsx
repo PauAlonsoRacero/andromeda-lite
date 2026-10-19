@@ -1,77 +1,99 @@
 /**
- * InfoButton.jsx — Botón (i) que abre un panel de instrucciones de uso.
+ * InfoButton.jsx — Botón (i) con explicación contextual.
  *
- * Estilo Andromeda: icono discreto que, al pulsarlo, despliega un popover con
- * la explicación punto por punto de la sección. Reutilizable en toda la app.
- *
- * Uso:
- *   <InfoButton title="Analíticas" items={[
- *     { h: 'Tasa de éxito', d: 'Porcentaje de peticiones que terminaron bien.' },
- *     ...
- *   ]} />
+ * Popover anclado al botón, no un modal centrado: la explicación aparece junto
+ * a lo que explica, así no se pierde la referencia visual de qué se describe.
+ * Se posiciona solo para no salirse de la pantalla y se cierra con clic fuera,
+ * Escape o el botón.
  */
 import { createSignal, For, Show, onCleanup } from 'solid-js'
+import { t } from '../stores/i18n.js'
 
 export default function InfoButton(props) {
   const [open, setOpen] = createSignal(false)
+  const [pos, setPos] = createSignal({ top: 0, left: 0, arrow: 0, above: false, width: 340 })
+  let btnRef
+
+  /** Sitúa el popover bajo el botón, corrigiendo si se saldría de la ventana. */
+  function place() {
+    if (!btnRef) return
+    const r = btnRef.getBoundingClientRect()
+    const W = Math.min(360, window.innerWidth - 24)
+    const H = 320                            // alto estimado, para elegir arriba/abajo
+    const above = r.bottom + H > window.innerHeight && r.top > H
+    let left = r.left + r.width / 2 - W / 2
+    left = Math.max(12, Math.min(left, window.innerWidth - W - 12))
+    setPos({
+      top: above ? r.top - 10 : r.bottom + 10,
+      left,
+      arrow: r.left + r.width / 2 - left,     // flecha alineada con el botón
+      above,
+      width: W,
+    })
+  }
 
   function toggle(e) {
     e?.stopPropagation()
+    if (!open()) place()
     setOpen(v => !v)
   }
-  function close() { setOpen(false) }
+  const close = () => setOpen(false)
 
-  // Cerrar con Escape.
-  const onKey = (e) => { if (e.key === 'Escape') close() }
   if (typeof window !== 'undefined') {
+    const onKey = (e) => { if (e.key === 'Escape') close() }
+    const onMove = () => { if (open()) close() }
     window.addEventListener('keydown', onKey)
-    onCleanup(() => window.removeEventListener('keydown', onKey))
+    window.addEventListener('resize', onMove)
+    window.addEventListener('scroll', onMove, true)
+    onCleanup(() => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onMove)
+      window.removeEventListener('scroll', onMove, true)
+    })
   }
 
   return (
     <>
       <button
+        ref={btnRef}
         onClick={toggle}
-        title={props.label || 'Cómo se usa'}
+        title={props.label || t('info.how_it_works')}
         aria-label="info"
-        style={`display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--glass-border);background:${open() ? 'var(--glass-bright)' : 'transparent'};color:${open() ? 'var(--text-1)' : 'var(--text-3)'};cursor:pointer;font-size:12px;font-weight:700;font-style:italic;font-family:Georgia,serif;flex-shrink:0;transition:all .15s;line-height:1`}
+        aria-expanded={open()}
+        class="info-dot"
+        style={`background:${open() ? 'var(--glass-bright)' : 'transparent'};color:${open() ? 'var(--text-1)' : 'var(--text-3)'};border-color:${open() ? 'var(--text-3)' : 'var(--glass-border)'}`}
       >i</button>
 
       <Show when={open()}>
-        {/* Overlay */}
-        <div onClick={close}
-          style="position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.45);backdrop-filter:blur(3px);animation:overlayFadeIn .18s ease"
-        />
-        {/* Panel */}
+        {/* Captura de clics fuera. Transparente a propósito: el popover no
+            oscurece la app, para poder seguir viendo lo que se explica. */}
+        <div onClick={close} style="position:fixed;inset:0;z-index:300" />
+
         <div
-          style="position:fixed;z-index:301;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,92vw);max-height:80vh;overflow-y:auto;background:var(--glass-bright,rgba(16,18,28,.98));border:1px solid var(--glass-border);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.5);backdrop-filter:blur(24px);padding:24px;animation:modalPopIn .2s cubic-bezier(0.34,1.4,0.5,1)"
+          class={`info-pop ${pos().above ? 'info-pop-above' : ''}`}
+          style={`top:${pos().top}px;left:${pos().left}px;width:${pos().width}px`}
         >
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <h3 style="font-size:18px;font-weight:700;color:var(--text-1);margin:0">{props.title}</h3>
-            <button onClick={close}
-              style="width:28px;height:28px;border-radius:50%;border:1px solid var(--glass-border);background:transparent;color:var(--text-3);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">×</button>
+          <span class="info-pop-arrow" style={`left:${pos().arrow}px`} />
+
+          <div class="info-pop-head">
+            <h4>{props.title}</h4>
+            <button onClick={close} aria-label="close">×</button>
           </div>
+
           <Show when={props.intro}>
-            <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin:0 0 16px">{props.intro}</p>
+            <p class="info-pop-intro">{props.intro}</p>
           </Show>
-          <div style="display:flex;flex-direction:column;gap:14px">
+
+          <div class="info-pop-body">
             <For each={props.items || []}>
               {(it, i) => (
-                <div style="display:flex;gap:12px">
-                  <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--accent-soft,rgba(91,120,245,.15));color:var(--blue);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">{i() + 1}</div>
-                  <div style="min-width:0">
-                    <div style="font-size:13.5px;font-weight:600;color:var(--text-1);margin-bottom:2px">{it.h}</div>
-                    <div style="font-size:13px;color:var(--text-3);line-height:1.55">{it.d}</div>
-                  </div>
+                <div class="info-pop-item" style={`animation-delay:${i() * 40}ms`}>
+                  <div class="info-pop-item-h">{it.h}</div>
+                  <div class="info-pop-item-d">{it.d}</div>
                 </div>
               )}
             </For>
           </div>
-          <Show when={props.tip}>
-            <div style="margin-top:18px;padding:11px 13px;border-radius:10px;background:var(--accent-soft,rgba(91,120,245,.1));border:1px solid color-mix(in srgb, var(--blue) 25%, transparent);font-size:12.5px;color:var(--text-2);line-height:1.5">
-              💡 {props.tip}
-            </div>
-          </Show>
         </div>
       </Show>
     </>

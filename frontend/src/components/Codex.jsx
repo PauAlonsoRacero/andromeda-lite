@@ -20,6 +20,7 @@ import perl from 'highlight.js/lib/languages/perl'
 import r from 'highlight.js/lib/languages/r'
 import 'highlight.js/styles/atom-one-dark.css'
 import { t } from '../stores/i18n.js'
+import { errorMessage } from '../services/errors.js'
 
 hljs.registerLanguage('python', python)
 hljs.registerLanguage('javascript', javascript)
@@ -96,6 +97,9 @@ export default function Codex() {
     } catch { /* noop */ }
   }
 
+  // En escritorio window.open no hace nada: se abre con el navegador del sistema.
+  const abrirWeb = (url) => axios.post('/api/system/open-url', { url }).catch(() => window.open(url, '_blank'))
+
   async function installLang(id) {
     setInstalling(id)
     setInstallMsg('')
@@ -109,10 +113,10 @@ export default function Codex() {
         setInstallMsg(t('codex.install_restart'))
       } else if (d.manual && d.url) {
         setInstallMsg(t('codex.install_manual'))
-        window.open(d.url, '_blank')
+        abrirWeb(d.url)
       } else {
         setInstallMsg(d.message || t('codex.install_fail'))
-        if (d.url) window.open(d.url, '_blank')
+        if (d.url) abrirWeb(d.url)
       }
     } catch {
       setInstallMsg(t('codex.install_fail'))
@@ -129,7 +133,7 @@ export default function Codex() {
       setResult(r.data)
       setHistory(h => [{ lang: lang(), success: r.data.success, ts: Date.now() }, ...h].slice(0, 5))
     } catch (e) {
-      setResult({ success: false, stderr: e.response?.data?.error || e.message, stdout: '', elapsed_ms: Date.now() - started })
+      setResult({ success: false, stderr: errorMessage(e), stdout: '', elapsed_ms: Date.now() - started })
     }
     setRunning(false)
   }
@@ -157,7 +161,10 @@ export default function Codex() {
       const html = hljs.highlight(code(), { language: lng }).value
       return html + '\n'
     } catch {
-      return code() + '\n'
+      // Se inserta con innerHTML: si el resaltado falla, hay que escapar. Sin
+      // esto, un fragmento con `<img onerror=...>` se ejecutaría.
+      return code().replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                   .replace(/>/g, '&gt;') + '\n'
     }
   }
 
@@ -174,8 +181,8 @@ export default function Codex() {
     <div style="padding:24px;max-width:1000px;margin:0 auto">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div>
-          <div style="font-size:22px;font-weight:800;letter-spacing:-0.02em">Codex</div>
-          <div style="font-size:13px;color:var(--text-3)">{t('codex.subtitle')}</div>
+          <div style="font-size:var(--fs-lg);font-weight:800;letter-spacing:-0.02em">Codex</div>
+          <div style="font-size:var(--fs-base);color:var(--text-3)">{t('codex.subtitle')}</div>
         </div>
       </div>
 
@@ -187,7 +194,7 @@ export default function Codex() {
               onClick={() => changeLang(l.id)}
               class="btn"
               title={l.available ? `${LANG_LABEL[l.id]} — listo para ejecutar` : `${LANG_LABEL[l.id]} — editable; instala el intérprete para ejecutar`}
-              style={`font-size:13px;padding:8px 14px;display:flex;align-items:center;gap:7px;${lang()===l.id
+              style={`font-size:var(--fs-base);padding:8px 14px;display:flex;align-items:center;gap:7px;${lang()===l.id
                 ? 'background:var(--grad-primary);color:#fff'
                 : 'background:var(--glass-bright);color:var(--text-2);border:1px solid var(--glass-border)'}`}>
               <span style={`width:6px;height:6px;border-radius:50%;flex-shrink:0;background:${l.available ? 'var(--green)' : 'var(--text-3)'}`} />
@@ -198,12 +205,12 @@ export default function Codex() {
       </div>
 
       <Show when={avail()[lang()] === false}>
-        <div style="font-size:12px;color:var(--text-2);background:var(--inset-surface);border:1px solid var(--glass-border);border-radius:10px;padding:9px 12px;margin:-6px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="font-size:var(--fs-sm);color:var(--text-2);background:var(--inset-surface);border:1px solid var(--glass-border);border-radius:10px;padding:9px 12px;margin:-6px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="flex:1;min-width:200px">
             Puedes escribir y guardar {LANG_LABEL[lang()]}, pero para <b>ejecutarlo</b> necesitas su intérprete.
             <Show when={installMsg()}><span style="color:var(--text-3);display:block;margin-top:4px">{installMsg()}</span></Show>
           </span>
-          <button class="btn btn-primary" style="font-size:12px;padding:6px 12px;white-space:nowrap"
+          <button class="btn btn-primary" style="font-size:var(--fs-sm);padding:6px 12px;white-space:nowrap"
             disabled={installing() === lang()}
             onClick={() => installLang(lang())}>
             {installing() === lang() ? t('codex.installing') : t('codex.install_btn')}
@@ -218,14 +225,14 @@ export default function Codex() {
             <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span>
             <span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span>
             <span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
-            <span style="font-size:12px;color:var(--text-3);margin-left:10px;font-family:var(--font-mono)">script{lang()==='python'?'.py':lang()==='javascript'?'.js':'.sh'}</span>
+            <span style="font-size:var(--fs-sm);color:var(--text-3);margin-left:10px;font-family:var(--font-mono)">script{lang()==='python'?'.py':lang()==='javascript'?'.js':'.sh'}</span>
           </div>
-          <span style="font-size:11px;color:var(--text-3)">{lineCount()} líneas</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-3)">{lineCount()} líneas</span>
         </div>
         <div class="codex-editor" style="position:relative;min-height:300px">
           {/* Capa de resaltado (debajo) */}
           <pre ref={preRef} aria-hidden="true"
-            style="margin:0;padding:16px;font-family:var(--font-mono);font-size:13px;line-height:1.6;tab-size:4;white-space:pre;overflow:auto;position:absolute;inset:0;pointer-events:none;color:var(--text-1)"
+            style="margin:0;padding:16px;font-family:var(--font-mono);font-size:var(--fs-base);line-height:1.6;tab-size:4;white-space:pre;overflow:auto;position:absolute;inset:0;pointer-events:none;color:var(--text-1)"
           ><code class={`language-${lang()} hljs`} innerHTML={highlighted()} /></pre>
           {/* Textarea transparente (encima) */}
           <textarea
@@ -235,46 +242,46 @@ export default function Codex() {
             onKeyDown={onKeyDown}
             onScroll={syncScroll}
             spellcheck={false}
-            style="width:100%;min-height:300px;background:transparent;border:none;outline:none;resize:none;padding:16px;font-family:var(--font-mono);font-size:13px;line-height:1.6;letter-spacing:0;color:transparent;caret-color:var(--text-1);tab-size:4;white-space:pre;overflow:auto;position:relative;z-index:1"
+            style="width:100%;min-height:300px;background:transparent;border:none;outline:none;resize:none;padding:16px;font-family:var(--font-mono);font-size:var(--fs-base);line-height:1.6;letter-spacing:0;color:transparent;caret-color:var(--text-1);tab-size:4;white-space:pre;overflow:auto;position:relative;z-index:1"
           />
         </div>
       </div>
 
       {/* Acciones */}
       <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
-        <button class="btn btn-primary" onClick={run} disabled={running()} style="font-size:14px;padding:10px 22px">
+        <button class="btn btn-primary" onClick={run} disabled={running()} style="font-size:var(--fs-base);padding:10px 22px">
           <Show when={!running()} fallback={<><span class="spin" /> Ejecutando...</>}>{t('cdx.run')}</Show>
         </button>
-        <span style="font-size:12px;color:var(--text-3)">o pulsa <kbd style="background:rgba(255,255,255,0.08);padding:2px 7px;border-radius:5px;font-family:var(--font-mono)">Ctrl/Cmd + Enter</kbd></span>
+        <span style="font-size:var(--fs-sm);color:var(--text-3)">o pulsa <kbd style="background:rgba(255,255,255,0.08);padding:2px 7px;border-radius:6px;font-family:var(--font-mono)">Ctrl/Cmd + Enter</kbd></span>
       </div>
 
       {/* Resultado */}
       <Show when={result()}>
         <div class="card anim-spring" style="margin-top:18px;padding:0;overflow:hidden;border-radius:14px">
           <div style={`display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--glass-border);background:${result().success?'rgba(40,200,100,0.08)':'rgba(255,95,87,0.08)'}`}>
-            <span style={`font-size:13px;font-weight:700;color:${result().success?'var(--green)':'var(--red)'}`}>
+            <span style={`font-size:var(--fs-base);font-weight:700;color:${result().success?'var(--green)':'var(--red)'}`}>
               {result().success ? t('js.exec_ok') : t('js.exec_err')}
             </span>
-            <span style="font-size:11px;color:var(--text-3)">{result().elapsed_ms} ms</span>
+            <span style="font-size:var(--fs-xs);color:var(--text-3)">{result().elapsed_ms} ms</span>
           </div>
           <div style="padding:16px">
             <Show when={result().stdout}>
-              <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:6px">Salida</div>
-              <pre style="margin:0 0 14px;font-family:var(--font-mono);font-size:13px;color:var(--text-1);white-space:pre-wrap;word-break:break-word">{result().stdout}</pre>
+              <div style="font-size:var(--fs-micro);color:var(--text-3);text-transform:uppercase;font-weight:700;margin-bottom:6px">Salida</div>
+              <pre style="margin:0 0 14px;font-family:var(--font-mono);font-size:var(--fs-base);color:var(--text-1);white-space:pre-wrap;word-break:break-word">{result().stdout}</pre>
             </Show>
             <Show when={result().stderr}>
-              <div style="font-size:10px;color:var(--red);text-transform:uppercase;font-weight:700;margin-bottom:6px">{t('common.errors')}</div>
-              <pre style="margin:0;font-family:var(--font-mono);font-size:13px;color:#ff9b94;white-space:pre-wrap;word-break:break-word">{result().stderr}</pre>
+              <div style="font-size:var(--fs-micro);color:var(--red);text-transform:uppercase;font-weight:700;margin-bottom:6px">{t('common.errors')}</div>
+              <pre style="margin:0;font-family:var(--font-mono);font-size:var(--fs-base);color:#ff9b94;white-space:pre-wrap;word-break:break-word">{result().stderr}</pre>
             </Show>
             <Show when={!result().stdout && !result().stderr}>
-              <div style="font-size:13px;color:var(--text-3);font-style:italic">{t('ui2.no_output')}</div>
+              <div style="font-size:var(--fs-base);color:var(--text-3);font-style:italic">{t('ui2.no_output')}</div>
             </Show>
           </div>
         </div>
       </Show>
 
       {/* Aviso de seguridad */}
-      <div style="margin-top:18px;padding:12px 14px;background:rgba(123,140,240,0.08);border-left:3px solid var(--blue);border-radius:8px;font-size:12px;color:var(--text-2)">
+      <div style="margin-top:18px;padding:12px 14px;background:rgba(123,140,240,0.08);border-left:3px solid var(--blue);border-radius:10px;font-size:var(--fs-sm);color:var(--text-2)">
         El código corre en un sandbox aislado con límite de tiempo (30s) y sin acceso a tus archivos. Ideal para probar fragmentos rápido.
       </div>
     </div>

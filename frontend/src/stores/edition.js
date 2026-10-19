@@ -50,3 +50,24 @@ export const hasFeature    = (key) => !!features()[key]
 // Si quieres que hasta lo básico sea solo Pro, cambia esta línea a:
 //   export const analyticsAvailable = () => isPro()
 export const analyticsAvailable = () => true
+
+
+// ── Panel de diagnóstico ───────────────────────────────────────────────────
+// Señal reactiva: una variable global normal no funciona porque el menú se
+// renderiza antes de que llegue la respuesta del backend y no se entera del
+// cambio. Con una señal, el menú se actualiza solo cuando se resuelve.
+// Arranca oculto: solo aparece si el backend lo confirma (ANDROMEDA_DIAGNOSTICS=1).
+export const [diagAvailable, setDiagAvailable] = createSignal(false)
+
+export async function checkDiagnostics() {
+  try {
+    // axios y no fetch: en la app de escritorio el frontend no comparte origen
+    // con el backend, y axios ya lleva la URL base configurada. Con fetch y una
+    // ruta relativa la petición no llegaba y el panel nunca aparecía.
+    const r = await axios.get('/api/diagnostics')
+    setDiagAvailable(r?.data?.available === true)
+  } catch {
+    // Sin respuesta no se apaga: durante la depuración es peor perder el panel
+    // que mostrarlo de más.
+  }
+}

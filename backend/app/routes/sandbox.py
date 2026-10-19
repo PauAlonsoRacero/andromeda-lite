@@ -31,41 +31,143 @@ TIMEOUT_DEFAULT = 30
 TIMEOUT_MAX     = 120
 
 SUPPORTED_LANGS = {
-    "python":     {"ext": ".py",  "cmds": ["python3", "python"],  "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "javascript": {"ext": ".js",  "cmds": ["node"],               "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "typescript": {"ext": ".ts",  "cmds": ["ts-node", "deno"],    "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "bash":       {"ext": ".sh",  "cmds": ["bash"],               "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "powershell": {"ext": ".ps1", "cmds": ["pwsh", "powershell"], "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "ruby":       {"ext": ".rb",  "cmds": ["ruby"],               "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "php":        {"ext": ".php", "cmds": ["php"],                "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "go":         {"ext": ".go",  "cmds": ["go"],                 "available": None, "cmd": None, "run": "{cmd} run {file}"},
-    "rust":       {"ext": ".rs",  "cmds": ["rust-script"],        "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "lua":        {"ext": ".lua", "cmds": ["lua"],                "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "perl":       {"ext": ".pl",  "cmds": ["perl"],               "available": None, "cmd": None, "run": "{cmd} {file}"},
-    "r":          {"ext": ".R",   "cmds": ["Rscript"],            "available": None, "cmd": None, "run": "{cmd} {file}"},
+    "python":     {"ext": ".py",  "cmds": ["python3", "python", "py"]},
+    "javascript": {"ext": ".js",  "cmds": ["node"]},
+    "typescript": {"ext": ".ts",  "cmds": ["deno", "ts-node", "tsx"]},
+    "bash":       {"ext": ".sh",  "cmds": ["bash"]},
+    "powershell": {"ext": ".ps1", "cmds": ["pwsh", "powershell"]},
+    "ruby":       {"ext": ".rb",  "cmds": ["ruby"]},
+    "php":        {"ext": ".php", "cmds": ["php"]},
+    "go":         {"ext": ".go",  "cmds": ["go"]},
+    "rust":       {"ext": ".rs",  "cmds": ["rust-script"]},
+    "lua":        {"ext": ".lua", "cmds": ["lua", "lua5.4", "lua54"]},
+    "perl":       {"ext": ".pl",  "cmds": ["perl"]},
+    "r":          {"ext": ".R",   "cmds": ["Rscript"]},
 }
+for _cfg in SUPPORTED_LANGS.values():
+    _cfg.update(available=None, cmd=None, path=None, checked=0.0)
+
+# Argumentos por intérprete ({file} = archivo con el código). Listas, no cadenas:
+# partir por espacios rompía rutas como "C:\Program Files\nodejs\node.exe".
+_ARGS = {
+    "deno": ["run", "--quiet", "--allow-read", "{file}"],
+    "go": ["run", "{file}"],
+    "powershell": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "{file}"],
+    "pwsh": ["-NoProfile", "-File", "{file}"],
+}
+# Cómo comprobar que un intérprete funciona de verdad (no solo que existe).
+_VERSION_ARGS = {"go": ["version"], "Rscript": ["--version"], "lua": ["-v"], "lua5.4": ["-v"],
+                 "lua54": ["-v"], "powershell": ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"],
+                 "pwsh": ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"]}
 
 
-def _detect_languages() -> None:
+def _extra_dirs() -> list[str]:
+    """Carpetas donde los instaladores dejan los intérpretes y que el PATH de la
+    app no siempre incluye (apps de macOS abiertas desde el Finder, o Windows
+    antes de reiniciar tras un winget)."""
+    import glob
+    import sys as _sys
+    home = os.path.expanduser("~")
+    if _sys.platform.startswith("win"):
+        la = os.environ.get("LOCALAPPDATA", os.path.join(home, "AppData", "Local"))
+        pf = os.environ.get("ProgramFiles", r"C:\Program Files")
+        pats = [os.path.join(la, "Microsoft", "WinGet", "Links"),
+                os.path.join(la, "Programs", "Python", "Python3*"),
+                os.path.join(la, "Programs", "Python", "Python3*", "Scripts"),
+                os.path.join(pf, "nodejs"), os.path.join(pf, "Go", "bin"),
+                os.path.join(pf, "R", "R-*", "bin"), os.path.join(pf, "PowerShell", "7"),
+                r"C:\Ruby3*\bin", r"C:\Strawberry\perl\bin",
+                os.path.join(home, ".deno", "bin"), os.path.join(home, "go", "bin"),
+                os.path.join(home, ".cargo", "bin"),
+                os.path.join(la, "Microsoft", "WinGet", "Packages", "*PHP*", "")]
+    else:
+        pats = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/local/go/bin",
+                os.path.join(home, ".deno", "bin"), os.path.join(home, ".cargo", "bin"),
+                os.path.join(home, ".local", "bin"), os.path.join(home, "go", "bin")]
+    dirs = []
+    for p in pats:
+        dirs += sorted(glob.glob(p), reverse=True) if "*" in p else [p]
+    return [d for d in dirs if os.path.isdir(d)]
+
+
+def _refresh_path() -> None:
+    """Actualiza el PATH del proceso con lo que el sistema tiene ahora.
+
+    En Windows se relee del registro: winget cambia el PATH del sistema, pero un
+    proceso ya abierto conserva el antiguo y no encontraba lo recién instalado.
     """
-    Detección perezosa y multiplataforma de intérpretes disponibles.
-    - shutil.which: puro Python, funciona en Windows/Mac/Linux (nada de 'which').
-    - NUNCA en tiempo de import: un subprocess al importar mató el .exe
-      en Windows (FileNotFoundError → backend muerto antes de arrancar).
-    """
+    import sys as _sys
+    partes = os.environ.get("PATH", "").split(os.pathsep)
+    if _sys.platform.startswith("win"):
+        try:
+            import winreg
+            for raiz, clave in ((winreg.HKEY_LOCAL_MACHINE,
+                                 r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+                                (winreg.HKEY_CURRENT_USER, "Environment")):
+                try:
+                    with winreg.OpenKey(raiz, clave) as k:
+                        valor = os.path.expandvars(winreg.QueryValueEx(k, "Path")[0])
+                        partes += valor.split(os.pathsep)
+                except OSError:
+                    pass
+        except ImportError:
+            pass
+    partes += _extra_dirs()
+    vistos, limpio = set(), []
+    for p in partes:
+        if p and p not in vistos:
+            vistos.add(p)
+            limpio.append(p)
+    os.environ["PATH"] = os.pathsep.join(limpio)
+
+
+def _which(cmd: str) -> str | None:
+    """Como shutil.which, pero descarta el acceso directo de la Microsoft Store
+    (carpeta WindowsApps), que abre la tienda en vez de ejecutar código."""
     import shutil
+    ruta = shutil.which(cmd)
+    if ruta and "windowsapps" in ruta.lower():
+        return None
+    return ruta
+
+
+def _works(path: str, name: str) -> bool:
+    """¿El intérprete arranca de verdad? Se ejecuta con --version."""
+    args = _VERSION_ARGS.get(name, ["--version"])
+    try:
+        r = silent_run([path, *args], capture_output=True, timeout=20)
+        return r.returncode == 0
+    except Exception:                                     # noqa: BLE001
+        return False
+
+
+def _detect_languages(force: bool = False) -> None:
+    """Detecta los intérpretes disponibles.
+
+    - Nunca en tiempo de import (un subprocess al importar mató el .exe en Windows).
+    - Los positivos se recuerdan; los negativos se reintentan pasados 10 s, así
+      que un intérprete instalado aparece sin reiniciar la app.
+    - Se guarda la RUTA completa y los argumentos: antes, tras instalar, se
+      marcaba "disponible" pero el comando quedaba vacío y no ejecutaba nada.
+    """
+    _refresh_path()
+    ahora = time.monotonic()
     for cfg in SUPPORTED_LANGS.values():
-        if cfg["available"] is not None:
+        if not force and cfg["available"] and cfg["path"] and os.path.exists(cfg["path"]):
             continue
-        found = next((c for c in cfg["cmds"] if shutil.which(c)), None)
-        cfg["available"] = found is not None
-        if found:
-            # Plantilla de ejecución: sustituye {cmd} por el intérprete encontrado
-            template = cfg.get("run", "{cmd} {file}")
-            parts = template.replace("{cmd}", found).split()
-            cfg["cmd"] = parts  # contiene placeholders {file}
-        else:
-            cfg["cmd"] = None
+        if not force and cfg["available"] is False and ahora - cfg["checked"] < 10:
+            continue
+        cfg["checked"] = ahora
+        cfg["available"], cfg["cmd"], cfg["path"] = False, None, None
+        for nombre in cfg["cmds"]:
+            ruta = _which(nombre)
+            if ruta:
+                base = os.path.splitext(os.path.basename(ruta))[0].lower()
+                clave = next((k for k in _ARGS if k.lower() == base), None)
+                cfg["path"], cfg["available"] = ruta, True
+                cfg["cmd"] = [ruta, *(_ARGS[clave] if clave else ["{file}"])]
+                break
+
 
 
 @router.get("/langs")
@@ -119,13 +221,13 @@ async def install_language(request: Request) -> JSONResponse:
     refresque (sobre todo en Windows).
     """
     import asyncio
-    import shutil
     body = await request.json()
     lang = (body.get("language") or "").strip().lower()
     info = _INSTALL_MAP.get(lang)
     if not info:
         return JSONResponse(status_code=400, content={"error": "Lenguaje no soportado para autoinstalación"})
 
+    _refresh_path()              # encontrar brew/winget aunque el PATH de la app sea mínimo
     pm = _detect_pkg_manager()
     if not pm or not info.get(pm):
         # Sin gestor de paquetes o paquete no mapeado → indicar URL oficial.
@@ -154,17 +256,27 @@ async def install_language(request: Request) -> JSONResponse:
             return JSONResponse(content={"success": False, "url": info["url"],
                                          "message": "La instalación tardó demasiado. Prueba a mano."})
         ok = proc.returncode == 0
-        # Re-detectar disponibilidad (puede requerir reinicio si el PATH no se refrescó).
-        _detect_languages.cache_clear() if hasattr(_detect_languages, "cache_clear") else None
-        for c in SUPPORTED_LANGS.get(lang, {}).get("cmds", []):
-            if shutil.which(c):
-                SUPPORTED_LANGS[lang]["available"] = True
-                break
+        salida = out.decode("utf-8", "replace")[-1200:] if out else ""
+        # winget devuelve distinto de 0 si ya estaba instalado: no es un fallo.
+        if not ok and pm == "winget" and "already installed" in salida.lower():
+            ok = True
+        # Re-detectar (PATH refrescado) y comprobar que el intérprete ARRANCA.
+        SUPPORTED_LANGS[lang]["checked"] = 0.0
+        _detect_languages(force=True)
+        cfg = SUPPORTED_LANGS[lang]
+        funciona = bool(cfg["available"] and cfg["path"]
+                        and _works(cfg["path"], os.path.splitext(os.path.basename(cfg["path"]))[0]))
+        if not funciona:
+            cfg["available"] = False
         return JSONResponse(content={
-            "success": ok,
-            "available_now": SUPPORTED_LANGS.get(lang, {}).get("available", False),
-            "needs_restart": ok and not SUPPORTED_LANGS.get(lang, {}).get("available", False),
-            "output": (out.decode("utf-8", "replace")[-1200:] if out else ""),
+            "success": funciona,
+            "installed": ok,
+            "available_now": funciona,
+            # Instalado pero no localizable: en Windows a veces el instalador
+            # necesita cerrar sesión o reiniciar la app para completar el PATH.
+            "needs_restart": ok and not funciona,
+            "path": cfg["path"] if funciona else None,
+            "output": salida,
             "url": info["url"],
         })
     except Exception as e:

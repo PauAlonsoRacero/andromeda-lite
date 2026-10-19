@@ -27,10 +27,24 @@ espacios) porque los modelos pequeños no son consistentes.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 
 from app.core.workspace import Workspace, WorkspaceError
+
+logger = logging.getLogger("andromeda.files")
+
+try:
+    from app.observability import diagnostics as diag
+except Exception:                                        # pragma: no cover
+    class _Nulo:                                         # el registro nunca es obligatorio
+        @staticmethod
+        def log(*a, **k): pass
+        @staticmethod
+        def is_enabled(): return False
+    diag = _Nulo()
+
 
 # Cabecera del bloque. Tolerante con lo que los modelos locales generan en la
 # práctica. Acepta TODAS estas variantes para la misma acción:
@@ -141,6 +155,7 @@ def has_actions(text: str) -> bool:
 
 
 def execute_actions(text: str, ws: Workspace | None = None) -> list[ActionResult]:
+    """Ejecuta las acciones de archivo del texto del modelo."""
     """
     Detecta y ejecuta las acciones presentes en la respuesta del modelo.
 
@@ -285,3 +300,45 @@ def execute_actions(text: str, ws: Workspace | None = None) -> list[ActionResult
 def strip_action_blocks(text: str) -> str:
     """Elimina los bloques de acción del texto para mostrar una respuesta limpia."""
     return _BLOCK_RE.sub("", text or "").strip()
+
+
+def run_for_response(text: str, *, settings, incognito: bool,
+                     project_id: str | None = None) -> list[dict]:
+    """Ejecuta los bloques de archivo de una respuesta. Común a ambos caminos.
+
+    Antes esto vivía solo en el camino streaming. La app de escritorio usa el
+    otro camino (WKWebView no admite streaming), así que ahí el modelo emitía
+    los bloques ```andromeda:write``` y nadie los ejecutaba: la creación de
+    archivos no funcionaba en la aplicación principal.
+
+    Devuelve el resumen que la interfaz muestra bajo el mensaje.
+    """
+    if incognito or not text:
+        return []
+    try:
+        from app.core.flags import get_flag
+        if not get_flag(settings, "andromeda_file_creation"):
+            diag.log("files", "creación de archivos desactivada en ajustes", level="warn")
+            return []
+        if not has_actions(text):
+            return []
+        ws = None
+        if project_id:
+            # En un proyecto, lo que el modelo crea o modifica queda dentro de él.
+            from app.core.projects import project_root
+            ws = Workspace(root=project_root(project_id, create=True))
+        resultados = execute_actions(text, ws)
+        # La ruta permite abrir el archivo desde el chat (panel de vista previa).
+        rutas = [a.attrs.get("path", "") for a in find_actions(text)]
+        resumen = [{"action": r.action, "ok": r.ok, "detail": r.detail,
+                    "path": rutas[i] if i < len(rutas) else ""}
+                   for i, r in enumerate(resultados)]
+        diag.log("files", f"{len(resumen)} acciones de archivo ejecutadas",
+                 data={"acciones": resumen},
+                 level="success" if all(r["ok"] for r in resumen) else "warn")
+        return resumen
+    except Exception as exc:                              # noqa: BLE001
+        logger.warning(f"file_actions falló: {exc}")
+        diag.log("files", "fallo ejecutando acciones de archivo",
+                 detail=str(exc), level="error")
+        return []

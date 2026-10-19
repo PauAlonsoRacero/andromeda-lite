@@ -1,5 +1,350 @@
 # Changelog
 
+## [1.1.0] — 2026-09-26
+
+### Añadido
+- **Panel lateral de vista previa**, como en Claude: los archivos creados en el chat
+  se abren con un clic. Páginas web (con sus CSS y JS), imágenes, PDF, Word, Excel
+  y CSV se ven renderizados; Markdown con formato; el resto como código.
+- **Biblioteca de prompts** con más de cien prompts prefabricados en 15 categorías,
+  en Configuración y en el chat.
+- Modelos de 2026 en la biblioteca: qwen3.8, qwen3.6, gemma4, gpt-oss, qwen3-coder,
+  devstral y glm-4.7-flash. gemma4 y qwen3.8 se usan también para ver imágenes.
+- **Archivos y carpetas en los proyectos.** Cada proyecto tiene su carpeta: sus
+  archivos, instrucciones y memoria llegan al modelo en cada mensaje del proyecto,
+  y lo que el modelo crea o modifica se guarda dentro. Antes los proyectos eran
+  solo una pantalla: sus instrucciones nunca se enviaban al modelo.
+- **Imágenes como en Claude**: se muestran en el mensaje (miniatura ampliable) y
+  el modelo las interpreta. Si el modelo de chat ve imágenes (gemma3, qwen2.5vl,
+  llama3.2-vision…) las recibe directamente; si no, el mejor modelo de visión
+  instalado las describe en el idioma de la interfaz.
+- Previsualización de artefactos: PDF en el visor y botón vista/código en páginas web.
+- El selector de potencia muestra qué modelo hay detrás de cada nivel.
+- **Skills**: paquetes de instrucciones que se activan solos según el mensaje, sin
+  seleccionarlos a mano. Se incluyen 9 (revisión de código, diseño de API, respuesta
+  a incidentes, depuración, SQL, redacción técnica, análisis de datos, refactorización
+  y enseñanza) y puedes crear las tuyas desde Ajustes.
+- **Documentos (RAG)**: indexa tus archivos de texto en local con BM25 (sin
+  dependencias ni servicios externos) y el chat los usa como contexto citando la
+  fuente. Panel con arrastrar y soltar, y prueba de búsqueda en vivo.
+- **Comandos de barra**: 13 atajos (`/explain`, `/review`, `/debug`, `/test`,
+  `/refactor`, `/sql`, `/commit`…) con alias en español y autocompletado.
+- **Claves de API para los conectores MCP desde la propia app**: ya no hace falta
+  exportar variables de entorno antes de abrir Andromeda. Se guardan en local con
+  permisos restringidos y se aplican sin reiniciar.
+- **Catálogo de 10 conectores MCP** (git, Playwright, Pandoc, Notion, Linear, Figma,
+  Obsidian, AWS, Gmail y Google Calendar).
+- **Instalación automática de runtimes**: si a un conector le falta `uv`, se instala
+  solo al activarlo. Para Node se muestra el comando exacto, sin tocar el sistema
+  a espaldas del usuario.
+- **Estado de los componentes**: monitorización de los 11 subsistemas con tarjetas
+  que se expanden explicando qué es cada pieza y qué hacer si está inactiva.
+- **Compactación de contexto**: al crecer la conversación, los mensajes antiguos se
+  resumen en vez de descartarse. Importante con modelos locales, cuya ventana de
+  contexto es pequeña.
+- **Circuit breaker de modelos**: un modelo que falla repetidamente entra en
+  cuarentena y el enrutado lo evita, degradando en vez de fallar en cadena.
+- **Memoria semántica conectada al chat**: lo que pides recordar vuelve a aparecer
+  cuando es relevante, con respaldo por texto si no hay embeddings disponibles.
+
+### Cambiado
+- **Búsqueda en la memoria ~8× más rápida** (misma lógica, mismos resultados):
+  cada recuerdo se interpreta y normaliza una sola vez y se guarda en caché. Con
+  5.000 recuerdos pasa de ~1,5 s a ~0,2 s por mensaje. `benchmarks/microbench.py`
+  lo mide.
+- **La búsqueda web viene activada de fábrica**. El modo incógnito la sigue
+  bloqueando siempre, independientemente de este ajuste.
+- **El idioma por defecto es el inglés** (antes español), respetando el idioma del
+  sistema si está entre los disponibles.
+- Interfaz depurada: escala tipográfica y de radios coherente, tarjetas estilo iOS,
+  ventanas emergentes de ayuda ancladas y animadas, y estados de carga que anticipan
+  la forma del contenido.
+
+### Añadido
+- **Respuesta progresiva en la app de escritorio**: el texto se escribe en pantalla
+  a medida que se genera, en lugar de aparecer de golpe tras 15-30 segundos. La
+  espera muestra la fase real en curso (buscando en internet, pensando…) con un
+  indicador animado, y las frases de espera salen en el idioma de la interfaz.
+
+### Añadido (preparación de Apolo)
+- **Corpus de entrenamiento local**: con el interruptor de Ajustes activado, guarda
+  los pares pregunta-respuesta completos y sus votos 👍/👎, y los exporta en el
+  formato de `mlx_lm.lora` con conjunto de validación. Desactivado por defecto,
+  nunca en incógnito, y solo exporta respuestas votadas como buenas.
+- **Consola de diagnóstico** (temporal, se retira antes de publicar): muestra qué
+  prompt recibe el modelo, qué busca y por qué, y cuánto tarda cada paso.
+
+### Diseño 1.1
+- **Pantalla de carga** en el diseño y modo elegidos (1.0 o 1.1, claro u oscuro).
+- La bienvenida del chat sigue el diseño 1.1; los "Primeros pasos" estaban en
+  español fijo y recomendaban modelos antiguos: ahora en los cinco idiomas.
+- **Apariencia en dos diseños**, 1.0 (el original) y 1.1 (inspirado en macOS), cada
+  uno con modo claro y oscuro. El 1.1 conserva los focos de color (sin bandas),
+  tiene barras superiores sin línea divisoria, caja de mensaje con cristal de
+  macOS y paleta propia en modo incógnito.
+- **Los botones de ventana** (cerrar, minimizar, ampliar) viven en una isla que
+  queda por encima de Configuración o Sistema: antes esas capas los difuminaban
+  y no se podían usar.
+
+### Memoria organizada como en Claude
+- Cada tema muestra una descripción y su última actualización; los iconos de
+  editar y borrar aparecen al pasar el ratón. Al editar, se describe el cambio
+  en lenguaje natural y la IA local reescribe el tema (o se edita el texto a mano).
+- Ajustes → Memoria muestra lo que Andromeda recuerda en secciones (Tú, Temas,
+  Áreas, Personas, Notas), con resumen, última actualización y acciones para
+  ver, editar o borrar cada dato o sección entera.
+- Cuatro ajustes: buscar en conversaciones anteriores (el interruptor existía
+  pero no hacía nada), generar memoria, temas sensibles (al apagarlo se borran
+  los guardados y se avisa si falla) e importar la memoria de otro asistente.
+- Reconoce personas ("mi hermano se llama Marc").
+
+### Apariencia macOS
+- Nuevo tema inspirado en el Finder: barra lateral flotante y redondeada con
+  fondo translúcido, selección en azul del sistema, botones tipo cápsula y
+  tipografía del sistema.
+
+### Memoria por significado, activada de base
+- Ya no hay que instalar nada: si falta el modelo de embeddings, Andromeda lo
+  descarga en segundo plano al arrancar (~270 MB, sin bloquear el chat) y calcula
+  los vectores de los recuerdos que ya existían. El estado se ve en Ajustes →
+  Memoria. Si el acceso a la red está desactivado en Capacidades, no descarga nada.
+- Búsqueda más precisa: prefijos de tarea del modelo, umbral ajustado (el anterior
+  descartaba casi todas las coincidencias por significado) y puntuación híbrida
+  que suma las palabras exactas en común.
+- El modelo de embeddings se mantiene cargado entre mensajes.
+- Un mismo dato ya no aparece dos veces en el contexto (perfil y recuerdos).
+
+### Rendimiento
+- **Mac: cada mensaje ejecutaba `system_profiler`** (entre 0,3 y 1 s en macOS)
+  antes de empezar a generar, y encima devolvía siempre el 75 % de la memoria
+  total. Ahora se usa la memoria realmente disponible, al instante.
+- **Búsquedas 2-4 s más rápidas**: las instancias públicas de SearXNG que no
+  responden se pausan 15 minutos, y el último buscador que funcionó se prueba
+  primero (DuckDuckGo Lite devolvía 0 resultados en cada búsqueda).
+- Preparar cada mensaje pasa de 28 ms a 2 ms: se reutiliza el cliente HTTP de
+  la memoria y se deja de consultar un modelo de embeddings no instalado.
+
+### Memoria (revisión completa)
+- **"¿Qué puedes hacer?" respondía hablando del color favorito del usuario.**
+  Cuatro causas: la limpieza de datos basura solo existía para el perfil y no
+  para la memoria por significado; borrar en Ajustes no borraba esa copia; las
+  preguntas genéricas buscaban recuerdos, y los recuerdos entraban al prompt sin
+  indicar que son contexto de fondo. Corregidas las cuatro.
+- Sin palabras en común con la pregunta, un recuerdo necesita similitud alta (0,72).
+
+### Respuestas
+- Guía de estilo reescrita al modo de Claude: prosa por defecto, formato solo
+  cuando el contenido lo pide, sin listas anidadas ni cierres de relleno. La
+  anterior pedía títulos y listas en cualquier respuesta de más de un párrafo.
+
+### Potencia de IA
+- **Mismo modelo, más o menos cómputo**: el nivel decide si los modelos de
+  razonamiento (qwen3, gpt-oss, deepseek-r1) piensan antes de responder. qwen3
+  razonaba siempre, incluso ante un "hola".
+- **Pack de potencia**: un modelo por nivel según la memoria del equipo, con
+  descarga de lo que falta en un clic.
+- Panel con despliegue animado de la altura, al estilo Apple.
+
+### Conectores MCP
+- Catálogo depurado de 28 a 10: fuera los que duplican funciones de Andromeda,
+  los de prueba, los archivados por sus autores y WhatsApp.
+- El estado de cada usuario se guarda en su carpeta de datos: antes se escribía
+  en el archivo de la app, que en Windows (Program Files) no se puede modificar.
+
+### Interfaz
+- Zoom de imágenes con toda la ventana desenfocada y la imagen original (antes
+  ampliaba una miniatura de 480 px).
+- Estado de componentes: muelle al abrir y cerrar, scroll centrado en el cuadro
+  abierto y rejilla que se reorganiza.
+- 30 sugerencias en la pantalla de inicio que rotan cada 10 segundos.
+
+### Rendimiento de los modelos
+- **Primer token más rápido**: la hora iba al principio del prompt del sistema y
+  cambiaba cada minuto, lo que impedía a Ollama reutilizar el trabajo ya hecho
+  (caché de prefijo). Ahora la fecha sigue primero y la hora va al final: el
+  inicio del prompt es idéntico durante todo el día.
+
+### Codex
+- **Los intérpretes "se instalaban" pero no funcionaban**: no se guardaba el
+  comando de ejecución, el PATH de la app no veía lo recién instalado (Homebrew
+  en macOS, winget en Windows), TypeScript con Deno se lanzaba sin `run` y en
+  Windows se aceptaba el acceso directo falso de Python de la Microsoft Store.
+  Ahora solo se da por instalado si el intérprete arranca de verdad.
+
+### Skills
+- **Las skills integradas nunca se cargaban en la app instalada** (macOS y
+  Windows): se buscaban en una ruta que no existe dentro del paquete.
+
+### Analíticas
+- El SLO no se evalúa hasta tener 20 peticiones (con dos, uno lento "rompía" el p95).
+- Estado de componentes traducido, con animación al abrir y cerrar, y sin el
+  brillo que se salía de las tarjetas.
+
+### Apariencia
+- Color de acento en el diseño 1.1, incluido el degradado de Andromeda.
+- Potencia de IA con controles de macOS y animación de apertura y cierre.
+- La paleta del fondo se puede cambiar en 1.1; bienvenida con la tipografía de marca.
+- Tipografías empaquetadas en la app: antes se cargaban desde Google Fonts.
+
+### Conectores MCP
+- Gmail, Google Calendar y WhatsApp (este último no oficial, marcado como riesgo alto).
+
+### Windows
+- **El selector de potencia no mostraba los modelos recién descargados**: la
+  lista no se actualizaba al terminar una descarga, y las asignaciones heredadas
+  de versiones antiguas (deepseek-coder en todos los niveles) se trataban como
+  elección del usuario y nunca se sustituían. Ahora se refresca al descargar y
+  al abrir el panel, y los modelos de programación solo se usan para conversar
+  si no hay otros (respondían con fórmulas y repetían su respuesta anterior).
+- **Rendimiento**: `nvidia-smi` se ejecutaba en cada mensaje antes de generar
+  (0,1-0,5 s en Windows); ahora se consulta en segundo plano. La app instalada
+  registra en INFO en vez de DEBUG, los desenfoques son más ligeros en WebView2
+  y las animaciones de fondo se pausan con la ventana oculta.
+- **El .exe nuevo podía abrir la interfaz de una versión antigua** (visto con
+  v2.12.0-beta). Tres causas, todas corregidas: la app daba por "listo"
+  cualquier servidor que respondiera en su puerto, incluida otra copia antigua
+  abierta en segundo plano (ahora verifica un identificador único por arranque
+  y salta los puertos ocupados); una variable de entorno antigua podía cambiar
+  la carpeta de la interfaz; y `index.html` podía salir de la caché de WebView2.
+- Corregido además un recorrido de rutas (`../`) al servir archivos de la interfaz.
+- **Causa real del caso anterior**: el perfil del navegador interno
+  (`%APPDATA%\Andromeda\webview`) es el mismo para todas las versiones, y
+  WebView2 reutilizaba su caché y sus Service Workers de la v2.12. Ahora, cuando
+  cambia la interfaz, se borran esas cachés (conservando ajustes y sesión), y
+  una comprobación en la página recarga si aun así no es la de esta compilación.
+- Todas las lecturas y escrituras de archivos declaran UTF-8 (en Windows la
+  codificación por defecto es cp1252: una "ñ" o un emoji podía romperlas). Un
+  test lo comprueba con el árbol sintáctico de cada archivo.
+- Tipografía nativa (Segoe UI Variable) en el diseño 1.1 y rutas con "/" en el
+  contexto de proyectos.
+
+### Publicación
+- El panel de Diagnóstico queda oculto; se activa con `ANDROMEDA_DIAGNOSTICS=1`.
+
+### Corregido
+- **Error en cada mensaje con un modelo de razonamiento** (qwen3, gpt-oss,
+  deepseek-r1…): el registro de diagnóstico se llamaba con argumentos que no
+  existen y el envío fallaba con un `TypeError`. Los tests no lo detectaban porque
+  la rama solo se ejecuta con modelos reales; ahora un test revisa todas las
+  llamadas a `diag.log` en el código fuente.
+- Un test del sandbox fallaba si la máquina tenía Ruby instalado (usaba `ruby`
+  como lenguaje "no soportado", pero sí lo está).
+- **Cada respuesta empezaba con "Hoy es viernes, 25 de septiembre… y son las 22:36"**
+  (y en cada ronda de las respuestas con herramientas). Se reformula la
+  instrucción y un filtro elimina esa frase de la salida.
+- El JSON de las llamadas a herramientas aparecía en el texto visible.
+- Se usaban herramientas de navegación sin motivo: el selector miraba el prompt
+  completo (con historial) en vez del mensaje. Ahora solo con una URL en el mensaje.
+- "No puedo proporcionar enlaces": ahora las respuestas incluyen los enlaces.
+- Con la IA desactivada en Modelos, el chat dejaba de funcionar con un aviso
+  engañoso ("descarga un modelo"); ahora usa la IA general.
+- Los mensajes de error ya no se envían al modelo como parte del historial.
+- **Los votos 👍/👎 nunca se asociaban a su respuesta**, y el aviso de archivo
+  creado, la latencia y las fuentes no aparecían hasta cambiar de conversación:
+  los metadatos del mensaje se leían una sola vez, antes de que llegaran.
+- Una respuesta que fallaba no mostraba el estilo ni el aviso de error.
+- **Solo se guardaban las 20 últimas conversaciones**; ahora 100, con tope por tamaño.
+- **La descarga de modelos podía detenerse sin aviso**: varias tareas en segundo
+  plano (descargas, entrenamiento, arranque de MCP) no guardaban su referencia y
+  Python podía destruirlas a mitad.
+- Un intento de inicio de sesión fallido congelaba el servidor 0,4 s.
+- El panel Sistema se cerraba sin animación; el visor de trazas podía no aparecer.
+- Preferencias y estado del corpus se escriben de forma atómica.
+- **La biblioteca de prompts rompía la interfaz** ("Can't find variable:
+  PromptCatalog"): faltaba un import. Vite compila igual, así que el fallo solo
+  aparecía al abrir la sección. Se añade análisis estático (ESLint) al frontend,
+  en la CI y en los tests, que encontró otros tres fallos del mismo tipo.
+- **Exportar tus datos (RGPD) mostraba siempre error** aunque la descarga funcionara.
+- **Descargar desde Artefactos o la vista previa no hacía nada en escritorio**
+  con Word, PDF o Excel: ahora el archivo se copia a Descargas.
+- Claves de traducción duplicadas y cuatro mensajes de error sin traducir.
+- Rendimiento: los proyectos leían cada archivo dos veces por mensaje, y cada
+  mensaje del chat registraba un escuchador de teclado permanente.
+- **Los artefactos no se abrían** y, al abrir Configuración, el archivo aparecía
+  tapándola: el panel de vista previa estaba montado dentro de la ventana de
+  Configuración y solo existía con ella abierta. Arrastraba también abrir archivos
+  desde el chat. Ahora vive en la raíz de la app y Configuración lo cierra.
+- La biblioteca de prompts, en los cinco idiomas según el de la interfaz, con botón
+  "Usar" también desde Configuración (antes el menú mostraba "settings.prompts").
+- Pedir una web "basada en la foto" copiaba un archivo anterior del espacio de
+  trabajo: ahora solo se incluye el contenido de los archivos que se nombran o se
+  piden modificar, y con imágenes la referencia es la imagen.
+- El tiempo hasta el primer token no contaba la carga del modelo (marcaba 0,4 ms).
+- Datos contradictorios guardados antes ("me gusta… lo odio") se limpian al cargar.
+- Vista previa de los archivos de un proyecto.
+- **Pedir olvidar un dato borraba TODA la memoria**, y además guardaba ese dato
+  como gusto. Ahora se olvida solo lo indicado y no se extrae nada de esa orden.
+- **Las imágenes no llegaban al modelo** cuando había conectores MCP.
+- **La vista previa salía en blanco**: una cabecera de seguridad (X-Frame-Options:
+  DENY) impedía mostrarla. Word y Excel no se podían previsualizar.
+- **No se podía desplazar el chat mientras escribía**: se forzaba el scroll con
+  cada token. Ahora solo sigue el texto si estás abajo, con botón para volver.
+- **Los enlaces se abrían dentro de la app**, sin forma de volver. Ahora se abren
+  en el navegador predeterminado.
+- Respuestas sin estructura: el modelo recibe ahora una guía de formato.
+- Lite ya no muestra distintivos de Pro (especialista, estrategia, nivel, confianza).
+- Adjuntar una carpeta metía binarios como texto y podía desbordar el contexto.
+- "Busca info sobre lo que te he dicho" buscaba esa frase literal.
+- **La memoria no guardaba gustos ni objetivos.** Cada gusto nuevo reemplazaba al
+  anterior, y faltaban frases como "me gustaría bajar de peso" o "mi color favorito
+  es…". Ahora se acumulan y hay patrones nuevos en los cinco idiomas.
+- **"Borra la memoria" no funcionaba**: el modelo usaba un conector MCP distinto.
+  Ahora es una orden directa, igual que "olvida que…".
+- **Respuestas lentas con conectores MCP**: cada mensaje inyectaba todas sus
+  herramientas (52). Ahora solo las relevantes, y ninguna si no hacen falta.
+- **"La página se ve igual"**: el visor mostraba la versión en caché, y las
+  herramientas de escritura de MCP fallaban mientras el modelo decía haberlo hecho.
+- Las páginas web largas se guardaban cortadas: el límite de respuesta era de 2048
+  tokens (ahora 8192, ajustado a la memoria de cada equipo).
+- Ya no busca en internet al pedir que cree o mejore algo; sin anuncios en resultados.
+- El visor de páginas web permitía a la página llamar a la API de Andromeda.
+- **Cada respuesta tardaba 15 s en empezar aunque no hubiera conectores.** Las
+  herramientas integradas de archivos activaban siempre el bucle de herramientas,
+  que generaba sin streaming. Ahora solo se activa con conectores MCP reales, y
+  cuando se activa también va en streaming, ocultando las llamadas y el
+  razonamiento interno del modelo.
+- "Demasiadas peticiones": consultar el progreso de la respuesta contaba contra el
+  límite del chat.
+- Cualquier pregunta en español que empezara por "¿" buscaba en internet: el signo
+  hacía que la primera palabra se tomara por un nombre propio.
+- Los resultados de DuckDuckGo llegaban sin texto, solo con títulos.
+- El mensaje actual se enviaba dos veces al modelo (en el historial y como pregunta).
+- Datos basura antiguos en el perfil de memoria ("It please.") se limpian al cargar.
+- La RAM se leía siempre como 0: en equipos sin GPU el contexto se quedaba al mínimo.
+- **Toda respuesta en streaming terminaba en error**: al final, el código compartido
+  con Pro llamaba a una función de Lite con parámetros que no aceptaba. El texto se
+  veía, pero se perdían los metadatos, el id de la respuesta y los votos.
+- **Las herramientas MCP no funcionaban en el navegador** (solo existían en el
+  camino sin streaming). Ahora funcionan en ambos, y nunca en modo incógnito.
+- **En la app de escritorio no había búsqueda web ni creación de archivos.** El
+  escritorio no puede usar streaming (WKWebView no entrega el cuerpo de forma
+  incremental) y va por otro camino del backend, donde ninguna de las dos
+  existía: el modelo solo podía usar la herramienta MCP de fetch, y los bloques
+  de archivo que emitía no los ejecutaba nadie. Búsqueda web, lectura de URLs y
+  acciones de archivo son ahora funciones comunes a ambos caminos.
+- **La memoria automática no funcionaba en el navegador** (en escritorio sí): solo
+  existía en el camino sin streaming. Ambos caminos comparten ya el procesado
+  posterior a la respuesta, que además se hace en segundo plano para no retrasar
+  el final de cada respuesta.
+- En escritorio no aparecían los indicadores de skill usada, fuentes y búsqueda web.
+- **El chat no recordaba lo dicho en la misma conversación**: el historial se
+  construía en la interfaz pero no llegaba a enviarse al backend.
+- **La IA respondía con una fecha inventada** ("15 de noviembre de 2023"). La fecha
+  real del sistema se inyecta ahora al principio del prompt, donde el modelo la lee.
+- **Descargar y exportar dejaban la ventana atrapada** en una página de texto sin
+  vuelta atrás. Ahora los archivos se guardan de verdad en la carpeta de Descargas.
+- **La búsqueda web fallaba en silencio**: ahora prueba tres motores en cadena y, si
+  no hay resultados, distingue "sin conexión" de "sin resultados" en vez de dejar que
+  el modelo invente datos.
+- **La memoria guardaba basura**: frases como "remember it please" se almacenaban
+  como si fueran hechos sobre el usuario, contaminando respuestas posteriores.
+- Activar un conector abría una segunda ventana de la aplicación.
+- Un conector que no lograba conectar quedaba marcado como activo igualmente.
+- Los votos 👍/👎 no confirmaban visualmente, así que parecían no funcionar.
+- Guardar archivos con nombres muy largos o con acentos fallaba o los destrozaba.
+- Textos que no cambiaban al cambiar de idioma, y traducciones que mostraban el
+  inglés en el resto de idiomas (896 claves revisadas en los 5 idiomas).
+
 ## [1.0.0] — 2026-07-10 · Primera release pública
 
 ### Añadido
@@ -459,7 +804,7 @@ El orquestador clasifica el prompt y elige el modo:
 ### Tests
 - 81 tests (antes 76): pipeline de 5 etapas, selección de modo, IA de salida solo con 2+ IAs, fallback de la IA de salida, código→best_of_n.
 
-## [1.1.0] — 2026-06
+## [interna 1.1] — 2026-06 · numeración anterior a la release pública
 
 Rediseño del sistema de orquestación.
 

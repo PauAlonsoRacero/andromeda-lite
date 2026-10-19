@@ -23,6 +23,13 @@ import httpx
 logger = logging.getLogger("andromeda.warmup")
 
 
+def _keep_alive() -> str:
+    """Cuánto mantiene Ollama el modelo en memoria. Ver core/streaming.py."""
+    import os
+    return (os.environ.get("ANDROMEDA_KEEP_ALIVE") or "30m").strip()
+
+
+
 async def warmup_models(
     registry,
     ollama_url: str,
@@ -133,6 +140,10 @@ async def _warm_model(specialist_id: str, model_name: str, ollama_url: str) -> b
                     "prompt": " ",          # Prompt mínimo
                     "stream": False,
                     "options": {"num_predict": 1},  # Generar solo 1 token
+                    # Sin keep_alive el precalentamiento se pierde: Ollama carga
+                    # el modelo y lo descarga a los 5 minutos, así que el primer
+                    # mensaje real vuelve a pagar la carga completa.
+                    "keep_alive": _keep_alive(),
                 },
                 timeout=60.0,   # Los modelos grandes tardan en cargar
             )

@@ -84,7 +84,7 @@ export default function ImageUpload({ onImages, maxImages = 4 }) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-4.5-4.5L5 21"/></svg>
           <span>
             {dragging()
-              ? 'Suelta aquí...'
+              ? t('iu.drop_here')
               : `Añadir imagen (arrastra, pega o clic) · ${images().length}/${maxImages}`}
           </span>
         </div>

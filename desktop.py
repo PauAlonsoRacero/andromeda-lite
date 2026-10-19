@@ -60,7 +60,17 @@ DIST = ROOT / "frontend" / "dist"
 sys.path.insert(0, str(BACKEND))
 
 # Config vía env (prefijo ANDROMEDA_ + nombre exacto del campo de Settings)
-os.environ.setdefault("ANDROMEDA_FRONTEND_DIST", str(DIST))
+# La interfaz es SIEMPRE la de este ejecutable. Con setdefault, una variable
+# ANDROMEDA_FRONTEND_DIST que quedara en el sistema de una instalación anterior
+# ganaba, y la app nueva servía la interfaz antigua.
+os.environ["ANDROMEDA_FRONTEND_DIST"] = str(DIST)
+
+# Identificador de ESTE arranque: sirve para comprobar que el servidor que
+# responde en el puerto es el nuestro y no otra Andromeda abierta (una versión
+# antigua en segundo plano respondía y la ventana cargaba su interfaz).
+import secrets as _secrets
+INSTANCE_ID = _secrets.token_hex(8)
+os.environ["ANDROMEDA_INSTANCE_ID"] = INSTANCE_ID
 os.environ.setdefault("ANDROMEDA_DATA_DIR", str(DATA_DIR))
 
 
@@ -202,7 +212,26 @@ def free_port() -> int:
 
 
 def _port_is_free(port: int) -> bool:
+    """Libre solo si NADIE escucha en él y además se puede reservar.
+
+    Comprobar solo bind() no basta en Windows: si otra app escucha en la
+    dirección comodín (0.0.0.0 o ::), bind() a 127.0.0.1 puede tener éxito
+    igualmente, y el servidor que acaba respondiendo es el otro.
+    """
+    for familia, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
+        try:
+            with socket.socket(familia, socket.SOCK_STREAM) as c:
+                c.settimeout(0.3)
+                if c.connect_ex((host, port)) == 0:
+                    return False                      # alguien responde ya
+        except OSError:
+            pass
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):     # Windows: reserva exclusiva
+            try:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            except OSError:
+                pass
         try:
             s.bind(("127.0.0.1", port))
             return True
@@ -235,6 +264,83 @@ PORT = stable_port()
 _backend_error: list[str] = []   # si el backend crashea, el traceback acaba aquí
 
 
+# ── Cachés del navegador interno ──────────────────────────────────────────────
+# El perfil del webview (%APPDATA%\Andromeda\webview) es el MISMO para todas las
+# versiones. WebView2 guarda ahí la caché HTTP, el código compilado y los Service
+# Workers del origen 127.0.0.1:8771, y los reutilizaba: el .exe nuevo, con su
+# servidor nuevo, mostraba la interfaz de junio (v2.12.0-beta). Cuando cambia la
+# interfaz se borran esas cachés; el localStorage (ajustes, sesión) se conserva.
+_CACHES_WEBVIEW = {"Cache", "Code Cache", "Service Worker", "GPUCache", "CacheStorage",
+                   "ScriptCache", "Application Cache"}
+
+
+def _huella_interfaz() -> str:
+    import hashlib
+    try:
+        return hashlib.sha256((DIST / "index.html").read_bytes()).hexdigest()[:16]
+    except OSError:
+        return ""
+
+
+def _script_principal() -> str:
+    """Nombre del script principal de ESTA interfaz (p. ej. /assets/index-Ab12.js)."""
+    import re as _re
+    try:
+        m = _re.search(r'src="(/assets/index-[^"]+\.js)"', (DIST / "index.html").read_text(encoding="utf-8"))
+        return m.group(1) if m else ""
+    except OSError:
+        return ""
+
+
+def limpiar_cache_webview(storage: str | None) -> int:
+    """Borra las cachés del webview si la interfaz ha cambiado. Devuelve cuántas."""
+    import shutil
+    if not storage or not os.path.isdir(storage):
+        return 0
+    marca = os.path.join(storage, ".andromeda-interfaz")
+    huella = _huella_interfaz()
+    try:
+        if huella and open(marca, encoding="utf-8").read().strip() == huella:
+            return 0                                  # misma interfaz: nada que hacer
+    except OSError:
+        pass
+    borradas = 0
+    for raiz, dirs, _ in os.walk(storage):
+        if raiz[len(storage):].count(os.sep) > 5:
+            dirs[:] = []
+            continue
+        for d in list(dirs):
+            if d in _CACHES_WEBVIEW:
+                shutil.rmtree(os.path.join(raiz, d), ignore_errors=True)
+                dirs.remove(d)
+                borradas += 1
+    try:
+        with open(marca, "w", encoding="utf-8") as f:
+            f.write(huella)
+    except OSError:
+        pass
+    print(f"Cachés del webview borradas (interfaz nueva): {borradas}")
+    return borradas
+
+
+def script_comprobar_interfaz() -> str:
+    """JS que se ejecuta tras cargar: si la página no es la de esta compilación,
+    elimina Service Workers y cachés y recarga desde el servidor."""
+    esperado = _script_principal()
+    if not esperado:
+        return ""
+    return ("(async () => {"
+            f"  const ok = [...document.scripts].some(s => (s.getAttribute('src') || '') === {esperado!r});"
+            "  if (ok) return;"
+            "  try { for (const r of await navigator.serviceWorker?.getRegistrations?.() || []) await r.unregister() } catch (e) {}"
+            "  try { for (const k of await caches.keys()) await caches.delete(k) } catch (e) {}"
+            "  if (!sessionStorage.getItem('andromeda_recargado')) {"
+            "    sessionStorage.setItem('andromeda_recargado', '1');"
+            "    location.replace('/?v=' + Date.now());"
+            "  }"
+            "})()")
+
+
 def run_backend():
     try:
         import uvicorn
@@ -253,15 +359,34 @@ def wait_for_backend(timeout: float = 40.0) -> bool:
     import urllib.error
     import urllib.request
     deadline = time.time() + timeout
-    url = f"http://127.0.0.1:{PORT}/api/health/hardware"
+    url = f"http://127.0.0.1:{PORT}/api/health/instance"
     while time.time() < deadline:
         if _backend_error:
             return False                      # crasheó: no esperar más
         try:
-            with urllib.request.urlopen(url, timeout=5):
-                return True
-        except urllib.error.HTTPError:
-            return True                       # respuesta HTTP = backend vivo
+            with urllib.request.urlopen(url, timeout=5) as r:
+                import json as _json
+                ident = _json.loads(r.read().decode("utf-8") or "{}").get("instance")
+                if ident == INSTANCE_ID:
+                    return True
+                # Responde OTRA Andromeda (p. ej. una versión antigua abierta en
+                # segundo plano): no cargar su interfaz.
+                _backend_error.append(
+                    f"Otra copia de Andromeda está usando el puerto {PORT} "
+                    f"(identificador {ident!r}). Ciérrala (Administrador de tareas → "
+                    f"Andromeda) y vuelve a abrir la app.")
+                print("[ERROR] " + _backend_error[-1])
+                return False
+        except urllib.error.HTTPError as e:
+            # Antes: cualquier respuesta HTTP (incluso un error) contaba como
+            # "backend listo". Una versión antigua, sin esta ruta, responde 404
+            # y la ventana acababa cargando SU interfaz.
+            _backend_error.append(
+                f"Otra copia de Andromeda (probablemente una versión anterior) está "
+                f"usando el puerto {PORT} (respondió HTTP {e.code}). Ciérrala desde el "
+                f"Administrador de tareas (procesos \"Andromeda\") y vuelve a abrir la app.")
+            print("[ERROR] " + _backend_error[-1])
+            return False
         except Exception:
             time.sleep(0.3)
     return False
@@ -340,6 +465,110 @@ SPLASH_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     }
   </script>
 </body></html>"""
+
+
+# ── Pantalla de carga del diseño 1.1 (inspirada en macOS) ─────────────────────
+# Se elige según el diseño y el modo guardados por la interfaz (Ajustes →
+# Apariencia), igual que el idioma: la app todavía no ha cargado.
+SPLASH_HTML_11 = """<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root { --bg:#1e1e1e; --card:rgba(44,44,48,0.55); --border:rgba(255,255,255,0.10);
+          --text:#f2f2f7; --text2:rgba(235,235,245,0.55); --track:rgba(255,255,255,0.10);
+          --accent:#0a84ff; --island:rgba(40,40,46,0.72); }
+  body.light { --bg:#f5f5f7; --card:rgba(255,255,255,0.72); --border:rgba(0,0,0,0.08);
+               --text:#1d1d1f; --text2:rgba(29,29,31,0.5); --track:rgba(0,0,0,0.08);
+               --accent:#007aff; --island:rgba(255,255,255,0.8); }
+  body { background:var(--bg); color:var(--text); height:100vh; overflow:hidden;
+         font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI Variable','Segoe UI',sans-serif;
+         display:flex; align-items:center; justify-content:center; }
+  .orb { position:fixed; border-radius:50%; filter:blur(110px); opacity:0.32; }
+  body.light .orb { opacity:0.22; }
+  .o1 { width:460px; height:460px; background:#0a84ff; top:-18%; left:-10%; animation:drift 15s ease-in-out infinite alternate; }
+  .o2 { width:400px; height:400px; background:#bf5af2; bottom:-18%; right:-8%; animation:drift 19s ease-in-out infinite alternate-reverse; }
+  @keyframes drift { from { transform:translate(0,0) scale(1);} to { transform:translate(36px,-26px) scale(1.1);} }
+  .card { position:relative; z-index:2; width:min(360px,84vw); padding:34px 34px 30px; text-align:center;
+          border-radius:26px; background:var(--card); border:1px solid var(--border);
+          backdrop-filter:blur(40px) saturate(180%); -webkit-backdrop-filter:blur(40px) saturate(180%);
+          box-shadow:0 30px 80px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+          animation:pop .7s cubic-bezier(.2,.8,.2,1) backwards; }
+  body.light .card { box-shadow:0 24px 60px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.9); }
+  .logo { width:64px; height:64px; margin:0 auto 16px; border-radius:16px; object-fit:contain; }
+  h1 { font-size:26px; font-weight:650; letter-spacing:-0.01em; }
+  .sub { margin-top:4px; font-size:13px; color:var(--text2); }
+  .track { margin-top:26px; height:4px; border-radius:999px; background:var(--track); overflow:hidden; }
+  .fill { height:100%; width:4%; border-radius:999px; background:var(--accent);
+          transition:width .6s cubic-bezier(.2,.8,.2,1); }
+  .status { margin-top:12px; font-size:12px; color:var(--text2); min-height:16px; }
+  @keyframes pop { from { opacity:0; transform:scale(.96) translateY(8px);} to { opacity:1; transform:none;} }
+  .island { position:fixed; top:9px; left:12px; z-index:10; height:26px; padding:0 10px; display:flex;
+            gap:8px; align-items:center; border-radius:999px; background:var(--island);
+            border:1px solid var(--border); }
+  .tl { width:12px; height:12px; border-radius:50%; border:0; cursor:pointer; }
+  .tl-c { background:#ff5f57; } .tl-m { background:#febc2e; } .tl-x { background:#28c840; opacity:.45; cursor:default; }
+  .win-close { position:fixed; top:8px; right:10px; z-index:10; width:30px; height:30px; display:flex;
+               align-items:center; justify-content:center; color:var(--text2); cursor:pointer;
+               font-size:15px; border-radius:8px; }
+  .win-close:hover { background:rgba(255,255,255,0.08); }
+  body.mac .win-close, body:not(.mac) .island { display:none; }
+</style></head><body class="__SPLASH_BODY__">
+  <div class="pywebview-drag-region" style="position:fixed;top:0;left:0;right:48px;height:40px;z-index:9"></div>
+  <div class="island"><button class="tl tl-c" onclick="window.pywebview && window.pywebview.api.close()"></button><button class="tl tl-m" onclick="window.pywebview && window.pywebview.api.minimize()"></button><button class="tl tl-x"></button></div>
+  <div class="win-close" onclick="window.pywebview && window.pywebview.api.close()">&#10005;</div>
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="card">
+    __SPLASH_LOGO__
+    <h1>Andromeda</h1>
+    <div class="sub">__SPLASH_SUB__</div>
+    <div class="track"><div class="fill" id="bar"></div></div>
+    <div class="status" id="st">__SPLASH_INIT__</div>
+  </div>
+  <script>
+    function setStage(pct, txt) {
+      document.getElementById('bar').style.width = pct + '%';
+      document.getElementById('st').textContent = txt;
+    }
+  </script>
+</body></html>"""
+
+
+def _ui_pref(clave: str, defecto: str) -> str:
+    """Un ajuste guardado por la interfaz (ui_state.json), antes de que cargue."""
+    try:
+        import json as _json
+        st = DATA_DIR / "ui_state.json"
+        if st.exists():
+            v = _json.loads(st.read_text(encoding="utf-8")).get(clave)
+            if isinstance(v, str) and v:
+                return v
+    except Exception:
+        pass
+    return defecto
+
+
+def build_splash_html() -> str:
+    """Pantalla de carga en el diseño (1.0 / 1.1) y modo (claro / oscuro) elegidos."""
+    diseno = _ui_pref("andromeda_design", "1.1")
+    tema = _ui_pref("andromeda_theme", "dark")
+    if tema == "macos":                       # tema de una versión anterior
+        diseno, tema = "1.1", "dark"
+    if diseno != "1.1":
+        html = SPLASH_HTML
+    else:
+        clases = " ".join(c for c in ("light" if tema == "light" else "",
+                                      "mac" if sys.platform == "darwin" else "") if c)
+        logo = ""
+        try:
+            import base64 as _b64
+            for cand in (DIST / "andromeda-logo.png", ROOT / "frontend" / "public" / "andromeda-logo.png"):
+                if cand.exists():
+                    logo = ('<img class="logo" alt="" src="data:image/png;base64,'
+                            + _b64.b64encode(cand.read_bytes()).decode() + '">')
+                    break
+        except Exception:
+            pass
+        html = (SPLASH_HTML_11.replace("__SPLASH_BODY__", clases)
+                .replace("__SPLASH_LOGO__", logo))
+    return html.replace("__SPLASH_SUB__", _tr("sub")).replace("__SPLASH_INIT__", _tr("init"))
 
 
 
@@ -497,7 +726,7 @@ def main():
     api = WindowApi()
     window = webview.create_window(
         "Andromeda",
-        html=SPLASH_HTML.replace("__SPLASH_SUB__", _tr("sub")).replace("__SPLASH_INIT__", _tr("init")),
+        html=build_splash_html(),
         width=1380, height=860,
         min_size=(980, 640),
         background_color="#0a0a0f",
@@ -547,13 +776,22 @@ def main():
         time.sleep(0.4)
         stage(100, _tr("ready"))
         time.sleep(0.35)
-        window.load_url(f"http://127.0.0.1:{PORT}")
+        # ?v=<arranque>: URL distinta en cada arranque. Un index.html antiguo que
+        # WebView2 tuviera ya en caché no se puede reutilizar para esta dirección.
+        print(f"Cargando interfaz: {DIST} (script {_script_principal() or '¿?'})")
+        window.load_url(f"http://127.0.0.1:{PORT}/?v={INSTANCE_ID}")
         # Marca para que el frontend sepa que corre dentro del binario de
         # escritorio (pywebview) y use el modo de chat sin streaming, que es
         # el que funciona en WKWebView. Reintentamos por si la página tarda.
         for _delay in (0.8, 1.6, 2.5):
             threading.Timer(_delay, lambda: _safe_eval(window,
                 "window.__ANDROMEDA_DESKTOP__ = true")).start()
+        # Red de seguridad: si aun así la página cargada no es la de esta
+        # compilación (Service Worker de una versión antigua), limpiar y recargar.
+        _js_check = script_comprobar_interfaz()
+        if _js_check:
+            for _delay in (1.2, 3.0):
+                threading.Timer(_delay, lambda: _safe_eval(window, _js_check)).start()
 
     threading.Thread(target=boot_monitor, daemon=True).start()
 
@@ -583,6 +821,7 @@ def main():
     except Exception:
         _storage = None
 
+    limpiar_cache_webview(_storage)
     webview.start(private_mode=False, storage_path=_storage)
 
 

@@ -24,6 +24,17 @@ from app.mcp.protocol import MCPStdioClient, MCPTool, MCPResult
 
 logger = logging.getLogger("andromeda.mcp.manager")
 
+try:
+    from app.observability import diagnostics as diag
+except Exception:                                        # pragma: no cover
+    class _Nulo:                                         # el registro nunca es obligatorio
+        @staticmethod
+        def log(*a, **k): pass
+        @staticmethod
+        def is_enabled(): return False
+    diag = _Nulo()
+
+
 
 class MCPManager:
     """
@@ -33,6 +44,8 @@ class MCPManager:
 
     def __init__(self, config_path: str = "config/mcp_servers.yaml"):
         self._clients:  dict[str, MCPStdioClient] = {}
+        # server_id → motivo del último fallo de conexión, para diagnóstico en la UI
+        self._last_errors: dict[str, str] = {}
         self._config_path = config_path
         self._all_tools:  list[MCPTool] = []
         self._initialized = False
@@ -52,6 +65,10 @@ class MCPManager:
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
             connected = sum(1 for r in results if r is True)
+            diag.log("mcp", f"inicialización: {connected}/{len(tasks)} conectados",
+                     data={"errores": [str(r)[:90] for r in results
+                                       if isinstance(r, Exception)]},
+                     level="success" if connected == len(tasks) else "warn")
             logger.info(f"MCP Manager: {connected}/{len(tasks)} servidores conectados")
 
         # Consolidar todas las herramientas
@@ -139,6 +156,25 @@ class MCPManager:
         self._rebuild_tools()
         return {"connected": False, "server_id": server_id}
 
+
+    async def disconnect_all(self) -> int:
+        """Cierra todos los servidores MCP. Devuelve cuántos se cerraron.
+
+        Cada servidor es un proceso hijo (npx/uvx). Si la aplicación termina sin
+        cerrarlos, quedan huérfanos consumiendo memoria hasta que el usuario los
+        mata a mano o reinicia.
+        """
+        clients = list(self._clients.items())
+        self._clients.clear()
+        cerrados = 0
+        for server_id, client in clients:
+            try:
+                await client.disconnect()
+                cerrados += 1
+            except Exception as exc:                       # noqa: BLE001
+                logger.warning(f"MCP [{server_id}] no se cerró limpiamente: {exc}")
+        self._rebuild_tools()
+        return cerrados
     async def _connect_server(self, server_id: str, cfg: dict) -> bool:
         raw_command = cfg.get("command", [])
         env         = cfg.get("env", {})
@@ -159,10 +195,21 @@ class MCPManager:
         ok = await client.connect()
         if ok:
             self._clients[server_id] = client
+            self._last_errors.pop(server_id, None)
             logger.info(f"MCP [{server_id}] conectado — {len(client.tools)} herramientas")
         else:
-            logger.warning(f"MCP [{server_id}] no disponible (¿servidor instalado / clave configurada?)")
+            # Conservar el motivo real para mostrarlo en la UI. Si faltan claves,
+            # ese es el diagnóstico más útil y va primero.
+            reason = client.last_error or "No se pudo conectar."
+            if missing:
+                reason = f"Falta configurar: {', '.join(missing)}"
+            self._last_errors[server_id] = reason
+            logger.warning(f"MCP [{server_id}] no disponible: {reason}")
         return ok
+
+    def last_error(self, server_id: str) -> str:
+        """Motivo del último fallo de conexión de un servidor (cadena vacía si ninguno)."""
+        return self._last_errors.get(server_id, "")
 
     async def call_tool(self, tool_name: str, arguments: dict, server_id: str | None = None,
                          timeout_s: float = 30.0) -> MCPResult:
@@ -210,6 +257,18 @@ class MCPManager:
         return self._all_tools
 
     @property
+    def has_external_tools(self) -> bool:
+        """¿Hay algún conector MCP real conectado?
+
+        `tools` incluye siempre las herramientas integradas de archivos
+        (builtin-fs). Usarlo para decidir si activar el bucle de herramientas
+        hacía que se activara en TODOS los mensajes, sin conectores: el modelo
+        recibía dos mecanismos distintos para crear archivos y, como ese bucle
+        iba sin streaming, cada respuesta era silencio hasta el final.
+        """
+        return any(getattr(t, "server_id", "") != "builtin-fs" for t in self._all_tools)
+
+    @property
     def tools_for_llm(self) -> list[dict]:
         """Formato de herramientas compatible con el schema de Ollama/OpenAI."""
         return [
@@ -251,7 +310,8 @@ class MCPManager:
             return {"servers": {}}
         try:
             with path.open("r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {"servers": {}}
+                from app.mcp import state as _state
+                return _state.apply(yaml.safe_load(f) or {"servers": {}})
         except Exception as exc:
             logger.error(f"Error leyendo mcp_servers.yaml: {exc}")
             return {"servers": {}}

@@ -69,7 +69,7 @@ async def analyze_image(request: Request) -> JSONResponse:
     model     = body.get("model", "llava:7b")
 
     if not image_b64:
-        return JSONResponse(status_code=400, content={"error": "image requerida (base64)"})
+        return JSONResponse(status_code=400, content={"error_key": "err.image_required"})
 
     # Limpiar data URI si la tiene
     if "," in image_b64:

@@ -117,7 +117,7 @@ async def eval_specialist(specialist_id: str, request: Request) -> JSONResponse:
         return JSONResponse(status_code=404, content={"error": f"Especialista '{specialist_id}' no encontrado"})
 
     if not registry.is_configured(specialist_id):
-        return JSONResponse(status_code=400, content={"error": "Especialista no configurado"})
+        return JSONResponse(status_code=400, content={"error_key": "err.specialist_unconfigured"})
 
     # Prompts de evaluación por especialista
     eval_prompts = {
@@ -194,7 +194,7 @@ async def latency_percentiles(request: Request) -> JSONResponse:
     """Percentiles de latencia p50/p90/p95/p99."""
     tracker = getattr(request.app.state, "mlops_tracker", None)
     if not tracker:
-        return JSONResponse(content={"error": "MLOps no disponible"})
+        return JSONResponse(content={"error_key": "err.mlops_unavailable"})
     return JSONResponse(content=tracker.get_latency_percentiles())
 
 

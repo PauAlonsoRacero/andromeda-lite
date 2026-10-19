@@ -31,7 +31,7 @@ async def list_versions(request: Request) -> JSONResponse:
 async def register_version(request: Request) -> JSONResponse:
     reg = _reg(request)
     if not reg:
-        return JSONResponse(status_code=503, content={"error": "Registry no disponible"})
+        return JSONResponse(status_code=503, content={"error_key": "err.registry_unavailable"})
     body = await request.json()
     model = (body.get("model") or "").strip()
     if not model:
@@ -49,7 +49,7 @@ async def register_version(request: Request) -> JSONResponse:
 async def promote_version(vid: str, request: Request) -> JSONResponse:
     reg = _reg(request)
     if not reg:
-        return JSONResponse(status_code=503, content={"error": "Registry no disponible"})
+        return JSONResponse(status_code=503, content={"error_key": "err.registry_unavailable"})
     body = await request.json()
     stage = (body.get("stage") or "").strip()
     try:
@@ -72,6 +72,6 @@ async def get_production(request: Request) -> JSONResponse:
 async def delete_version(vid: str, request: Request) -> JSONResponse:
     reg = _reg(request)
     if not reg:
-        return JSONResponse(status_code=503, content={"error": "Registry no disponible"})
+        return JSONResponse(status_code=503, content={"error_key": "err.registry_unavailable"})
     ok = reg.delete(vid)
     return JSONResponse(content={"success": ok})

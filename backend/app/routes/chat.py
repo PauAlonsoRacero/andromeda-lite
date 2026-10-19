@@ -10,6 +10,7 @@ Endpoints:
 from datetime import timezone
 import httpx
 import json
+import uuid
 import logging
 
 from fastapi import APIRouter, Request
@@ -238,6 +239,12 @@ async def chat(request: Request):
 
             # Obtener especialistas activos para el tier actual
             active = registry.get_eligible_for_tier(hardware.max_tier)
+            # Si no queda ninguna IA activa pero hay modelos instalados (p. ej. se pulsó
+            # "Desactivar" en Modelos), se usa la general: en Lite hay una sola, y
+            # desactivarla dejaba el chat inservible con un aviso engañoso
+            # ("descarga un modelo" teniendo diez instalados).
+            if not active:
+                active = registry.fallback_specialists(hardware.max_tier)
             if not active:
                 # Sin especialistas — enviar error descriptivo
                 status = registry.get_status_summary()
@@ -281,6 +288,8 @@ async def chat(request: Request):
                                 if _live:
                                     registry.set_available_models(_live)
                             active = registry.get_eligible_for_tier(hardware.max_tier)
+                            if not active:
+                                active = registry.fallback_specialists(hardware.max_tier)
             except Exception as _e:
                 logger.debug(f"No se pudo refrescar modelos vivos: {_e}")
 
@@ -363,6 +372,17 @@ async def chat(request: Request):
                         base.model_name = lvl_obj.model_name
                     logger.info(f"Lite linear: nivel '{_chosen_level}' "
                                 f"(score={_decision.score}, {_decision.reason}) → {base.model_name}")
+                    # Visible en Diagnóstico: permite comprobar que la potencia
+                    # automática funciona (qué nivel, con qué puntuación y por qué).
+                    try:
+                        from app.observability import diagnostics as _dg
+                        _dg.log("power", f"potencia '{_chosen_level}' → {base.model_name}",
+                                level="success",
+                                modo="forzado" if _decision.forced else "automático",
+                                puntuacion=_decision.score, motivo=_decision.reason,
+                                niveles_con_modelo=sorted(_avail) or "ninguno")
+                    except Exception:
+                        pass
                 except Exception as exc:
                     logger.warning(f"No se pudo aplicar el nivel '{_chosen_level}': {exc}")
 
@@ -397,6 +417,12 @@ async def chat(request: Request):
                     # no hay especialistas activos: error claro
                     raise RuntimeError("No hay especialistas activos para forzar el modelo")
                 base.model_name = _fm
+                try:
+                    from app.observability import diagnostics as _dg
+                    _dg.log("power", f"modelo forzado por el usuario: {_fm} (la potencia automática no se aplica)",
+                            level="warn")
+                except Exception:
+                    pass
                 plan = OrchestrationPlan(
                     specialists=[base],
                     strategy="single",
@@ -430,70 +456,119 @@ async def chat(request: Request):
             # Si el usuario adjuntó imágenes, un modelo de visión (llava) las
             # describe primero, y esa descripción se inyecta en el prompt para
             # que el resto del pipeline pueda razonar sobre su contenido.
-            effective_prompt = chat_request.prompt
+            # Construcción del prompt con el constructor COMPARTIDO con el
+            # camino no-streaming. Antes esta lógica estaba escrita aquí por
+            # separado y se desincronizó: la compactación de contexto y el
+            # perfil de memoria solo existían en el otro camino, de modo que en
+            # streaming (el modo normal) no se aplicaban nunca.
+            from app.core import prompt_builder as pb
+
+            _parts = pb.PromptParts(message=pb.expand_slash(chat_request.prompt))
+            pb.add_skill(_parts, chat_request.prompt,
+                         getattr(request.app.state, "skill_registry", None))
+            # Órdenes explícitas sobre la memoria ("borra la memoria", "olvida
+            # que…"): se ejecutan antes de inyectarla, sin depender del modelo.
+            await pb.handle_memory_commands(
+                _parts, chat_request.prompt,
+                getattr(request.app.state, "memory_profile", None),
+                getattr(request.app.state, "memory_store", None),
+                chat_request.incognito,
+            )
+            await pb.add_memory_async(
+                _parts, chat_request.prompt,
+                getattr(request.app.state, "memory_profile", None),
+                getattr(request.app.state, "memory_store", None),
+                chat_request.incognito,
+            )
+            pb.add_past_chats(_parts, chat_request.prompt, settings,
+                              chat_request.conversation_history, chat_request.incognito)
+            pb.add_documents(_parts, chat_request.prompt,
+                             getattr(request.app.state, "rag_index", None),
+                             chat_request.incognito)
+            if not pb.add_project(_parts, chat_request):
+                pb.add_workspace(_parts, chat_request.prompt, chat_request.incognito,
+                                 has_images=bool(getattr(chat_request, "images", None)))
+
+            # Compatibilidad con el resto de la función, que aún usa estos nombres.
+            _rag_doc_ids = _parts.meta.get("rag_sources", [])
+            _matched_skill = _parts.meta.get("skill_used")
+            # (el prompt se ensambla una sola vez, más abajo, con todas las piezas)
+            _images_directas = None
             if getattr(chat_request, "images", None):
-                try:
-                    imgs = [im.split(",", 1)[1] if "," in im else im
-                            for im in chat_request.images[:3]]
-                    vision_model = "llava:7b"
-                    async with httpx.AsyncClient(trust_env=False) as _c:
-                        vr = await _c.post(
-                            f"{settings.ollama_base_url}/api/chat",
-                            json={
-                                "model": vision_model,
-                                "messages": [{
-                                    "role": "user",
-                                    "content": (chat_request.prompt or
-                                                "Describe esta imagen en detalle."),
-                                    "images": imgs,
-                                }],
-                                "options": {"temperature": 0.3, "num_predict": 1024},
-                                "stream": False,
-                            },
-                            timeout=90.0,
-                        )
-                        if vr.status_code == 200:
-                            desc = vr.json().get("message", {}).get("content", "")
-                            if desc.strip():
-                                pass  # imagen procesada
-                                effective_prompt = (
-                                    f"El usuario adjuntó una o más imágenes. Un modelo de "
-                                    f"visión las ha analizado y describe lo siguiente:\n\n"
-                                    f"{desc}\n\n"
-                                    f"Pregunta del usuario: {chat_request.prompt}"
-                                )
-                        elif vr.status_code == 404:
-                            logger.warning("Modelo de visión no instalado (llava:7b)")
-                except Exception as _ve:
-                    logger.warning(f"Análisis de imagen falló: {_ve}")
+                # Imágenes adjuntas. Si el modelo que va a responder ve imágenes,
+                # las recibe directamente; si no, otro modelo las describe en el
+                # idioma de la interfaz; si no hay ninguno, se avisa sin inventar.
+                from app.core import vision as _vis
+                from app.observability import diagnostics as _dg
+                _modelo_chat = next((getattr(sp, "model_name", "") for sp in selected), "")
+                if _vis.is_vision_model(_modelo_chat):
+                    _images_directas = chat_request.images[:3]
+                    _dg.log("vision", f"imagen enviada directamente a {_modelo_chat}",
+                            level="success")
+                else:
+                    _vm = _vis.pick_vision_model(
+                        list(getattr(registry, "available_models", []) or []))
+                    if not _vm:
+                        pb.add_notice(_parts, _vis.no_model_notice())
+                        _dg.log("vision", "sin modelo de visión instalado", level="warn")
+                    else:
+                        try:
+                            desc = await _vis.describe(chat_request.images,
+                                                       settings.ollama_base_url, _vm)
+                            if desc:
+                                _parts.documents = (
+                                    "IMAGEN ADJUNTA (descrita por un modelo de visión; responde "
+                                    f"a la pregunta del usuario a partir de esto):\n\n{desc}"
+                                    + (f"\n\n{_parts.documents}" if _parts.documents else ""))
+                                _dg.log("vision", f"imagen descrita por {_vm}", detail=desc,
+                                        level="success")
+                        except Exception as _vexc:
+                            logger.warning(f"Visión falló con {_vm}: {_vexc}")
+                            _dg.log("vision", f"fallo describiendo con {_vm}",
+                                    detail=str(_vexc), level="error")
 
             # ── Búsqueda web (solo si NO es incógnito) ────────────────────────
             # En incógnito: 100% local, nunca toca internet. Y solo si el toggle
             # "Permitir salida de red" está activo en Ajustes.
-            web_used = False
-            from app.core.flags import get_flag as _gf
-            _net_ok = _gf(settings, "andromeda_network_egress")
-            if _net_ok and not chat_request.incognito and chat_request.web_search:
-                from app.core.web_search import search_web, needs_web_search
-                if needs_web_search(chat_request.prompt):
-                    results = await search_web(chat_request.prompt, max_results=4)
-                    if results:
-                        web_used = True
-                        ctx = "\n".join(
-                            f"[{i+1}] {r['title']}: {r['snippet']} ({r['url']})"
-                            for i, r in enumerate(results)
-                        )
-                        effective_prompt = (
-                            f"Tienes acceso a estos resultados de búsqueda web actuales:\n\n"
-                            f"{ctx}\n\n"
-                            f"INSTRUCCIONES: Responde a la pregunta del usuario basándote en "
-                            f"estos resultados. Son información real y actual — úsala como "
-                            f"fuente principal. NO inventes datos que contradigan los "
-                            f"resultados. Si los resultados no contienen la respuesta, dilo "
-                            f"claramente en vez de inventar.\n\n"
-                            f"Pregunta del usuario: {chat_request.prompt}"
-                        )
-                        logger.info(f"Web search: {len(results)} resultados inyectados")
+            # Fase visible: si va a buscar en internet, decirlo ANTES. La
+            # búsqueda puede tardar varios segundos y sin esto el usuario solo
+            # veía una espera muda.
+            try:
+                from app.core.flags import get_flag as _gfp
+                from app.core.web_search import extract_urls as _eu, needs_web_search as _nws
+                if (not chat_request.incognito and chat_request.web_search
+                        and _gfp(settings, "andromeda_network_egress")
+                        and (_nws(chat_request.prompt) or _eu(chat_request.prompt))):
+                    yield "data: " + json.dumps({
+                        "chunk_id": str(uuid.uuid4()), "specialist_id": "system",
+                        "content": "", "is_final": False,
+                        "metadata": {"phase": "searching"},
+                    }) + "\n\n"
+            except Exception:
+                pass
+
+            web_used = await pb.add_web_context(
+                _parts, prompt=chat_request.prompt, settings=settings,
+                incognito=chat_request.incognito,
+                web_search=chat_request.web_search,
+                history=chat_request.conversation_history,
+                model=getattr(chat_request, "force_model", None) or "",
+            )
+
+            # Historial de conversación, compactado si no cabe en el contexto.
+            # Esto SOLO existía en el camino no-streaming: en streaming (el modo
+            # normal) las conversaciones largas se truncaban sin resumir y se
+            # perdía lo hablado al principio.
+            await pb.add_history(
+                _parts, chat_request.conversation_history, chat_request.context_window,
+                ollama_url=getattr(settings, "ollama_base_url", "") or "",
+                model=getattr(registry, "orchestrator_model", "") or "",
+            )
+
+            # El prompt final se ensambla UNA vez, tras recoger todas las piezas.
+            # Antes cada bloque sobrescribía la variable y tiraba el trabajo
+            # anterior: una búsqueda web borraba la skill, el RAG y la memoria.
+            effective_prompt = _parts.render()
 
             # Iniciar run MLOps
             request_id = str(_uuid.uuid4())
@@ -533,7 +608,9 @@ async def chat(request: Request):
             if request.app.state.mlops_tracker:
                 mlops_run_id = request.app.state.mlops_tracker.start_run(
                     request_id=request_id,
-                    prompt_preview=chat_request.prompt[:100],
+                    # Incógnito: nunca escribir el texto del usuario en disco.
+                    prompt_preview=("" if chat_request.incognito
+                                    else chat_request.prompt[:100]),
                     strategy=strategy,
                     hardware_tier=hardware.max_tier,
                 )
@@ -549,7 +626,26 @@ async def chat(request: Request):
                     "orchestrator_model": registry.orchestrator_model,
                     "mlops_tracker":      getattr(request.app.state, "mlops_tracker", None),
                     "hardware_tier":      hardware.max_tier,
+                    # Datos completos del equipo: permiten ajustar contexto,
+                    # hilos de CPU y capas en GPU a lo que de verdad hay.
+                    "hardware":           hardware,
                     "force_model":        _fm or None,
+                    # Imágenes para un modelo de chat que ve por sí mismo.
+                    "images":             _images_directas,
+                    # Herramientas MCP. Antes el streaming no las tenía (en el
+                    # navegador no funcionaban nunca). En incógnito no se pasan:
+                    # una herramienta como fetch saldría a internet, justo lo
+                    # que ese modo promete no hacer.
+                    # Tampoco si el mensaje era una orden sobre la memoria: el
+                    # modelo tiraba del conector MCP "memory", otro sistema.
+                    "mcp_manager": (None if (chat_request.incognito
+                                             or _parts.meta.get("memory_command"))
+                                    else getattr(request.app.state, "mcp_manager", None)),
+                    "metrics":            getattr(request.app.state, "metrics", None),
+                    "user_prompt":        chat_request.prompt,
+                    # Nivel elegido por la potencia (o None en Pro): decide si
+                    # los modelos de razonamiento piensan antes de responder.
+                    "power_level":        locals().get("_chosen_level"),
                 }
 
                 # Config de escalado por reintento (opt-in vía ANDROMEDA_ESCALATION).
@@ -617,23 +713,12 @@ async def chat(request: Request):
                         # los ejecutamos sobre el workspace (borrado reversible)
                         # y adjuntamos el resumen a la metadata para que el
                         # frontend lo muestre. En incógnito no se tocan archivos.
-                        if not chat_request.incognito:
-                            try:
-                                from app.core.flags import get_flag
-                                if get_flag(settings, "andromeda_file_creation"):
-                                    from app.core.file_actions import execute_actions, has_actions
-                                    _full_txt = "".join(_response_acc)
-                                    if has_actions(_full_txt):
-                                        _fa = execute_actions(_full_txt)
-                                        if _fa:
-                                            meta["file_actions"] = [
-                                                {"action": r.action, "ok": r.ok,
-                                                 "detail": r.detail} for r in _fa
-                                            ]
-                                            logger.info(
-                                                f"Acciones de archivo ejecutadas: {len(_fa)}")
-                            except Exception as _fae:
-                                logger.warning(f"file_actions falló: {_fae}")
+                        from app.core.file_actions import run_for_response
+                        _fa = run_for_response("".join(_response_acc), settings=settings,
+                                               incognito=chat_request.incognito,
+                                               project_id=chat_request.project_id)
+                        if _fa:
+                            meta["file_actions"] = _fa
                         # Confianza estimada de la respuesta (heurística barata)
                         try:
                             from app.core.confidence import estimate_confidence, should_escalate
@@ -677,6 +762,10 @@ async def chat(request: Request):
                             logger.warning(f"ab.record falló: {_abe}")
                         # request_id en el meta → el feedback de usuario lo referencia.
                         meta["request_id"] = request_id
+                        if _rag_doc_ids:
+                            meta["rag_sources"] = _rag_doc_ids
+                        if _matched_skill:
+                            meta["skill_used"] = _matched_skill
 
                         # 2) Tracker MLOps SQLite → alimenta /api/mlops/* (MLOps)
                         if request.app.state.mlops_tracker and mlops_run_id:
@@ -704,6 +793,21 @@ async def chat(request: Request):
                                 )
                             tracker.end_run(mlops_run_id, success=True)
 
+                        # 2b) Memoria automática y corpus de entrenamiento. Antes
+                        #     esto no existía en streaming y la memoria no se
+                        #     guardaba nunca en uso normal.
+                        # En segundo plano: guardar un recuerdo puede llamar a
+                        # Ollama para calcular embeddings (hasta 10 s), y eso
+                        # retrasaba el final de CADA respuesta que el usuario
+                        # veía. La respuesta ya está completa; esto no la afecta.
+                        _spawn_background(_after_response(
+                            request, chat_request,
+                            response_text="".join(_response_acc),
+                            request_id=request_id,
+                            model=next((s.model_name for s in selected
+                                        if s.id in specialists_used), ""),
+                        ))
+
                         # 3) Trace en SQLite → alimenta /api/traces (Actividad reciente).
                         #    Sin esto, la pantalla de Actividad queda siempre vacía.
                         try:
@@ -712,7 +816,8 @@ async def chat(request: Request):
                                 from app.models.schemas import TraceRecord
                                 await store.save(TraceRecord(
                                     request_id=request_id,
-                                    prompt_preview=(chat_request.prompt or "")[:100],
+                                    prompt_preview=("" if chat_request.incognito
+                                                    else (chat_request.prompt or "")[:100]),
                                     strategy=chat_request.strategy or "auto",
                                     strategy_effective=meta.get("strategy_used", strategy),
                                     specialists_used=specialists_used,
@@ -781,29 +886,20 @@ async def chat(request: Request):
             memory_store=getattr(request.app.state, 'memory_store', None),
             mcp_manager=getattr(request.app.state, 'mcp_manager', None),
             memory_profile=getattr(request.app.state, 'memory_profile', None),
+            rag_index=getattr(request.app.state, 'rag_index', None),
+            skill_registry=getattr(request.app.state, 'skill_registry', None),
         )
 
-        # Memoria automática (estilo Claude): detectar datos clave o peticiones
-        # explícitas de recordar en el mensaje del usuario y guardarlos en el
-        # PERFIL unificado (un solo bloque, con reemplazo por topic). Solo fuera
-        # de incógnito, si el toggle "Generar memoria" está activo.
-        from app.core.flags import get_flag
-        _autogen = get_flag(settings, "andromeda_mem_autogenerate")
-        _profile = getattr(request.app.state, 'memory_profile', None)
-        if _profile is not None and _autogen and not chat_request.incognito:
-            try:
-                from app.memory.extractor import extract_memories
-                nuevos = extract_memories(chat_request.prompt or "")
-                for contenido, _categoria, topic in nuevos:
-                    # Normalizar a frase con mayúscula inicial para el perfil.
-                    frase = contenido.strip()
-                    if frase:
-                        frase = frase[0].upper() + frase[1:]
-                    # Topic explícito sin categoría clara → usar 'nota:<n>'.
-                    tkey = topic if not topic.startswith("explicit:") else f"nota:{topic[9:]}"
-                    _profile.upsert_fact(tkey, frase)
-            except Exception as _exc:
-                logger.warning(f"Extracción de memoria falló: {_exc}")
+        # Efectos posteriores a la respuesta (memoria, corpus de entrenamiento),
+        # compartidos con el camino streaming.
+        # En segundo plano: la respuesta no debe esperar a que se calculen los
+        # embeddings de la memoria (hasta 10 s con Ollama ocupado).
+        _spawn_background(_after_response(
+            request, chat_request,
+            response_text=getattr(response, "response", "") or "",
+            request_id=getattr(response, "request_id", "") or "",
+            model=(getattr(response, "specialists_used", None) or [""])[0],
+        ))
 
         return JSONResponse(content=response.model_dump())
 
@@ -817,6 +913,97 @@ async def chat(request: Request):
                 "message": str(exc) if settings.environment == "development" else "Error interno",
             },
         )
+
+
+# Referencias a las tareas en segundo plano: sin guardarlas, el recolector de
+# basura puede destruir una tarea a medias (comportamiento documentado de asyncio).
+_background_tasks: set = set()
+
+
+def _spawn_background(coro) -> None:
+    """Lanza una corrutina sin bloquear, registrando cualquier fallo."""
+    import asyncio
+
+    async def _seguro():
+        try:
+            await coro
+        except Exception as exc:                          # noqa: BLE001
+            logger.debug(f"Tarea en segundo plano falló: {exc}")
+
+    tarea = asyncio.create_task(_seguro())
+    _background_tasks.add(tarea)
+    tarea.add_done_callback(_background_tasks.discard)
+
+
+async def _after_response(request: Request, chat_request, *, response_text: str,
+                          request_id: str, model: str = "") -> None:
+    """Lo que ocurre DESPUÉS de responder, idéntico en los dos caminos.
+
+    Antes esto solo existía en el camino no-streaming. Como el streaming (el
+    modo normal de la interfaz) retorna mucho antes, la extracción automática de
+    memoria no se ejecutaba NUNCA en uso real: "recuerda que me llamo Pau" no se
+    guardaba. Es el mismo tipo de fallo que tuvo la construcción del prompt, que
+    también estaba duplicada y desincronizada.
+
+    Nada de lo que hay aquí puede romper la respuesta: ya se ha enviado.
+    """
+    if chat_request.incognito:
+        return
+    settings = request.app.state.settings
+    from app.core.flags import get_flag
+    from app.observability import diagnostics as _dg
+
+    # ── Memoria automática ────────────────────────────────────────────────
+    _profile = getattr(request.app.state, "memory_profile", None)
+    # Una orden sobre la memoria no es información sobre el usuario: al pedir
+    # "elimina que me gusta el negro" se guardaba justo ese dato.
+    from app.core.prompt_builder import is_memory_command
+    if is_memory_command(chat_request.prompt or ""):
+        _profile = None
+    if _profile is not None and get_flag(settings, "andromeda_mem_autogenerate"):
+        try:
+            from app.memory.extractor import extract_memories
+            nuevos = extract_memories(chat_request.prompt or "")
+            from app.memory.structure import es_sensible
+            if not get_flag(settings, "andromeda_mem_sensitive"):
+                nuevos = [n for n in nuevos if not es_sensible(n[0])]
+            for contenido, _categoria, topic in nuevos:
+                frase = contenido.strip()
+                if frase:
+                    frase = frase[0].upper() + frase[1:]
+                # Clave acumulable: los gustos, objetivos y notas se suman en
+                # vez de reemplazarse (antes un gusto nuevo borraba el anterior).
+                from app.memory.extractor import topic_key
+                tkey = topic_key(topic, frase)
+                _profile.upsert_fact(tkey, frase)
+
+            # También al almacén semántico, para recuperar solo lo relevante.
+            _store = getattr(request.app.state, "memory_store", None)
+            if _store is not None:
+                for contenido, categoria, _topic in nuevos:
+                    try:
+                        await _store.save(contenido, source="chat", category=categoria)
+                    except Exception as _sexc:
+                        logger.debug(f"No se pudo indexar el recuerdo: {_sexc}")
+            _dg.log("memory", f"extracción: {len(nuevos)} datos guardados",
+                    data={"datos": [n[0][:60] for n in nuevos]},
+                    level="success" if nuevos else "info")
+        except Exception as _exc:
+            logger.warning(f"Extracción de memoria falló: {_exc}")
+            _dg.log("memory", "fallo en la extracción", detail=str(_exc), level="error")
+
+    # ── Corpus de entrenamiento (Apolo) ───────────────────────────────────
+    _corpus = getattr(request.app.state, "training_corpus", None)
+    if _corpus is not None:
+        try:
+            _corpus.record(
+                request_id, chat_request.prompt or "", response_text,
+                model=model or "",
+                history=chat_request.conversation_history or [],
+                incognito=chat_request.incognito,
+            )
+        except Exception as _exc:
+            logger.debug(f"Corpus de entrenamiento: {_exc}")
 
 
 @router.get("/strategies")
@@ -899,7 +1086,7 @@ async def save_prompt(request: Request) -> JSONResponse:
     content = body.get("content", "")
     tags    = body.get("tags", [])
     if not content.strip():
-        return JSONResponse(status_code=400, content={"error": "content requerido"})
+        return JSONResponse(status_code=400, content={"error_key": "err.content_required"})
 
     db_path = request.app.state.settings.mlops_db_path
     conn = sqlite3.connect(db_path)
@@ -994,7 +1181,7 @@ async def evaluate_response(request: Request) -> JSONResponse:
     settings = request.app.state.settings
 
     if not prompt or not response:
-        return JSONResponse(status_code=400, content={"error": "prompt y response requeridos"})
+        return JSONResponse(status_code=400, content={"error_key": "err.prompt_response_required"})
 
     judge_prompt = f"""Evalúa la siguiente respuesta de IA según estos criterios.
 Responde SOLO con un JSON válido, sin texto adicional.

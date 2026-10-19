@@ -21,6 +21,17 @@ from dataclasses import dataclass
 
 logger = logging.getLogger("andromeda.mcp.protocol")
 
+try:
+    from app.observability import diagnostics as diag
+except Exception:                                        # pragma: no cover
+    class _Nulo:                                         # el registro nunca es obligatorio
+        @staticmethod
+        def log(*a, **k): pass
+        @staticmethod
+        def is_enabled(): return False
+    diag = _Nulo()
+
+
 
 @dataclass
 class MCPTool:
@@ -74,6 +85,9 @@ class MCPStdioClient:
         self._req_id    = 0
         self._lock      = asyncio.Lock()
         self._connected = False
+        # Motivo del último fallo de conexión, para poder explicárselo al
+        # usuario en la UI en lugar de un genérico "sin conectar".
+        self.last_error: str = ""
 
     async def connect(self) -> bool:
         """Arranca el servidor MCP y hace el handshake inicial."""
@@ -82,7 +96,13 @@ class MCPStdioClient:
             import shutil
             import subprocess as _sp
             import sys as _sys
-            env = {**os.environ, **(self.env or {})}
+            # Las variables que PyInstaller inyecta apuntan a las librerías
+            # embebidas dentro del bundle de Andromeda. Heredarlas hace que el
+            # servidor MCP cargue librerías equivocadas o falle de forma opaca.
+            _frozen_vars = ("_MEIPASS", "_MEIPASS2", "LD_LIBRARY_PATH",
+                            "DYLD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH")
+            env = {k: v for k, v in os.environ.items() if k not in _frozen_vars}
+            env.update(self.env or {})
 
             # Las apps GUI empaquetadas (.app de macOS, .exe) arrancan con un PATH
             # mínimo que NO incluye donde viven npx/uvx (Homebrew, ~/.local/bin, nvm…).
@@ -112,10 +132,11 @@ class MCPStdioClient:
             if resolved:
                 cmd[0] = resolved
             else:
-                logger.warning(
-                    f"MCP [{self.server_id}]: no se encontró '{cmd[0]}' en el PATH. "
-                    f"¿Está instalado Node (npx) o uv (uvx)?"
-                )
+                runtime = "Node.js (npx)" if cmd[0].startswith("npx") else (
+                    "uv (uvx)" if cmd[0].startswith("uvx") else cmd[0])
+                self.last_error = (
+                    f"No se encontró '{cmd[0]}'. Instala {runtime} y reinicia Andromeda.")
+                logger.warning(f"MCP [{self.server_id}]: {self.last_error}")
                 return False
             self._process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -133,6 +154,20 @@ class MCPStdioClient:
                 "clientInfo":      {"name": "andromeda", "version": "1.0.0"},
             })
             if not resp:
+                # El proceso arrancó pero no completó el handshake. Su stderr
+                # suele decir exactamente por qué (falta una clave, paquete no
+                # encontrado, versión incompatible…). Sin esto el usuario solo
+                # ve "sin conectar" y no tiene ninguna pista.
+                detail = ""
+                try:
+                    if self._process and self._process.stderr:
+                        raw = await asyncio.wait_for(self._process.stderr.read(600), timeout=1.0)
+                        detail = (raw or b"").decode("utf-8", "replace").strip()
+                except Exception:
+                    pass
+                self.last_error = detail.splitlines()[-1][:200] if detail else (
+                    "El servidor no respondió al handshake inicial.")
+                logger.warning(f"MCP [{self.server_id}]: {self.last_error}")
                 return False
 
             # Notificar initialized
@@ -156,6 +191,7 @@ class MCPStdioClient:
             return True
 
         except Exception as exc:
+            self.last_error = f"{type(exc).__name__}: {exc}"[:200]
             logger.error(f"MCP [{self.server_id}] connect error: {exc}")
             return False
 
@@ -167,10 +203,18 @@ class MCPStdioClient:
                 content=[], is_error=True, error_msg="Servidor no conectado"
             )
         try:
+            import time as _t
+            _t0 = _t.perf_counter()
             resp = await self._request("tools/call", {
                 "name":      tool_name,
                 "arguments": arguments,
             })
+            diag.log("mcp", f"herramienta {self.server_id}.{tool_name}",
+                     data={"argumentos": str(arguments)[:200],
+                           "respondio": resp is not None},
+                     detail=str(resp)[:800] if resp else "sin respuesta",
+                     duration_ms=(_t.perf_counter() - _t0) * 1000,
+                     level="success" if resp else "error")
             if resp is None:
                 return MCPResult(tool_name=tool_name, server_id=self.server_id,
                                  content=[], is_error=True, error_msg="Sin respuesta")
@@ -210,15 +254,31 @@ class MCPStdioClient:
                 self._process.stdin.write((msg + "\n").encode())
                 await self._process.stdin.drain()
 
-                # Leer respuesta con timeout
-                line = await asyncio.wait_for(
-                    self._process.stdout.readline(), timeout=30.0
-                )
-                if not line:
-                    return None
-
-                data = json.loads(line.decode().strip())
-                if data.get("id") != req_id:
+                # Leer hasta encontrar LA respuesta a esta petición.
+                #
+                # Antes, si llegaba un mensaje con otro id (una notificación del
+                # servidor o una respuesta desfasada tras un timeout), se
+                # devolvía None dejando el mensaje correcto en el buffer: a
+                # partir de ahí, cada llamada leía la respuesta de la anterior y
+                # el servidor quedaba inutilizable hasta reconectar.
+                data = None
+                for _ in range(10):          # tope: evita un bucle infinito
+                    line = await asyncio.wait_for(
+                        self._process.stdout.readline(), timeout=30.0
+                    )
+                    if not line:
+                        return None
+                    try:
+                        mensaje = json.loads(line.decode().strip())
+                    except json.JSONDecodeError:
+                        continue             # línea de log del servidor: ignorar
+                    if mensaje.get("id") == req_id:
+                        data = mensaje
+                        break
+                    logger.debug(f"MCP [{self.server_id}]: descartado mensaje "
+                                 f"id={mensaje.get('id')} (esperaba {req_id})")
+                if data is None:
+                    logger.warning(f"MCP [{self.server_id}]: sin respuesta para {method}")
                     return None
 
                 if "error" in data:

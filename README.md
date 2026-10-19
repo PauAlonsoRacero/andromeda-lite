@@ -9,11 +9,12 @@ Open source, offline, and private by default.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/PauAlonsoRacero/andromeda-lite/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Release](https://github.com/PauAlonsoRacero/andromeda-lite/actions/workflows/release.yml/badge.svg)](../../actions/workflows/release.yml)
-![Tests](https://img.shields.io/badge/tests-160%20passing-brightgreen)
+![Version](https://img.shields.io/badge/version-1.1.0-0a84ff)
+![Tests](https://img.shields.io/badge/tests-1257%20passing-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 ![Python](https://img.shields.io/badge/python-3.12%2B-3776AB)
 ![Frontend](https://img.shields.io/badge/frontend-SolidJS-2C4F7C)
-![Security](https://img.shields.io/badge/bandit-0%20issues-success)
+![Security](https://img.shields.io/badge/bandit-0%20medium%2Fhigh-success)
 
 </div>
 
@@ -36,6 +37,103 @@ Open source, offline, and private by default.
 
 ---
 
+## ✨ What's new in 1.1
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/chart-in-numbers-dark.png">
+    <img src="docs/media/chart-in-numbers-light.png" alt="1.1 in numbers: 1,257 tests, 3 operating systems in CI, 5 languages, 10 MCP connectors, 9 skills, 13 slash commands, 103 ready prompts" width="860">
+  </picture>
+</p>
+
+### 🎨 Design and memory
+
+- **Design 1.1.** A new macOS-inspired interface: floating translucent sidebar, system-blue accents, a glass message box and seamless title bars. It comes in light and dark mode, with its own incognito palette. The original design is still there as **1.0**.
+- **Memory that works like Claude's.** What Andromeda knows about you is organised into topics (You, Topics, Areas, People, Notes). Open a topic to read it, or describe a change in plain language ("actually I hate black, and the Audi is a mk1") and the local model rewrites it. There are switches for searching past chats, generating memory, sensitive topics and importing memory from another assistant.
+- **Meaning-based memory, on by default.** Andromeda downloads its embedding model in the background the first time it starts, then back-fills vectors for everything it already remembered. Asking "which car did I like?" finds "I like the Audi TT" even with no words in common.
+- **~8× faster memory search.** Every message compares your question with everything Andromeda remembers. Each memory is now parsed and normalised once and kept in a cache, so the comparison is a single dot product. Same results (a test compares it against the original algorithm), a fraction of the time.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/chart-memory-speed-dark.png">
+    <img src="docs/media/chart-memory-speed-light.png" alt="Memory search time per message: 152 ms to 19 ms with 500 memories, 743 ms to 94 ms with 2,000, 1,458 ms to 175 ms with 5,000" width="760">
+  </picture>
+</p>
+
+```mermaid
+flowchart LR
+    Q["Your message"] --> E["Embed the question once"]
+    E --> C{"Memory vector<br/>in cache?"}
+    C -- "first time" --> P["Parse + normalise<br/>then cache it"]
+    P --> D
+    C -- "yes" --> D["Dot product<br/>with cached vectors"]
+    D --> B["+ bonus for exact<br/>words in common"]
+    B --> T["Top memories go<br/>into the prompt"]
+```
+
+### 💬 Chat, files and tools
+
+- **Artifacts and projects.** Files the AI creates open in a side panel (HTML, Word, Excel, CSV, PDF, code). Projects keep their own folder of files, instructions and memory, and all of it reaches the model with every message in the project.
+- **Images, as in Claude.** They show up in the message (expandable thumbnail) and the model interprets them. If your chat model can see images it gets them directly; otherwise the best vision model you have installed describes them.
+- **Skills.** Nine instruction packs (code review, API design, incident response, debugging, SQL, technical writing, data analysis, refactoring, teaching) that activate on their own depending on your message. Create your own from Settings.
+- **Your documents (RAG).** Index your text files locally with BM25, with no extra dependencies or services, and the chat cites them as sources. Drag and drop, plus a live search test.
+- **13 slash commands** (`/explain`, `/review`, `/debug`, `/test`, `/refactor`, `/sql`, `/commit`…), with Spanish aliases and autocomplete, and a **library of 103 ready prompts** in 15 categories.
+- **MCP connectors.** A catalog of 10 one-click connectors (git, Playwright, Pandoc, Notion, Linear, Figma, Obsidian, AWS, Gmail and Google Calendar). API keys are entered inside the app, and a missing `uv` runtime installs itself when you enable a connector.
+- **Web search that answers with links**, in five languages, with ad filtering and automatic fallback between search engines.
+- **Streaming in the desktop app.** Text is written on screen as it is generated, and the wait shows the real phase (searching the web, thinking…).
+- **Long chats stay useful.** Old messages are summarised instead of dropped, which matters with the small context windows of local models.
+
+### ⚙️ Reliability and speed
+
+- **A fix worth knowing about:** every message to a reasoning model (qwen3, gpt-oss, deepseek-r1…) could fail on a wrong diagnostic call. It's fixed, and a test now checks every diagnostic call in the source.
+- Preparing each message went from 28 ms to 2 ms, web searches are 2 to 4 seconds quicker, and a slow system call that ran on every message on macOS is gone.
+- A model that keeps failing goes into quarantine and routing avoids it, instead of failing in a chain.
+- **Hardened for Windows.** Every file access declares UTF-8, window controls stay usable above dialogs, and the full test suite runs on Windows in CI.
+- Frontend dependencies audited: no known vulnerabilities in what ships in the app.
+
+### 🔒 Privacy
+
+- Everything runs on your machine. Incognito mode keeps nothing and always blocks web search.
+- The local training corpus is **off by default**, never records in incognito and only exports answers you voted as good.
+
+See the [CHANGELOG](CHANGELOG.md) for the complete list.
+
+---
+
+## ⚡ AI power: the right model for each message
+
+Most local AI apps make you pick one model and use it for everything. That means either a small model that struggles with hard questions, or a big one that makes you wait ten seconds to answer "hi".
+
+Andromeda maps your installed models to four power levels and chooses one **per message**:
+
+| Level | Target size | Used for |
+|---|---|---|
+| Fast | ~3B | Greetings, short questions, quick lookups |
+| Balanced | ~7B | Explanations, everyday writing, simple files |
+| Strong | ~22B | Reasoning, code, multi-step tasks |
+| Maximum | ~70B | The hardest prompts, when your hardware allows it |
+
+**How it decides.** Each prompt gets a complexity score from 0 to 1, based on its length, structure and the kind of task it asks for (proofs, architecture and code score higher than chat). The score maps to a level (below 0.22 Fast, below 0.50 Balanced, below 0.66 Strong, above that Maximum), which is then capped by what your hardware can run and moved to the nearest level that actually has a model installed. Real scores from the router:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/chart-power-levels-dark.png">
+    <img src="docs/media/chart-power-levels-light.png" alt="Complexity scores: 'hola' 0.00 (Fast), 'crea una página index.html a partir de esta captura' 0.28 (Balanced), 'Demuestra que la raíz de 2 es irracional' 0.57 (Strong), a microservices architecture prompt 0.59 (Strong)" width="760">
+  </picture>
+</p>
+
+> The scoring heuristics were tuned on Spanish prompts, which is why the examples are in Spanish. English prompts are scored by the same rules but with fewer keyword hits, so they tend to land lower; improving that is planned for 1.2. You can always pin a level by hand.
+
+**Same model, more or less compute.** Reasoning models (qwen3, gpt-oss, deepseek-r1) can think before answering, or not. The level controls that too: Fast and Balanced answer straight away, Strong and Maximum reason first (gpt-oss gets low, medium or high effort). So even with a single model installed, power still scales. It also means a simple "hi" no longer triggers qwen3's hidden reasoning.
+
+**A power pack for your machine.** Settings → AI models recommends one model per level based on your memory, marks what you already have and downloads the rest in one click. On a 16 GB laptop that's qwen3 4B / 8B / 14B; with 48 GB of unified memory, qwen3 4B / 8B plus gemma3 27B.
+
+**Assignment is automatic.** When you pull a model it's slotted into the level closest to its size, as soon as the download finishes. Coding models (deepseek-coder, codellama…) are only used for general chat if nothing else is installed. You can pin a level in the **AI power** panel, or force one specific model. Forcing a model turns automatic power off until you switch back to Auto.
+
+**Check it yourself.** With diagnostics enabled (`ANDROMEDA_DIAGNOSTICS=1`), every message logs the chosen level, its score and the reason.
+
+---
+
 ## 1. What is Andromeda Lite?
 
 Andromeda Lite runs language models on your own machine through [Ollama](https://ollama.com), so there's no cloud, no token limits, and nothing leaves your computer. It's more than a chat window on top of Ollama, though. It wraps a local model in a desktop app that can read and write files, call tools, pick the right model for each prompt, and manage the whole lifecycle of evaluating, versioning, promoting and monitoring those models.
@@ -54,7 +152,7 @@ I built it with two goals in mind. First, a genuinely useful offline AI app that
 - **Fully local inference.** Prompts and files never leave your machine, and it works offline.
 - **Adaptive model selection.** The app reads how complex a prompt is and picks a power level from low to ultra, within what your hardware can run. You can override it whenever you want.
 - **Sandboxed file actions.** The AI can read, write, move and delete files inside a workspace folder, using explicit action blocks that are reversible.
-- **MCP tools.** Connect Model Context Protocol servers (filesystem, git, web) in one click and the AI calls them when it needs to.
+- **MCP tools.** Connect Model Context Protocol servers from a catalog of 10 (git, Playwright, Notion, Linear, Figma and more) in one click, and the AI calls them when it needs to.
 - **Model registry, A/B testing and quality evaluation.** Version your models, promote the best one to production, compare two of them in real use with a proper statistical test, and track quality against SLOs over time.
 - **Plug-and-play models.** Anything you `ollama pull` shows up automatically. There are no config files to edit.
 - **Private by default.** Incognito mode keeps nothing, and network egress is off unless you turn it on.
@@ -239,7 +337,7 @@ If you're reviewing this as MLOps work, here's how each piece maps to a standard
 | **Infrastructure as code** | Full Kubernetes manifest set (Deployments, HPA, PDB, NetworkPolicy, ServiceMonitor) + Kustomize. |
 | **Rollback strategy** | One-click archive + re-promote of the previous production model. |
 | **Reproducibility** | Deterministic orchestration; pinned deps; config captured in MLflow runs. |
-| **Security** | Localhost-only CORS allowlist, sandboxed execution, security middleware stack, `bandit` clean. |
+| **Security** | Localhost-only CORS allowlist, sandboxed execution, security middleware stack, `bandit` with no medium or high findings. |
 
 More detailed docs for the MLOps stack are in [`deploy/README.md`](deploy/README.md).
 
@@ -283,7 +381,7 @@ andromeda-lite/
 │   ├── k8s/             # Kubernetes manifests + Kustomize
 │   ├── monitoring/      # Prometheus, Grafana, alert rules
 │   └── mlflow/          # MLflow tracking server
-├── tests/               # 160 passing tests
+├── tests/               # 1,257 passing tests
 ├── .github/workflows/   # CI/CD pipelines
 └── desktop.py           # Desktop entry point (pywebview + embedded backend)
 ```
@@ -297,7 +395,7 @@ andromeda-lite/
 ```bash
 # 1. Pull a model (any size your hardware can handle)
 ollama pull llama3.2:3b       # light and fast, a good starting point
-# or: ollama pull qwen2.5:7b   # more capable, needs more VRAM
+# or: ollama pull gemma3:27b   # more capable, needs 32 GB+ of memory
 
 # 2. Clone
 git clone https://github.com/PauAlonsoRacero/andromeda-lite.git
@@ -333,8 +431,8 @@ Then open Settings → Model Registry, promote the version to production, turn o
 
 | Aspect | Status |
 |--------|--------|
-| Backend tests | **160 passing** (`pytest`) |
-| Frontend build | 120 modules, clean |
+| Backend tests | **1257 passing** (`pytest`), on Linux, macOS and Windows in CI |
+| Frontend | ESLint (undefined names, Solid reactivity) + i18n key checks, clean |
 | Static security scan | `bandit`, 0 medium or high issues |
 | Dependency audit | `pip-audit` in CI |
 | Dead code | `pyflakes` clean in `backend/app` |

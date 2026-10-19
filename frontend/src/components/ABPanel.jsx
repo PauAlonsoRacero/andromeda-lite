@@ -22,19 +22,19 @@ export default function ABPanel() {
       const r = await axios.get('/api/ab')
       setExperiments(r.data.experiments || [])
       for (const e of r.data.experiments || []) loadResults(e.id)
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
   }
   async function loadModels() {
     try {
       const r = await axios.get('/api/models/ollama')
       setModels(r.data.models || [])
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
   }
   async function loadResults(id) {
     try {
       const r = await axios.get(`/api/ab/${encodeURIComponent(id)}/results`)
       setResults(prev => ({ ...prev, [id]: r.data }))
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
   }
 
   async function create() {
@@ -70,7 +70,7 @@ export default function ABPanel() {
   return (
     <div class="panel-page" style="max-width:760px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-        <div style="font-size:22px;font-weight:700">{t('ab.title')}</div>
+        <div style="font-size:var(--fs-lg);font-weight:700">{t('ab.title')}</div>
         <InfoButton title={t('ab.title')} intro={t('info.ab.intro')} tip={t('info.ab.tip')} items={[
           { h: t('info.ab.1h'), d: t('info.ab.1d') },
           { h: t('info.ab.2h'), d: t('info.ab.2d') },
@@ -78,7 +78,7 @@ export default function ABPanel() {
           { h: t('info.ab.4h'), d: t('info.ab.4d') },
         ]} />
       </div>
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:18px">{t('ab.sub')}</div>
+      <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:18px">{t('ab.sub')}</div>
 
       <Show when={!creating()}>
         <button class="btn btn-primary" onClick={() => setCreating(true)}>{t('ab.new')}</button>
@@ -88,7 +88,7 @@ export default function ABPanel() {
       <Show when={creating()}>
         <div class="card">
           <div class="card-title">{t('ab.new')}</div>
-          <input class="g-input" placeholder={t('ab.name_ph')} value={form().id}
+          <input aria-label={t('ab.name_ph')} class="g-input" placeholder={t('ab.name_ph')} value={form().id}
             onInput={e => setForm({ ...form(), id: e.target.value })} style="width:100%;margin-bottom:10px" />
           <div style="display:flex;gap:10px;margin-bottom:10px">
             <select class="g-input" style="flex:1" onChange={e => setForm({ ...form(), a: e.target.value })}>
@@ -100,7 +100,7 @@ export default function ABPanel() {
               <For each={models()}>{m => <option value={m} selected={form().b === m}>{m}</option>}</For>
             </select>
           </div>
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">{t('ab.split')}: A {form().weight}% · B {100 - form().weight}%</div>
+          <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:6px">{t('ab.split')}: A {form().weight}% · B {100 - form().weight}%</div>
           <input type="range" min="10" max="90" step="10" value={form().weight}
             onInput={e => setForm({ ...form(), weight: e.target.value })} style="width:100%;margin-bottom:12px" />
           <div style="display:flex;gap:8px">
@@ -119,8 +119,8 @@ export default function ABPanel() {
               <div class="card">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                   <div style="display:flex;align-items:center;gap:10px">
-                    <span style="font-size:15px;font-weight:700">{e.id}</span>
-                    <span style={`font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;${e.active ? 'background:rgba(52,211,153,.15);color:var(--green)' : 'background:var(--surface-2);color:var(--text-3)'}`}>
+                    <span style="font-size:var(--fs-md);font-weight:700">{e.id}</span>
+                    <span style={`font-size:var(--fs-micro);font-weight:700;padding:2px 8px;border-radius:10px;${e.active ? 'background:rgba(52,211,153,.15);color:var(--green)' : 'background:var(--surface-2);color:var(--text-3)'}`}>
                       {e.active ? t('ab.active') : t('ab.paused')}
                     </span>
                   </div>
@@ -134,13 +134,13 @@ export default function ABPanel() {
                   <For each={Object.entries(res().variants)}>
                     {([name, v]) => (
                       <div style="margin-bottom:12px">
-                        <div style="display:flex;justify-content:space-between;font-size:13px">
+                        <div style="display:flex;justify-content:space-between;font-size:var(--fs-base)">
                           <span><b>{name}</b> · <span style="font-family:var(--mono);color:var(--text-2)">{v.model}</span></span>
                           <span style="color:var(--text-3)">{v.requests} req · {v.success_rate}% · {v.avg_latency_ms}ms</span>
                         </div>
                         <Bar pct={v.success_rate} color={res().winner === name ? 'var(--green)' : 'var(--blue)'} />
                         <Show when={v.satisfaction != null}>
-                          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:6px">
+                          <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--text-3);margin-top:6px">
                             <span>👍 {t('ab.satisfaction')}</span>
                             <span>{v.satisfaction}% · {v.positive}/{v.ratings}</span>
                           </div>
@@ -151,8 +151,8 @@ export default function ABPanel() {
                   </For>
 
                   {/* Veredicto estadístico */}
-                  <div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--surface-1);font-size:12px;line-height:1.6">
-                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:2px">{t('ab.by_success')}</div>
+                  <div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface-1);font-size:var(--fs-sm);line-height:1.6">
+                    <div style="font-size:var(--fs-micro);text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:2px">{t('ab.by_success')}</div>
                     <Show when={res().confident} fallback={
                       <span style="color:var(--text-3)">
                         {res().enough_sample
@@ -168,7 +168,7 @@ export default function ABPanel() {
                     </Show>
                     {/* Veredicto por CALIDAD (satisfacción 👍/👎) */}
                     <Show when={res().quality_test || res().quality_leader}>
-                      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin:8px 0 2px">{t('ab.by_quality')}</div>
+                      <div style="font-size:var(--fs-micro);text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin:8px 0 2px">{t('ab.by_quality')}</div>
                       <Show when={res().quality_confident} fallback={
                         <span style="color:var(--text-3)">
                           {res().quality_enough_sample
@@ -192,7 +192,7 @@ export default function ABPanel() {
       </div>
 
       <Show when={experiments().length === 0 && !creating()}>
-        <div style="text-align:center;padding:40px;color:var(--text-3);font-size:13px">{t('ab.empty')}</div>
+        <div style="text-align:center;padding:40px;color:var(--text-3);font-size:var(--fs-base)">{t('ab.empty')}</div>
       </Show>
     </div>
   )

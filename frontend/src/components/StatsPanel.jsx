@@ -116,11 +116,11 @@ export default function StatsPanel() {
           </div>
           <div class="kpi-card">
             <div class="kpi-label">{t('stat.degradation')}</div>
-            <div class="kpi-val" style="color:var(--amber);font-size:22px">{(kpis()?.degradation_rate ?? 0).toFixed(0)}%</div>
+            <div class="kpi-val" style="color:var(--amber);font-size:var(--fs-lg)">{(kpis()?.degradation_rate ?? 0).toFixed(0)}%</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">TTFT medio</div>
-            <div class="kpi-val" style={`color:${latColor(kpis()?.avg_ttft_ms)};font-size:22px`}>{fmtMs(kpis()?.avg_ttft_ms)}</div>
+            <div class="kpi-val" style={`color:${latColor(kpis()?.avg_ttft_ms)};font-size:var(--fs-lg)`}>{fmtMs(kpis()?.avg_ttft_ms)}</div>
           </div>
         </div>
 
@@ -129,14 +129,14 @@ export default function StatsPanel() {
           <LineChart values={seriesVals()} height={180}
             empty="Necesitas al menos 2 ejecuciones para ver la tendencia. Haz varias preguntas en el Chat." />
           <Show when={seriesVals().length > 1}>
-            <div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:6px">{t('stat.oldest_newest')}</div>
+            <div style="font-size:var(--fs-xs);color:var(--text-3);text-align:center;margin-top:6px">{t('stat.oldest_newest')}</div>
           </Show>
         </div>
 
         <div class="card">
           <div class="card-title">{t('ui2.recent_activity')}</div>
           <Show when={traces().length > 0} fallback={
-            <div style="text-align:center;padding:40px;color:var(--text-3);font-size:13px">{t('ui2.no_activity')}</div>
+            <div style="text-align:center;padding:40px;color:var(--text-3);font-size:var(--fs-base)">{t('ui2.no_activity')}</div>
           }>
             <table class="g-table">
               <thead><tr><th>Prompt</th><th>Estrategia</th><th>Especialistas</th><th>Latencia</th><th></th></tr></thead>
@@ -145,9 +145,9 @@ export default function StatsPanel() {
                   {(t) => (
                     <tr>
                       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{t.prompt_preview || '—'}</td>
-                      <td style="font-family:var(--mono);font-size:11px;color:var(--text-3)">{t.strategy_effective || '—'}</td>
-                      <td style="font-size:11px;color:var(--text-3)">{(t.specialists_used||[]).join(', ') || '—'}</td>
-                      <td style={`font-family:var(--mono);font-size:11px;color:${latColor(t.latency_ms)}`}>{fmtMs(t.latency_ms)}</td>
+                      <td style="font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-3)">{t.strategy_effective || '—'}</td>
+                      <td style="font-size:var(--fs-xs);color:var(--text-3)">{(t.specialists_used||[]).join(', ') || '—'}</td>
+                      <td style={`font-family:var(--mono);font-size:var(--fs-xs);color:${latColor(t.latency_ms)}`}>{fmtMs(t.latency_ms)}</td>
                       <td><span style={`color:${t.success?'var(--green)':'var(--red)'};font-weight:700`}>{t.success?'OK':'ERR'}</span></td>
                     </tr>
                   )}
@@ -177,12 +177,12 @@ export default function StatsPanel() {
           <div class="card">
             <div class="card-title">Percentiles de latencia · {pct().count} muestras</div>
             <div class="kpi-grid" style="margin-bottom:0">
-              <div class="kpi-card"><div class="kpi-label">P50</div><div class="kpi-val" style={`font-size:18px;color:${latColor(pct().p50)}`}>{fmtMs(pct().p50)}</div></div>
-              <div class="kpi-card"><div class="kpi-label">P90</div><div class="kpi-val" style={`font-size:18px;color:${latColor(pct().p90)}`}>{fmtMs(pct().p90)}</div></div>
-              <div class="kpi-card"><div class="kpi-label">P95</div><div class="kpi-val" style={`font-size:18px;color:${latColor(pct().p95)}`}>{fmtMs(pct().p95)}</div></div>
-              <div class="kpi-card"><div class="kpi-label">P99</div><div class="kpi-val" style={`font-size:18px;color:${latColor(pct().p99)}`}>{fmtMs(pct().p99)}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Min</div><div class="kpi-val" style="font-size:18px;color:var(--green)">{fmtMs(pct().min)}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Max</div><div class="kpi-val" style="font-size:18px;color:var(--red)">{fmtMs(pct().max)}</div></div>
+              <div class="kpi-card"><div class="kpi-label">P50</div><div class="kpi-val" style={`font-size:var(--fs-lg);color:${latColor(pct().p50)}`}>{fmtMs(pct().p50)}</div></div>
+              <div class="kpi-card"><div class="kpi-label">P90</div><div class="kpi-val" style={`font-size:var(--fs-lg);color:${latColor(pct().p90)}`}>{fmtMs(pct().p90)}</div></div>
+              <div class="kpi-card"><div class="kpi-label">P95</div><div class="kpi-val" style={`font-size:var(--fs-lg);color:${latColor(pct().p95)}`}>{fmtMs(pct().p95)}</div></div>
+              <div class="kpi-card"><div class="kpi-label">P99</div><div class="kpi-val" style={`font-size:var(--fs-lg);color:${latColor(pct().p99)}`}>{fmtMs(pct().p99)}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Min</div><div class="kpi-val" style="font-size:var(--fs-lg);color:var(--green)">{fmtMs(pct().min)}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Max</div><div class="kpi-val" style="font-size:var(--fs-lg);color:var(--red)">{fmtMs(pct().max)}</div></div>
             </div>
           </div>
         </Show>
@@ -191,13 +191,13 @@ export default function StatsPanel() {
           <div class="card" style={`border-color:${drift().drift_detected ? 'rgba(248,113,113,0.3)' : 'var(--glass-border)'}`}>
             <div class="card-title">{t('stat.drift')}</div>
             <Show when={drift().baseline > 0} fallback={
-              <div style="font-size:13px;color:var(--text-3)">{drift().reason || 'Sin datos suficientes'}</div>
+              <div style="font-size:var(--fs-base);color:var(--text-3)">{drift().reason || 'Sin datos suficientes'}</div>
             }>
               <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-                <div style={`font-size:13px;font-weight:700;padding:6px 14px;border-radius:10px;background:${drift().drift_detected?'rgba(248,113,113,0.15)':'rgba(52,211,153,0.15)'};color:${drift().drift_detected?'var(--red)':'var(--green)'}`}>
+                <div style={`font-size:var(--fs-base);font-weight:700;padding:6px 14px;border-radius:10px;background:${drift().drift_detected?'rgba(248,113,113,0.15)':'rgba(52,211,153,0.15)'};color:${drift().drift_detected?'var(--red)':'var(--green)'}`}>
                   {drift().drift_detected ? 'DRIFT DETECTADO' : 'Estable'}
                 </div>
-                <div style="font-size:13px;color:var(--text-2)">
+                <div style="font-size:var(--fs-base);color:var(--text-2)">
                   Baseline: <b>{fmtMs(drift().baseline)}</b> → Reciente: <b>{fmtMs(drift().recent)}</b>
                   <span style={`margin-left:8px;color:${drift().change_pct>0?'var(--red)':'var(--green)'}`}>
                     ({drift().change_pct > 0 ? '+' : ''}{drift().change_pct}%)
@@ -245,10 +245,10 @@ export default function StatsPanel() {
                 <For each={mlops().model_registry}>
                   {(m) => (
                     <tr>
-                      <td style="font-size:12px">{m.specialist_id}</td>
-                      <td style="font-family:var(--mono);font-size:11px;color:var(--text-3)">{m.model_name}</td>
+                      <td style="font-size:var(--fs-sm)">{m.specialist_id}</td>
+                      <td style="font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-3)">{m.model_name}</td>
                       <td>T{m.hardware_tier}</td>
-                      <td style={`font-family:var(--mono);font-size:11px;color:${latColor(m.avg_latency_ms)}`}>{fmtMs(m.avg_latency_ms)}</td>
+                      <td style={`font-family:var(--mono);font-size:var(--fs-xs);color:${latColor(m.avg_latency_ms)}`}>{fmtMs(m.avg_latency_ms)}</td>
                       <td style="color:var(--green)">{m.success_count || 0}</td>
                       <td style={`color:${(m.error_count||0)>0?'var(--red)':'var(--text-3)'}`}>{m.error_count || 0}</td>
                     </tr>
@@ -265,7 +265,7 @@ export default function StatsPanel() {
             <a href="/api/mlops/export/csv" target="_blank" class="btn btn-glass" style="text-decoration:none">CSV</a>
             <a href="/api/mlops/export/prometheus" target="_blank" class="btn btn-glass" style="text-decoration:none">Prometheus</a>
           </div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:10px">{t('stat.export_note')}</div>
+          <div style="font-size:var(--fs-sm);color:var(--text-3);margin-top:10px">{t('stat.export_note')}</div>
         </div>
       </Show>
 
@@ -297,10 +297,10 @@ export default function StatsPanel() {
               <div style="font-size:34px;font-weight:800;background:var(--grad-primary);-webkit-background-clip:text;background-clip:text;color:transparent">
                 ${projection().savedMonth.toFixed(2)}
               </div>
-              <div style="font-size:12px;color:var(--text-3)">estimado / mes ejecutando local</div>
+              <div style="font-size:var(--fs-sm);color:var(--text-3)">estimado / mes ejecutando local</div>
             </div>
             <div style="flex:1;min-width:200px">
-              <div style="font-size:13px;color:var(--text-2);line-height:1.6">
+              <div style="font-size:var(--fs-base);color:var(--text-2);line-height:1.6">
                 Con tu ritmo actual proyectado a 30 días, una API cloud equivalente
                 facturaría alrededor de <b style="color:var(--text-1)">${projection().savedMonth.toFixed(2)}</b>.
                 En Andromeda esa inferencia corre en tu hardware: coste de API <b style="color:var(--green)">$0</b>.
@@ -325,7 +325,7 @@ export default function StatsPanel() {
             <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
               <For each={errors().by_strategy}>
                 {(e) => (
-                  <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-sm)">
                     <span style="color:var(--text-2);font-family:var(--mono)">{e.strategy || '—'}</span>
                     <span style={`font-weight:700;color:${(e.failed||0)>0?'var(--red)':'var(--green)'}`}>{e.failed || 0} / {e.total || 0}</span>
                   </div>

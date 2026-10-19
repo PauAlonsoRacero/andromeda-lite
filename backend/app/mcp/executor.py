@@ -42,9 +42,12 @@ class MCPExecutor:
     Se integra en el pipeline del orquestador.
     """
 
-    def __init__(self, manager: MCPManager, metrics=None):
+    def __init__(self, manager: MCPManager, metrics=None, tools=None):
         self.manager = manager
         self.metrics = metrics
+        # Subconjunto de herramientas a ofrecer al modelo. Por defecto todas;
+        # el streaming pasa solo las relevantes para el mensaje.
+        self._tools = tools
 
     async def run_with_tools(
         self,
@@ -86,56 +89,170 @@ class MCPExecutor:
                 # No hay más herramientas — respuesta final
                 return response_text, tool_calls_log
 
-            # Ejecutar las herramientas solicitadas
-            logger.info(f"MCP ronda {round_n+1}: {len(tool_calls)} herramientas a ejecutar")
-            tool_results = []
-            for tc in tool_calls:
-                t_start = time.perf_counter()
-                result = await self.manager.call_tool(tc["name"], tc["input"])
-                elapsed = (time.perf_counter() - t_start) * 1000
-
-                tool_calls_log.append({
-                    "tool":       tc["name"],
-                    "input":      tc["input"],
-                    "result":     result.text[:500],
-                    "is_error":   result.is_error,
-                    "latency_ms": round(elapsed, 1),
-                })
-
-                logger.info(f"  [{tc['name']}] {'ERROR' if result.is_error else 'OK'} ({elapsed:.0f}ms)")
-                # Analytics: registrar la ejecución (params sanitizados dentro)
-                if self.metrics is not None:
-                    try:
-                        self.metrics.record_tool_call(
-                            name=tc["name"],
-                            latency_ms=elapsed,
-                            success=not result.is_error,
-                            params=tc.get("input"),
-                            error=result.error_msg if result.is_error else None,
-                        )
-                    except Exception:
-                        pass  # analytics nunca debe romper la ejecución
-                tool_results.append({
-                    "tool":   tc["name"],
-                    "result": result.text if not result.is_error else f"ERROR: {result.error_msg}",
-                })
-
-            # Añadir el resultado al historial de mensajes
-            messages.append({"role": "assistant", "content": response_text})
-            results_text = "\n".join(
-                f"[{r['tool']}]: {r['result']}" for r in tool_results
-            )
-            messages.append({
-                "role":    "user",
-                "content": f"Resultados de las herramientas:\n{results_text}\n\nContinúa con la respuesta.",
-            })
+            await self._run_tool_calls(tool_calls, messages, response_text, tool_calls_log)
 
         # Máximo de rondas alcanzado
         return response_text, tool_calls_log
 
+
+    async def _run_tool_calls(self, tool_calls, messages, response_text, tool_calls_log):
+        """Ejecuta las herramientas pedidas y añade sus resultados a la conversación."""
+        # Ejecutar las herramientas solicitadas
+        logger.info(f"MCP: {len(tool_calls)} herramientas a ejecutar")
+        tool_results = []
+        for tc in tool_calls:
+            t_start = time.perf_counter()
+            result = await self.manager.call_tool(tc["name"], tc["input"])
+            elapsed = (time.perf_counter() - t_start) * 1000
+
+            tool_calls_log.append({
+                "tool":       tc["name"],
+                "input":      tc["input"],
+                "result":     result.text[:500],
+                "is_error":   result.is_error,
+                "latency_ms": round(elapsed, 1),
+            })
+
+            logger.info(f"  [{tc['name']}] {'ERROR' if result.is_error else 'OK'} ({elapsed:.0f}ms)")
+            # Analytics: registrar la ejecución (params sanitizados dentro)
+            if self.metrics is not None:
+                try:
+                    self.metrics.record_tool_call(
+                        name=tc["name"],
+                        latency_ms=elapsed,
+                        success=not result.is_error,
+                        params=tc.get("input"),
+                        error=result.error_msg if result.is_error else None,
+                    )
+                except Exception:
+                    pass  # analytics nunca debe romper la ejecución
+            tool_results.append({
+                "tool":   tc["name"],
+                "result": result.text if not result.is_error else f"ERROR: {result.error_msg}",
+            })
+
+        # Añadir el resultado al historial de mensajes
+        messages.append({"role": "assistant", "content": response_text})
+        results_text = "\n".join(
+            f"[{r['tool']}]: {r['result']}" for r in tool_results
+        )
+        messages.append({
+            "role":    "user",
+            "content": f"Resultados de las herramientas:\n{results_text}\n\nContinúa con la respuesta.",
+        })
+
+
+    async def stream_with_tools(
+        self, *, prompt: str, model_name: str, system_prompt: str, ollama_url: str,
+        on_token, options: dict | None = None, keep_alive: str = "30m",
+        max_tool_rounds: int = 3,
+    ) -> tuple[str, list[dict]]:
+        """Como run_with_tools, pero emitiendo el texto a medida que se genera.
+
+        run_with_tools genera cada ronda sin streaming: con herramientas
+        conectadas, el usuario esperaba en silencio toda la generación (14 s en
+        un caso real) aunque el modelo no llegara a usar ninguna herramienta.
+
+        Aquí cada ronda va en streaming. El texto se retiene solo mientras pueda
+        ser una llamada a herramienta (empieza por "<tool" o "{"); en cuanto es
+        claramente texto normal se emite en directo. Si a mitad de respuesta
+        aparece una llamada, se deja de emitir desde ese punto.
+        """
+        import json as _json
+
+        messages = [{"role": "user", "content": prompt}]
+        tool_calls_log: list[dict] = []
+        sistema = system_prompt + self._tools_system_injection()
+        texto = ""
+        for ronda in range(max_tool_rounds + 1):
+            permite_herramientas = ronda < max_tool_rounds
+            texto = ""          # lo generado en esta ronda (sin razonamiento)
+            emitido = 0         # cuánto de `texto` ya se ha enviado
+            retenido = True     # ¿esperando a saber si es una llamada?
+            en_llamada = False  # ya empezó una llamada: nada más de la ronda se muestra
+            en_think = False
+            try:
+                async with httpx.AsyncClient(trust_env=False) as client:
+                    async with client.stream("POST", f"{ollama_url}/api/chat", json={
+                        "model": model_name,
+                        "messages": [{"role": "system", "content": sistema}, *messages],
+                        "options": options or {"temperature": 0.3, "num_predict": 4096},
+                        "keep_alive": keep_alive,
+                        "stream": True,
+                    }, timeout=180.0) as resp:
+                        resp.raise_for_status()
+                        async for linea in resp.aiter_lines():
+                            if not linea.strip():
+                                continue
+                            try:
+                                dato = _json.loads(linea)
+                            except ValueError:
+                                continue
+                            token = (dato.get("message") or {}).get("content", "")
+                            if not token:
+                                continue
+                            # El razonamiento interno (<think>) nunca se muestra.
+                            if "<think>" in token:
+                                en_think = True
+                            if en_think:
+                                if "</think>" in token:
+                                    en_think = False
+                                continue
+                            texto += token
+                            # Tras el inicio de una llamada, todo lo demás de la ronda
+                            # es la propia llamada. Antes se volvía a emitir y en el
+                            # chat aparecía '"fetch", "input": {…}}</t'.
+                            if en_llamada:
+                                continue
+
+                            if retenido:
+                                inicio = texto.lstrip()
+                                parece_llamada = permite_herramientas and (
+                                    inicio.startswith("<tool") or inicio.startswith("{")
+                                    or "<tool_call>".startswith(inicio[:11]))
+                                if parece_llamada and len(inicio) < 400:
+                                    continue          # seguir esperando
+                                retenido = False
+                            # Si aparece una llamada a mitad de texto (en cualquiera
+                            # de los dos formatos), cortar ahí. Antes solo se vigilaba
+                            # <tool_call> y el formato JSON {"tool": …} se colaba en
+                            # el texto visible y en el historial.
+                            pendiente = texto[emitido:]
+                            marcas = [pendiente.find(m) for m in ("<tool_call>", '{"tool"')
+                                      if permite_herramientas and m in pendiente]
+                            if marcas:
+                                corte = emitido + min(marcas)
+                                if corte > emitido:
+                                    await on_token(texto[emitido:corte])
+                                emitido = corte
+                                en_llamada = True
+                                continue
+                            # Se reservan los últimos caracteres: una marca puede
+                            # llegar partida en dos tokens ('{"to' + 'ol"').
+                            seguro = len(texto) - 10
+                            if seguro > emitido:
+                                await on_token(texto[emitido:seguro])
+                                emitido = seguro
+            except Exception as exc:                      # noqa: BLE001
+                logger.error(f"Error en streaming con herramientas: {exc}")
+                if not texto:
+                    raise
+
+            llamadas = self._extract_tool_calls(texto) if permite_herramientas else []
+            if not llamadas:
+                # Lo retenido resultó no ser una llamada: se emite ahora.
+                if emitido < len(texto):
+                    await on_token(texto[emitido:])
+                return texto, tool_calls_log
+            # Hubo llamada: lo reservado al final no debe verse.
+
+            logger.info(f"MCP ronda {ronda + 1}: {len(llamadas)} herramientas a ejecutar")
+            await self._run_tool_calls(llamadas, messages, texto, tool_calls_log)
+        return texto, tool_calls_log
+
     def _tools_system_injection(self) -> str:
         """Añade instrucciones de uso de herramientas al system prompt."""
-        tools = self.manager.tools
+        tools = self._tools if self._tools is not None else self.manager.tools
         if not tools:
             return ""
         # Describir cada herramienta CON sus parámetros, para que el modelo sepa
@@ -220,6 +337,9 @@ Usa rutas simples (solo el nombre, p. ej. "index.html" o "notas/todo.txt"). Andr
                             *messages,
                         ],
                         "options": {"temperature": 0.3, "num_predict": 4096},
+                        # Sin keep_alive, Ollama descargaba el modelo y cada
+                        # respuesta con herramientas podía pagar la recarga.
+                        "keep_alive": __import__("os").environ.get("ANDROMEDA_KEEP_ALIVE") or "30m",
                         "stream":  False,
                     },
                     timeout=120.0,
@@ -229,3 +349,64 @@ Usa rutas simples (solo el nombre, p. ej. "index.html" o "notas/todo.txt"). Andr
         except Exception as exc:
             logger.error(f"Error llamando al modelo: {exc}")
             return f"Error: {exc}"
+
+
+
+# ── Selección de herramientas relevantes ──────────────────────────────────
+# Con 6 conectores, cada mensaje inyectaba 52 herramientas: miles de tokens de
+# instrucciones antes de empezar, y un modelo de 8B que se confundía y llamaba
+# a herramientas con argumentos inventados.
+
+# La escritura de archivos la hace Andromeda con sus bloques ```andromeda:write```,
+# que sí funcionan. Ofrecer además las de los conectores provocaba que el modelo
+# usara edit_file con argumentos erróneos, fallara, y dijera que lo había hecho.
+_ESCRITURA = {"write_file", "edit_file", "create_directory", "move_file", "append_file",
+              "delete_file", "make_dir", "create_file"}
+
+_VACIAS = {"the", "and", "for", "with", "that", "this", "from", "into", "your", "you",
+           "que", "para", "con", "por", "los", "las", "una", "uno", "del", "est",
+           "tool", "tools", "use", "using", "file", "files", "returns", "given"}
+
+
+def _palabras(texto: str) -> set[str]:
+    import re as _re
+    texto = _re.sub(r"[_\-]", " ", (texto or "").lower())
+    return {w for w in _re.findall(r"[a-záéíóúñ]{4,}", texto) if w not in _VACIAS}
+
+
+def select_tools(tools, prompt: str, k: int = 6) -> list:
+    """Herramientas relevantes para el mensaje (lista vacía = no usar ninguna).
+
+    Coincidencia de palabras entre el mensaje y el nombre y la descripción de
+    cada herramienta. Casos directos: una URL activa las de lectura web; pedir
+    la hora activa las de tiempo.
+    """
+    import re as _re
+    p = (prompt or "").lower()
+    palabras = _palabras(p)
+    tiene_url = bool(_re.search(r"https?://", p))
+    pide_hora = bool(_re.search(r"\b(hora|time|zona horaria|timezone|uhr|heure)\b", p))
+    puntuadas = []
+    for t in tools or []:
+        nombre = getattr(t, "name", "") or ""
+        if nombre in _ESCRITURA:
+            continue
+        if getattr(t, "server_id", "") == "builtin-fs":
+            continue
+        texto_t = f"{nombre} {getattr(t, 'description', '') or ''}"
+        puntos = len(palabras & _palabras(texto_t))
+        # Abrir páginas solo con una URL en el mensaje: la búsqueda web ya la hace
+        # Andromeda, y sin esta regla el modelo inventaba URLs para "fetch"
+        # ("https://www.media markt.es/ps5-pro") y encadenaba fallos.
+        es_web = any(x in nombre.lower() for x in ("fetch", "navigate", "scrape", "browse",
+                                                   "puppeteer", "screenshot", "click"))
+        if es_web and not tiene_url:
+            continue
+        if tiene_url and es_web:
+            puntos += 3
+        if pide_hora and "time" in nombre:
+            puntos += 3
+        if puntos >= 2 or (puntos >= 1 and len(palabras) <= 4):
+            puntuadas.append((puntos, t))
+    puntuadas.sort(key=lambda x: -x[0])
+    return [t for _, t in puntuadas[:k]]

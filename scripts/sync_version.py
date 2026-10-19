@@ -45,6 +45,15 @@ def main():
         cfg.write_text(s)
         print(f"✓ backend/app/config.py → {version}")
 
+    # frontend/package.json — se quedaba fuera de la sincronización, así que
+    # divergía en silencio (llegó a estar en 2.2.0 con el resto en 1.0.0).
+    pkg = ROOT / "frontend" / "package.json"
+    if pkg.exists():
+        s = pkg.read_text()
+        s = re.sub(r'"version":\s*"[^"]*"', f'"version": "{version}"', s, count=1)
+        pkg.write_text(s)
+        print(f"✓ frontend/package.json → {version}")
+
     print(f"\nVersión sincronizada: {version}")
 
 

@@ -11,6 +11,8 @@
  *   data: {"chunk_id":"...","content":"...","is_final":true,"metadata":{...}}\n\n
  *   data: [DONE]\n\n
  */
+import { t } from '../stores/i18n.js'
+
 
 /**
  * Abre un stream SSE al backend de Andromeda.
@@ -27,16 +29,59 @@
  *
  * @returns {function} cancel — llama a cancel() para abortar el stream
  */
+/**
+ * Reparte el texto recibido fotograma a fotograma.
+ *
+ * Llega a bloques (cada consulta trae todo lo generado desde la anterior); si se
+ * pintara tal cual, el texto aparecería a saltos. Aquí se revela poco a poco, y
+ * la velocidad se adapta a lo pendiente: con mucho acumulado acelera, para no
+ * quedarse nunca más de ~0,3 s por detrás de lo que ya ha generado el modelo.
+ */
+function createSmoother(emit) {
+  let queue = ''
+  let spec = null
+  let raf = null
+  let onDrained = null
+  const tick = () => {
+    if (!queue) {
+      raf = null
+      if (onDrained) { const f = onDrained; onDrained = null; f() }
+      return
+    }
+    const n = Math.max(2, Math.ceil(queue.length / 18))
+    emit?.(queue.slice(0, n), spec)
+    queue = queue.slice(n)
+    raf = requestAnimationFrame(tick)
+  }
+  return {
+    push(text, specialist) {
+      queue += text
+      if (specialist) spec = specialist
+      if (!raf) raf = requestAnimationFrame(tick)
+    },
+    flush() {
+      if (!queue && !raf) return Promise.resolve()
+      return new Promise(resolve => { onDrained = resolve; if (!raf) raf = requestAnimationFrame(tick) })
+    },
+    cancel() { if (raf) cancelAnimationFrame(raf); raf = null; queue = '' },
+  }
+}
+
 export function openStream({
   prompt,
   strategy = 'auto',
   specialists = [],
   temperature = 0.7,
-  maxTokens = 2048,
+  // 8192: con 2048 una página web completa se cortaba a mitad del archivo
+  // y se guardaba un HTML truncado. El backend lo ajusta al hardware.
+  maxTokens = 8192,
   parallel_policy = 'auto',
   max_parallel = null,
   specialist_levels = {},
   force_model = null,
+  project_id = null,
+  project_name = null,
+  project_instructions = null,
   images = [],
   incognito = false,
   conversation_history = [],
@@ -56,41 +101,74 @@ export function openStream({
     || (window.__ANDROMEDA_DESKTOP__ === true)
 
   if (isDesktop) {
+    // Escritorio: WKWebView no lee respuestas a trozos, así que el backend
+    // genera en streaming y aquí se consulta el progreso cada ~100 ms. El
+    // suavizador reparte el texto nuevo fotograma a fotograma para que se vea
+    // escribirse de forma continua, no a saltos.
+    let stopped = false
+    let jobId = null
+    const headers = { 'Content-Type': 'application/json' }
+    try {
+      const saved = JSON.parse(localStorage.getItem('andromeda_session') || 'null')
+      if (saved?.token) headers['X-Andromeda-Token'] = saved.token
+    } catch { /* sin sesión guardada */ }
+    const smoother = createSmoother(onToken)
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
     ;(async () => {
       try {
-        const headers = { 'Content-Type': 'application/json' }
-        try {
-          const saved = JSON.parse(localStorage.getItem('andromeda_session') || 'null')
-          if (saved?.token) headers['X-Andromeda-Token'] = saved.token
-        } catch {}
-        onPlaceholder?.('Pensando…')
-        const response = await fetch('/api/chat', {
+        onPlaceholder?.(t('phase.thinking'))
+        const response = await fetch('/api/chat/jobs', {
           method: 'POST', headers, signal: controller.signal,
           body: JSON.stringify({
             prompt, strategy, specialists, temperature, max_tokens: maxTokens,
             stream: false, incognito, web_search: !incognito, parallel_policy,
             images, max_parallel, specialist_levels, force_model,
+            project_id, project_name, project_instructions,
+            // El historial se recibía como parámetro pero NO se enviaba: la IA
+            // no recordaba nada de lo hablado en el mismo chat, así que un
+            // "búscalo, por favor" no tenía a qué referirse.
+            conversation_history,
           }),
         })
         if (!response.ok) {
           let err; try { err = await response.json() } catch { err = { message: `HTTP ${response.status}` } }
           onError?.(err); return
         }
-        const data = await response.json()
-        // El JSON completo trae la respuesta final y metadata.
-        const text = data.response || data.content || ''
-        const specId = (data.specialists_used && data.specialists_used[0]) || null
-        if (text) onToken?.(text, specId)
-        onComplete?.({
-          power_tier: data.power_tier, power_reason: data.power_reason,
-          models_used: data.models_used, latency_ms: data.latency_ms,
-          ...data,
-        })
+        jobId = (await response.json()).job_id
+        let offset = 0
+        let lastPhase = null
+        while (!stopped) {
+          const r = await fetch(`/api/chat/jobs/${jobId}?since=${offset}`, { headers, signal: controller.signal })
+          if (!r.ok) { onError?.({ message: t('err.generic') }); return }
+          const d = await r.json()
+          if (d.delta) {
+            smoother.push(d.delta, d.specialist)
+            offset = d.offset
+          } else if (offset === 0 && d.phase !== lastPhase) {
+            // Mientras no haya texto, la frase refleja lo que está pasando de verdad.
+            lastPhase = d.phase
+            onPlaceholder?.(d.phase === 'thinking' && d.phrase ? d.phrase : t('phase.' + d.phase))
+          }
+          if (d.done) {
+            await smoother.flush()
+            if (d.error && offset === 0) { onError?.(d.error); return }
+            onComplete?.({ ...(d.meta || {}) })
+            return
+          }
+          // Antes del primer token se consulta con menos frecuencia.
+          await sleep(offset === 0 ? 250 : 90)
+        }
       } catch (e) {
-        if (e.name !== 'AbortError') onError?.({ message: e.message || 'Error de red' })
+        if (e.name !== 'AbortError') onError?.({ message: e.message || t('err.no_connection') })
       }
     })()
-    return () => controller.abort()
+    return () => {
+      stopped = true
+      smoother.cancel()
+      controller.abort()
+      if (jobId) fetch(`/api/chat/jobs/${jobId}`, { method: 'DELETE', headers }).catch(() => {})
+    }
   }
 
   // Lanzar la petición de forma async sin bloquear
@@ -121,6 +199,8 @@ export function openStream({
           max_parallel,
           specialist_levels,
           force_model,
+          project_id, project_name, project_instructions,
+          conversation_history,
         }),
         signal: controller.signal,
       })
@@ -166,6 +246,9 @@ export function openStream({
             if (chunk.is_final) {
               // Último chunk — contiene los metadatos completos
               onComplete?.(chunk.metadata || {})
+            } else if (chunk.metadata?.phase) {
+              // Fase real del proceso (p. ej. buscando en internet)
+              onPlaceholder?.(t('phase.' + chunk.metadata.phase))
             } else if (chunk.metadata?.placeholder) {
               // Frase de espera mientras el modelo carga (antes del primer token)
               onPlaceholder?.(chunk.metadata.placeholder, chunk.metadata.power_level)
@@ -183,7 +266,7 @@ export function openStream({
       // Ignorar errores de abort (el usuario canceló)
       if (err.name !== 'AbortError') {
         // Mensaje específico según el tipo de fallo
-        let msg = err?.message || 'Error desconocido'
+        let msg = err?.message || t('err.generic')
         if (err instanceof TypeError && /fetch/i.test(msg)) {
           msg = 'No se pudo conectar con el backend (¿está corriendo en :8000?)'
         }

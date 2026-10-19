@@ -7,8 +7,9 @@
  * - Los hechos del mismo tipo se REEMPLAZAN (catalán sustituye a alemán).
  * - El usuario puede editar el bloque entero a mano; su texto manda.
  */
-import { createSignal, onMount, Show } from 'solid-js'
+import { createSignal, onMount, onCleanup, Show } from 'solid-js'
 import axios from 'axios'
+import MemoryFiles from './MemoryFiles.jsx'
 import { t } from '../stores/i18n.js'
 import InfoButton from './InfoButton.jsx'
 
@@ -25,6 +26,21 @@ export default function MemoryPanel() {
   }
 
   onMount(load)
+
+  // Memoria por significado: se activa sola al arrancar (descarga el modelo de
+  // embeddings si falta). Aquí se muestra su estado, y durante la descarga se
+  // refresca para ver el progreso.
+  const [sem, setSem] = createSignal(null)
+  let semTimer
+  const cargarSem = async () => {
+    try {
+      const d = (await axios.get('/api/memory/semantic')).data
+      setSem(d)
+      if (d.status !== 'downloading' && d.status !== 'pending' && d.status !== 'waiting_ollama') clearInterval(semTimer)
+    } catch { clearInterval(semTimer) }
+  }
+  onMount(() => { cargarSem(); semTimer = setInterval(cargarSem, 2000) })
+  onCleanup(() => clearInterval(semTimer))
   async function load() {
     setLoading(true)
     try {
@@ -69,7 +85,19 @@ export default function MemoryPanel() {
 
   return (
     <div class="panel-page" style="max-width:760px">
-      <div class="panel-page-header">
+      <Show when={sem()}>
+        <div class={`sem-status sem-${sem().status}`} role="status">
+          <span class="sem-dot" aria-hidden="true" />
+          <span>
+            {t('mem.semantic_' + sem().status)}
+            <Show when={sem().status === 'downloading'}> · {sem().progress}%</Show>
+            <Show when={sem().status === 'ready' && sem().backfilled}> · {sem().backfilled} {t('mem.semantic_backfilled')}</Show>
+          </span>
+        </div>
+      </Show>
+      {/* Ajustes y memoria organizada, como en Claude */}
+      <MemoryFiles />
+      <div class="panel-page-header" style="margin-top:22px">
         <div>
           <div style="display:flex;align-items:center;gap:9px"><div class="panel-page-title">{t('mem.title')}</div><InfoButton title={t('mem.title')} intro={t('info.mem.intro')} tip={t('info.mem.tip')} items={[
             { h: t('info.mem.1h'), d: t('info.mem.1d') },
@@ -79,7 +107,7 @@ export default function MemoryPanel() {
           ]} /></div>
           <div class="panel-page-sub">{t('mem.subtitle')}</div>
         </div>
-        <button class="btn btn-ghost" onClick={load} title={t('mem.refresh')}>↺</button>
+        <button class="btn btn-ghost" onClick={load} title={t('mem.refresh')} aria-label={t('mem.refresh')}>↺</button>
       </div>
 
       <Show when={!loading()} fallback={
@@ -87,7 +115,7 @@ export default function MemoryPanel() {
       }>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div style="font-size:14px;font-weight:700;color:var(--text-1)">{t('mem.block_title')}</div>
+            <div style="font-size:var(--fs-base);font-weight:700;color:var(--text-1)">{t('mem.block_title')}</div>
             <Show when={!editing()}>
               <button class="btn btn-ghost btn-sm" onClick={startEdit}>{t('mem.edit')}</button>
             </Show>
@@ -96,15 +124,15 @@ export default function MemoryPanel() {
           {/* Modo lectura: bloque de texto cohesivo (estilo Claude) */}
           <Show when={!editing()}>
             <Show when={!profile()?.is_empty} fallback={
-              <div style="padding:24px 4px;color:var(--text-3);font-size:13px;line-height:1.6">
+              <div style="padding:24px 4px;color:var(--text-3);font-size:var(--fs-base);line-height:1.6">
                 {t('mem.empty_block')}
               </div>
             }>
-              <div style="font-size:14px;line-height:1.7;color:var(--text-1);white-space:pre-wrap">
+              <div style="font-size:var(--fs-base);line-height:1.7;color:var(--text-1);white-space:pre-wrap">
                 {profile()?.text}
               </div>
               <Show when={updatedLabel()}>
-                <div style="margin-top:14px;font-size:11px;color:var(--text-3)">
+                <div style="margin-top:14px;font-size:var(--fs-xs);color:var(--text-3)">
                   {t('mem.updated')} · {updatedLabel()}
                 </div>
               </Show>
@@ -119,7 +147,7 @@ export default function MemoryPanel() {
               onInput={e => setDraft(e.target.value)}
               placeholder={t('mem.edit_ph')}
               rows={8}
-              style="width:100%;resize:vertical;font-size:14px;line-height:1.7"
+              style="width:100%;resize:vertical;font-size:var(--fs-base);line-height:1.7"
             />
             <div style="display:flex;gap:8px;margin-top:12px">
               <button class="btn btn-primary" onClick={save} disabled={saving()}>
@@ -132,7 +160,7 @@ export default function MemoryPanel() {
           </Show>
 
           <Show when={toast()}>
-            <div style={`margin-top:12px;font-size:12px;padding:8px 12px;border-radius:var(--r-sm);${toast().type === 'ok' ? 'background:rgba(52,211,153,.12);color:var(--green)' : 'background:rgba(248,113,113,.12);color:var(--red)'}`}>
+            <div style={`margin-top:12px;font-size:var(--fs-sm);padding:8px 12px;border-radius:var(--r-sm);${toast().type === 'ok' ? 'background:rgba(52,211,153,.12);color:var(--green)' : 'background:rgba(248,113,113,.12);color:var(--red)'}`}>
               {toast().text}
             </div>
           </Show>

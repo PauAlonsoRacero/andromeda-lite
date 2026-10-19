@@ -72,3 +72,77 @@ construirlo. Enlace en comentarios.
 GitHub: [tu-enlace-aquí]
 Está todo documentado, incluido cómo funciona el orquestador y el banco de
 pruebas. Si lo pruebas en tu máquina, me encantaría saber qué tal.
+
+---
+
+# Post de LinkedIn — Andromeda 1.1
+
+> Mismo enfoque: el aprendizaje, no el producto. El hilo de este post es cómo
+> encontré los fallos: con telemetría de uso real, no con suposiciones. Es lo
+> que más encaja con un perfil de MLOps. Imagen: `docs/media/chart-memory-speed-dark.png`.
+> Enlace al repo en el primer comentario.
+
+## Versión larga
+
+Acabo de publicar Andromeda 1.1, mi app de IA que corre 100 % en local.
+
+La novedad visible es un diseño nuevo inspirado en macOS y una memoria que
+funciona como la de Claude: organizada por temas, y editable describiendo el
+cambio con tus palabras.
+
+Pero lo que más me ha enseñado esta versión no se ve.
+
+Durante semanas usé la app a diario con un panel de diagnóstico que registraba
+cada paso de cada mensaje: qué contexto se construía, qué herramientas se
+elegían, cuánto tardaba cada fase. Luego leía esos registros como quien lee los
+logs de producción.
+
+Algunas cosas que encontré así:
+
+→ En macOS, cada mensaje ejecutaba un comando del sistema que tarda entre 0,3 y
+1 segundo antes de empezar a generar. Para devolver un número que además era
+falso.
+
+→ Las búsquedas web perdían entre 2 y 4 segundos probando buscadores que
+fallaban siempre. Ahora recuerda cuál funciona.
+
+→ Los votos 👍/👎 llevaban semanas sin asociarse a su respuesta por un problema
+de reactividad en la interfaz. El dataset para afinar mi propio modelo estaba
+vacío y nada lo indicaba.
+
+→ La memoria semántica tenía un umbral tan alto que casi nunca encontraba nada.
+
+Ninguno de estos fallos aparecía en los tests. Todos aparecían en los registros.
+
+La lección para mí: los tests te dicen si el código hace lo que pensabas. La
+telemetría te dice si lo que pensabas era correcto.
+
+Números de la 1.1: 1.257 tests en Linux, macOS y Windows, preparar cada mensaje
+pasa de 28 ms a 2 ms, la búsqueda en la memoria es unas 8 veces más rápida (con
+5.000 recuerdos, de 1,5 s a 0,17 s, con resultados idénticos comprobados por test)
+y la memoria por significado viene activada de base.
+
+Es open source (MIT). Enlace en el primer comentario.
+
+#MLOps #LocalAI #OpenSource #Ollama #Python
+
+## Versión corta
+
+Publicada Andromeda 1.1, mi app de IA 100 % local.
+
+Diseño nuevo inspirado en macOS, memoria organizada como la de Claude y búsqueda
+por significado activada de base.
+
+Lo que más aprendí: los peores fallos no los encontraron los tests, sino los
+registros de uso real. Un comando que añadía hasta 1 s a cada mensaje en Mac,
+búsquedas que perdían 3 s probando buscadores rotos, votos que no se guardaban.
+
+Los tests dicen si el código hace lo que pensabas. La telemetría, si lo que
+pensabas era correcto.
+
+Open source, enlace en comentarios. #MLOps #LocalAI #OpenSource
+
+## Primer comentario
+
+Repositorio: https://github.com/PauAlonsoRacero/andromeda-lite
+Descarga para macOS y Windows en la release 1.1.0. Necesita Ollama.

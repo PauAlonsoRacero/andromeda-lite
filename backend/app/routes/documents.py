@@ -38,7 +38,7 @@ async def generate_document(request: Request):
     title = body.get("title") or "Documento Andromeda"
 
     if not content:
-        return JSONResponse(status_code=400, content={"error": "Contenido vacío"})
+        return JSONResponse(status_code=400, content={"error_key": "err.empty_content"})
     if fmt not in MIME:
         return JSONResponse(status_code=400, content={"error": f"Formato no soportado: {fmt}"})
 
@@ -57,6 +57,23 @@ async def generate_document(request: Request):
 
     safe_title = re.sub(r"[^\w\-]", "_", title)[:40] or "documento"
     filename = f"{safe_title}.{fmt}"
+
+    # En la app de escritorio no hay gestor de descargas: devolver un stream hace
+    # que la ventana navegue al contenido y el usuario quede atrapado. Con
+    # save_to_disk el backend lo escribe en Descargas y devuelve la ruta.
+    if body.get("save_to_disk"):
+        from app.routes.save_file import _downloads_dir, _unique_path
+        try:
+            target = _unique_path(_downloads_dir(), filename)
+            target.write_bytes(data)
+        except OSError as exc:
+            logger.warning(f"No se pudo guardar el documento: {exc}")
+            return JSONResponse(status_code=500,
+                                content={"error": f"No se pudo guardar: {exc}"})
+        logger.info(f"Documento guardado: {target}")
+        return JSONResponse(content={"saved": True, "path": str(target),
+                                     "name": target.name})
+
     return StreamingResponse(
         io.BytesIO(data),
         media_type=MIME[fmt],

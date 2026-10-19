@@ -28,7 +28,7 @@ async def routing_eval() -> JSONResponse:
     eval_dir = _ROOT / "eval"
     if not eval_dir.exists():
         return JSONResponse(status_code=503,
-                            content={"error": "Banco de pruebas no disponible"})
+                            content={"error_key": "err.lab_unavailable"})
     sys.path.insert(0, str(eval_dir))
     try:
         from eval_routing import evaluate

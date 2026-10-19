@@ -110,6 +110,18 @@ async def health(request: Request) -> JSONResponse:
     return JSONResponse(content=body, status_code=http_status)
 
 
+@router.get("/instance")
+async def instance(request: Request):
+    """Identificador de este arranque y versión.
+
+    La app de escritorio lo comprueba antes de cargar la interfaz, para no
+    conectarse por error a otra copia de Andromeda que ocupe el puerto.
+    """
+    import os
+    return {"instance": os.environ.get("ANDROMEDA_INSTANCE_ID", ""),
+            "version": getattr(request.app.state.settings, "app_version", "")}
+
+
 @router.get("/hardware")
 async def hardware_info(request: Request) -> JSONResponse:
     """

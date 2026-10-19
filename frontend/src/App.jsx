@@ -1,5 +1,5 @@
-import { orbsOn, bgStyle, waveCount, waveHeight, animationsOn, compactMode, theme, orbPalette, orbSpeed, orbIntensity, orbSize, orbCustom, orbColors, hydrateFromBackend } from './stores/settings'
-import { createSignal, onMount, onCleanup, createEffect, Show } from 'solid-js'
+import { orbsOn, design, effectiveBgStyle, accent, ACCENTS, waveCount, waveHeight, animationsOn, compactMode, theme, orbPalette, orbSpeed, orbIntensity, orbSize, orbCustom, orbColors, hydrateFromBackend } from './stores/settings'
+import { createSignal, onMount, onCleanup, createEffect, Show, lazy, Suspense } from 'solid-js'
 import axios from 'axios'
 
 import TitleBar      from './components/TitleBar.jsx'
@@ -8,19 +8,26 @@ import { session, authRequired, authChecked, checkAuth, showLogin, setShowLogin 
 import Sidebar       from './components/Sidebar.jsx'
 import TopBar        from './components/TopBar.jsx'
 import Chat          from './components/Chat.jsx'
-import StatsPanel     from './components/StatsPanel.jsx'
-import AnalyticsPanel from './components/AnalyticsPanel.jsx'
-import LabPanel       from './components/LabPanel.jsx'
-import SettingsPanel  from './components/SettingsPanel.jsx'
-import ProjectsPanel  from './components/ProjectsPanel.jsx'
-import ArtifactsPanel  from './components/ArtifactsPanel.jsx'
-import Codex          from './components/Codex.jsx'
-import ChatsListPanel from './components/ChatsListPanel.jsx'
+// Carga diferida de los paneles pesados: al abrir Andromeda se cargaba TODO
+// (analíticas con sus gráficos, laboratorio, explorador de modelos) aunque el
+// usuario solo fuera a chatear. Cada panel se descarga la primera vez que se
+// abre, no antes.
+const StatsPanel     = lazy(() => import('./components/StatsPanel.jsx'))
+const AnalyticsPanel = lazy(() => import('./components/AnalyticsPanel.jsx'))
+const LabPanel       = lazy(() => import('./components/LabPanel.jsx'))
+const SettingsPanel  = lazy(() => import('./components/SettingsPanel.jsx'))
+const ProjectsPanel  = lazy(() => import('./components/ProjectsPanel.jsx'))
+const ArtifactsPanel = lazy(() => import('./components/ArtifactsPanel.jsx'))
+const Codex          = lazy(() => import('./components/Codex.jsx'))
+const ChatsListPanel = lazy(() => import('./components/ChatsListPanel.jsx'))
+const DiagnosticsPanel = lazy(() => import('./components/DiagnosticsPanel.jsx'))
+const FilePreview = lazy(() => import('./components/FilePreview.jsx'))
 import Onboarding     from './components/Onboarding.jsx'
 import { refreshHardware } from './stores/hardware.js'
-import { loadEdition, isPro as isProEd, analyticsAvailable as analyticsAvail } from './stores/edition.js'
+import { loadEdition, isPro as isProEd, analyticsAvailable as analyticsAvail, checkDiagnostics } from './stores/edition.js'
 import { lang, setLang, hydrateLangFromBackend } from './stores/i18n.js'
-import { hydrateConversationsFromBackend } from './stores/chat.js'
+import { hydrateConversationsFromBackend, newConversation } from './stores/chat.js'
+import { closePreview } from './stores/preview.js'
 
 function App() {
   createEffect(() => {
@@ -55,6 +62,21 @@ function App() {
     const t = theme() === 'light' ? 'light' : 'dark'
     document.body.classList.toggle('theme-light', t === 'light')
     document.body.classList.toggle('theme-dark', t === 'dark')
+    // Diseño 1.1 (inspirado en macOS), en claro u oscuro
+    document.body.classList.toggle('design-11', design() === '1.1')
+    document.body.classList.remove('theme-macos')
+    // Color de acento del 1.1 (variables que usan selección, burbujas y botones)
+    const ac = ACCENTS.find(a => a.id === accent()) || ACCENTS[0]
+    const b = document.body.style
+    if (design() === '1.1') {
+      b.setProperty('--accent', ac.color)
+      b.setProperty('--accent-fill', ac.fill || ac.color)
+      b.setProperty('--blue', ac.color)
+    } else {
+      b.removeProperty('--accent'); b.removeProperty('--accent-fill'); b.removeProperty('--blue')
+    }
+    // Sobre amarillo o verde claros el texto blanco no se lee
+    document.body.classList.toggle('accent-light', ['yellow', 'green'].includes(ac.id))
   })
 
   // Paleta de orbes + velocidad + intensidad (variables CSS en :root)
@@ -115,6 +137,55 @@ function App() {
     loadEdition()
   })
 
+  // ¿Debe mostrarse el panel de diagnóstico? Actualiza una señal reactiva, así
+  // el menú se entera cuando llega la respuesta (una variable global no basta:
+  // el menú ya se ha renderizado para entonces).
+  onMount(() => { checkDiagnostics() })
+
+  // Rendimiento: en Windows, efectos de cristal más ligeros (WebView2 sufre más
+  // con desenfoques grandes), y en todos los sistemas las animaciones de fondo
+  // se pausan cuando la ventana no está visible.
+  onMount(() => {
+    document.body.classList.toggle('os-win', /Windows/i.test(navigator.userAgent))
+    const vis = () => document.body.classList.toggle('app-hidden', document.hidden)
+    document.addEventListener('visibilitychange', vis)
+    onCleanup(() => document.removeEventListener('visibilitychange', vis))
+  })
+
+  // Abrir Configuración cierra la vista previa: si no, el archivo quedaba
+  // encima tapando la ventana de ajustes.
+  createEffect(() => { if (settingsOpen()) closePreview() })
+
+  // "Usar" un prompt desde Configuración: cerrar ajustes e ir al chat.
+  onMount(() => {
+    const ir = () => { closeSettings(); setActiveTab('chat') }
+    window.addEventListener('andromeda:go-chat', ir)
+    onCleanup(() => window.removeEventListener('andromeda:go-chat', ir))
+  })
+
+  // Enlaces externos → navegador del sistema. En la app de escritorio se
+  // abrían dentro de la propia ventana, sin forma de volver atrás.
+  onMount(() => {
+    const esEscritorio = /pywebview/i.test(navigator.userAgent) || window.pywebview != null
+                         || window.__ANDROMEDA_DESKTOP__ === true
+    const alClic = (e) => {
+      const a = e.target?.closest?.('a[href]')
+      if (!a) return
+      const href = a.getAttribute('href') || ''
+      if (!/^https?:\/\//i.test(href)) return
+      if (new URL(href, location.href).origin === location.origin) return
+      e.preventDefault()
+      if (esEscritorio) {
+        fetch('/api/system/open-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ url: href }) }).catch(() => {})
+      } else {
+        window.open(href, '_blank', 'noopener,noreferrer')
+      }
+    }
+    document.addEventListener('click', alClic, true)
+    onCleanup(() => document.removeEventListener('click', alClic, true))
+  })
+
   onMount(async () => {
     // Rehidratar estado persistido en disco (tema, idioma, fondo, conversaciones).
     // En el binario de escritorio localStorage no persiste, así que esta es la
@@ -154,17 +225,17 @@ function App() {
   return (
     <>
       {/* Fondo animado: orbes flotantes o bandas tricolores, según ajuste */}
-      <Show when={orbsOn() && bgStyle() === 'bands'}><div class="bg-bands">
+      <Show when={orbsOn() && effectiveBgStyle() === 'bands'}><div class="bg-bands">
         <div class="bg-band bg-band-1" />
         <div class="bg-band bg-band-2" />
         <div class="bg-band bg-band-3" />
       </div></Show>
-      <Show when={orbsOn() && bgStyle() === 'orbs'}><div class="bg-orbs">
+      <Show when={orbsOn() && effectiveBgStyle() === 'orbs'}><div class="bg-orbs">
         <div class="bg-orb bg-orb-1" />
         <div class="bg-orb bg-orb-2" />
         <div class="bg-orb bg-orb-3" />
       </div></Show>
-      <Show when={orbsOn() && bgStyle() === 'waves'}><div class="bg-waves" data-count={waveCount()} style={`--wave-h:${waveHeight()}%`}>
+      <Show when={orbsOn() && effectiveBgStyle() === 'waves'}><div class="bg-waves" data-count={waveCount()} style={`--wave-h:${waveHeight()}%`}>
         <div class="bg-wave bg-wave-1" />
         <div class="bg-wave bg-wave-2" />
         <Show when={waveCount() >= 3}><div class="bg-wave bg-wave-3" /></Show>
@@ -207,26 +278,43 @@ function App() {
             </div>
 
             <div class="enter-stagger enter-3" style="flex:1;overflow:hidden;position:relative">
-              <Show when={activeTab() === 'chat'}>     <div class="page-enter" style="height:100%"><Chat incognito={incognito} onOpenModels={() => openSettings('models')} /></div></Show>
+              {/* Suspense: los paneles se cargan bajo demanda, así que hace
+                  falta algo que mostrar durante esa fracción de segundo. */}
+              <Suspense fallback={
+                <div style="display:flex;align-items:center;justify-content:center;height:100%">
+                  <span class="spin" />
+                </div>
+              }>
+              <Show when={activeTab() === 'chat'}>     <div class="page-enter" style="height:100%"><Chat incognito={incognito} onOpenModels={(sec) => openSettings(sec || 'models')} /></div></Show>
               <Show when={activeTab() === 'chatlist'}> <div class="page-enter" style="height:100%"><ChatsListPanel onOpen={() => setActiveTab('chat')} /></div></Show>
-              <Show when={activeTab() === 'projects'}> <div class="page-enter" style="height:100%"><ProjectsPanel onNewChat={() => setActiveTab('chat')} onOpenChat={() => setActiveTab('chat')} /></div></Show>
+              <Show when={activeTab() === 'projects'}> <div class="page-enter" style="height:100%"><ProjectsPanel onNewChat={(pid) => { newConversation(pid); setActiveTab('chat') }} onOpenChat={() => setActiveTab('chat')} /></div></Show>
               <Show when={activeTab() === 'artifacts'}><div class="page-enter" style="height:100%"><ArtifactsPanel /></div></Show>
               <Show when={activeTab() === 'codex'}>    <div class="page-enter" style="height:100%;overflow-y:auto"><Codex /></div></Show>
               <Show when={activeTab() === 'lab' && isProEd()}>     <div class="page-enter" style="height:100%;overflow-y:auto"><LabPanel /></div></Show>
               <Show when={activeTab() === 'stats' && isProEd()}>   <div class="page-enter" style="height:100%;overflow-y:auto"><StatsPanel /></div></Show>
               <Show when={activeTab() === 'analytics' && analyticsAvail()}>   <div class="page-enter" style="height:100%;overflow-y:auto"><AnalyticsPanel /></div></Show>
+              <Show when={activeTab() === 'diagnostics'}>  <div class="page-enter" style="height:100%;overflow-y:auto"><DiagnosticsPanel /></div></Show>
+              </Suspense>
             </div>
           </div>
         </div>
 
         {/* Configuración como overlay (estilo Claude): cubre la app y blurea el fondo */}
+        {/* Panel lateral de vista previa, a nivel raíz. Antes estaba dentro de
+            la ventana de Configuración: solo existía con ella abierta, así que
+            en Artefactos no se abría nada y al abrir Configuración aparecía
+            el archivo tapándola. */}
+        <Suspense fallback={null}><FilePreview /></Suspense>
+
         <Show when={settingsOpen()}>
           <div class={`cfg-overlay${settingsClosing() ? ' closing' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) closeSettings() }}>
             <div class={`cfg-modal${settingsClosing() ? ' closing' : ''}`}>
               <button class="cfg-close" title="Cerrar" onClick={closeSettings}>
                 <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 2 L14 14 M14 2 L2 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
               </button>
-              <SettingsPanel initialSection={settingsSection()} />
+              <Suspense fallback={<div style="display:flex;align-items:center;justify-content:center;height:100%"><span class="spin" /></div>}>
+                <SettingsPanel initialSection={settingsSection()} />
+              </Suspense>
             </div>
           </div>
         </Show>

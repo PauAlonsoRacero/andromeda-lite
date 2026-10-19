@@ -225,10 +225,11 @@ async def test_sandbox_empty_code_400(app_client):
 @pytest.mark.asyncio
 async def test_sandbox_unsupported_lang_400(app_client):
     r = await app_client.post("/api/sandbox/run",
-        json={"code":"puts 'hi'","language":"ruby"})
-    # 400 si el lenguaje no está en la lista; 503 si está pero no hay runtime.
-    # Ambos son respuestas correctas a "no puedo ejecutar esto".
-    assert r.status_code in (400, 503)
+        json={"code":"hi","language":"brainfuck-inexistente"})
+    # Lenguaje fuera de la lista soportada → 400, independientemente de qué
+    # runtimes haya instalados en la máquina (antes usaba ruby, que SÍ está
+    # soportado: el test fallaba solo si Ruby estaba instalado).
+    assert r.status_code == 400
 
 # ── Context ───────────────────────────────────────────────────────────────
 

@@ -4,10 +4,12 @@
  */
 import { createSignal, onMount, For, Show } from 'solid-js'
 import axios from 'axios'
+import PowerPack from './PowerPack.jsx'
 import { refreshHardware } from '../stores/hardware.js'
 import { isPro } from '../stores/edition.js'
 import ModelExplorer from './ModelExplorer.jsx'
 import { t } from '../stores/i18n.js'
+import { errorMessage } from '../services/errors.js'
 import InfoButton from './InfoButton.jsx'
 
 // Traduce los campos del especialista si hay clave i18n (p. ej. generalist).
@@ -60,13 +62,13 @@ export default function ModelsPanel() {
       // (no debe quedarse caliente). El nuevo se cargará al primer uso.
       const toUnload = !active ? prev : (prev && prev !== modelName ? prev : null)
       if (toUnload) {
-        try { await axios.post('/api/models/unload', { models: [toUnload] }) } catch {}
+        try { await axios.post('/api/models/unload', { models: [toUnload] }) } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
       }
       setMsg(m => ({ ...m, [specId]: active ? 'Aplicado' : 'Desactivado' }))
       await loadData()
       setTimeout(() => setMsg(m => ({ ...m, [specId]: null })), 2500)
     } catch (e) {
-      const detail = e.response?.data?.message || e.message
+      const detail = errorMessage(e)
       setMsg(m => ({ ...m, [specId]: 'Error: ' + detail }))
     } finally {
       setBusy(null)
@@ -96,14 +98,17 @@ export default function ModelsPanel() {
         </button>
       </div>
 
+      {/* Pack de potencia: un modelo por nivel según este equipo */}
+      <PowerPack />
+
       {/* Pestañas: Especialistas | Explorar modelos */}
-      <div style="display:flex;gap:4px;background:var(--glass-bright);border-radius:12px;padding:4px;margin-bottom:20px;width:fit-content">
+      <div style="display:flex;gap:4px;background:var(--glass-bright);border-radius:14px;padding:4px;margin-bottom:20px;width:fit-content">
         <button onClick={() => setView('specialists')}
-          style={`padding:8px 18px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font);transition:all 0.15s;background:${view()==='specialists'?'var(--glass-hi)':'transparent'};color:${view()==='specialists'?'var(--text-1)':'var(--text-3)'}`}>
+          style={`padding:8px 18px;border-radius:10px;border:none;cursor:pointer;font-size:var(--fs-base);font-weight:600;font-family:var(--font);transition:all 0.15s;background:${view()==='specialists'?'var(--glass-hi)':'transparent'};color:${view()==='specialists'?'var(--text-1)':'var(--text-3)'}`}>
           {t('mdl.tab_specialists')}
         </button>
         <button onClick={() => setView('explore')}
-          style={`padding:8px 18px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font);transition:all 0.15s;background:${view()==='explore'?'var(--glass-hi)':'transparent'};color:${view()==='explore'?'var(--text-1)':'var(--text-3)'}`}>
+          style={`padding:8px 18px;border-radius:10px;border:none;cursor:pointer;font-size:var(--fs-base);font-weight:600;font-family:var(--font);transition:all 0.15s;background:${view()==='explore'?'var(--glass-hi)':'transparent'};color:${view()==='explore'?'var(--text-1)':'var(--text-3)'}`}>
           ⌕ {t('mdl.tab_explore')}
         </button>
       </div>
@@ -116,18 +121,18 @@ export default function ModelsPanel() {
       {/* Estado Ollama */}
       <Show when={!ollamaOnline()}>
         <div class="banner banner-warn">
-          <span style="font-size:16px">⚠️</span>
+          <span style="font-size:var(--fs-md)">⚠️</span>
           <div>
             <div style="font-weight:700;margin-bottom:3px">{t('mdl.ollama_down')}</div>
-            <div style="font-size:12px">{t('mdl.install_ollama')}<code style="font-family:var(--mono);background:var(--inset-surface);padding:2px 6px;border-radius:5px">ollama pull mistral:7b</code></div>
+            <div style="font-size:var(--fs-sm)">{t('mdl.install_ollama')}<code style="font-family:var(--mono);background:var(--inset-surface);padding:2px 6px;border-radius:6px">ollama pull mistral:7b</code></div>
           </div>
         </div>
       </Show>
 
       <Show when={ollamaOnline()}>
         <div class="banner banner-ok">
-          <span style="font-size:16px">✓</span>
-          <div style="font-size:12px">
+          <span style="font-size:var(--fs-md)">✓</span>
+          <div style="font-size:var(--fs-sm)">
             <strong>{t('ui2.ollama_connected')}</strong> · {ollamaModels().length} {t('mdl.models_available')}
             <Show when={ollamaModels().length > 0}>
               <span style="color:var(--text-3)"> · {ollamaModels().map(m => typeof m === 'string' ? m : m.name).join(', ')}</span>
@@ -139,14 +144,14 @@ export default function ModelsPanel() {
       {/* IAs ACTIVAS */}
       <div style="margin-bottom:10px;margin-top:24px;display:flex;align-items:center;gap:10px">
         <span style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)" />
-        <span style="font-size:13px;font-weight:700;color:var(--text-1)">{isPro() ? t('mdl.ais_active') : t('mdl.your_ai')}</span>
-        <span style="font-size:12px;color:var(--text-3)">{active().length}</span>
+        <span style="font-size:var(--fs-base);font-weight:700;color:var(--text-1)">{isPro() ? t('mdl.ais_active') : t('mdl.your_ai')}</span>
+        <span style="font-size:var(--fs-sm);color:var(--text-3)">{active().length}</span>
       </div>
 
       <Show when={active().length > 0} fallback={
         <div class="card" style="text-align:center;padding:36px">
-          <div style="font-size:15px;font-weight:600;margin-bottom:6px">{isPro() ? t('mdl.none_active') : t('mdl.your_ai_inactive')}</div>
-          <div style="font-size:13px;color:var(--text-3);margin-bottom:20px">{isPro() ? 'Activa un especialista de la lista de abajo para empezar' : 'Asígnale un modelo de Ollama abajo para empezar a usar Andromeda'}</div>
+          <div style="font-size:var(--fs-md);font-weight:600;margin-bottom:6px">{isPro() ? t('mdl.none_active') : t('mdl.your_ai_inactive')}</div>
+          <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:20px">{isPro() ? 'Activa un especialista de la lista de abajo para empezar' : t('mp.assign_model_hint')}</div>
         </div>
       }>
         <For each={active()}>
@@ -159,8 +164,8 @@ export default function ModelsPanel() {
 
       {/* IAs DISPONIBLES (inactivas) */}
       <div style="margin-bottom:10px;margin-top:28px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:13px;font-weight:700;color:var(--text-2)">{isPro() ? t('mdl.available_activate') : t('mdl.your_ai_unactivated')}</span>
-        <span style="font-size:12px;color:var(--text-3)">{inactive().length}</span>
+        <span style="font-size:var(--fs-base);font-weight:700;color:var(--text-2)">{isPro() ? t('mdl.available_activate') : t('mdl.your_ai_unactivated')}</span>
+        <span style="font-size:var(--fs-sm);color:var(--text-3)">{inactive().length}</span>
       </div>
 
       <div class="stagger" style="display:flex;flex-direction:column;gap:12px">
@@ -271,27 +276,27 @@ function SpecCard(props) {
     <div class="card fade-up lift" style={`border-color:${s().active ? 'rgba(52,211,153,0.25)' : 'var(--glass-border)'}`}>
       <div style="display:flex;align-items:flex-start;gap:14px">
         {/* Icono */}
-        <div class="app-icon" style={`width:48px;height:48px;font-size:20px;color:${s().active?'var(--green)':'var(--text-3)'};flex-shrink:0`}>
+        <div class="app-icon" style={`width:48px;height:48px;font-size:var(--fs-lg);color:${s().active?'var(--green)':'var(--text-3)'};flex-shrink:0`}>
           {ICONS[s().id] || fallbackIcon}
         </div>
 
         {/* Info */}
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-            <span style="font-size:15px;font-weight:700">{specField(s(), "name", s().name)}</span>
-            <span style={`font-size:10px;font-weight:700;padding:2px 8px;border-radius:7px;background:${s().active?'rgba(52,211,153,0.15)':'var(--chip-surface)'};color:${s().active?'var(--green)':'var(--text-3)'}`}>
+            <span style="font-size:var(--fs-md);font-weight:700">{specField(s(), "name", s().name)}</span>
+            <span style={`font-size:var(--fs-micro);font-weight:700;padding:2px 8px;border-radius:6px;background:${s().active?'rgba(52,211,153,0.15)':'var(--chip-surface)'};color:${s().active?'var(--green)':'var(--text-3)'}`}>
               {s().active ? t('mdl.active') : t('mdl.inactive')}
             </span>
           </div>
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">{specField(s(), "desc", s().description || s().domain)}</div>
+          <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:12px">{specField(s(), "desc", s().description || s().domain)}</div>
 
           {/* Campos de info — el Tier ahora se detecta en vivo */}
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px">
             <InfoField label={t("mdl.speciality")} value={specField(s(), "domain", s().domain) || '—'} />
             <InfoField label={t("mdl.vram_est")} value={autoTier() ? `${autoTier().vram_estimated_gb} GB` : `${(s().vram_required_gb || 0).toFixed(1)} GB`} />
             <div style="padding:8px 11px;background:var(--inset-surface);border-radius:10px;border:1px solid var(--glass-border)">
-              <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em">{t('mdl.tier_auto')}</div>
-              <div style="font-size:12px;margin-top:2px;font-weight:700" class={detecting() ? '' : 'anim-spring'}>
+              <div style="font-size:var(--fs-micro);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em">{t('mdl.tier_auto')}</div>
+              <div style="font-size:var(--fs-sm);margin-top:2px;font-weight:700" class={detecting() ? '' : 'anim-spring'}>
                 <Show when={!detecting()} fallback={<span style="color:var(--text-3)">detectando...</span>}>
                   <Show when={autoTier()} fallback={<span style="color:var(--text-3)">—</span>}>
                     <span style={`color:${TIER_COLOR[autoTier().tier]}`}>{autoTier().tier_name}</span>
@@ -303,7 +308,7 @@ function SpecCard(props) {
 
           {/* Selector de modelo + acción */}
           <Show when={props.ollamaOnline()} fallback={
-            <div style="font-size:12px;color:var(--text-3);font-style:italic">{t('mdl.connect_ollama')}</div>
+            <div style="font-size:var(--fs-sm);color:var(--text-3);font-style:italic">{t('mdl.connect_ollama')}</div>
           }>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <select
@@ -331,13 +336,13 @@ function SpecCard(props) {
               </Show>
             </div>
             <Show when={props.msg}>
-              <div style={`font-size:12px;margin-top:8px;color:${props.msg.startsWith('Error')?'var(--red)':'var(--green)'}`}>{props.msg}</div>
+              <div style={`font-size:var(--fs-sm);margin-top:8px;color:${props.msg.startsWith('Error')?'var(--red)':'var(--green)'}`}>{props.msg}</div>
             </Show>
 
             {/* ── Especialización: asignar topic ── */}
             <div style="margin-top:14px;padding-top:14px;border-top:0.5px solid var(--glass-border)">
               <button onClick={() => setShowRole(!showRole())}
-                style="display:flex;align-items:center;gap:8px;background:none;border:none;color:var(--text-2);font-size:13px;cursor:pointer;padding:0;font-weight:600;font-family:var(--font)">
+                style="display:flex;align-items:center;gap:8px;background:none;border:none;color:var(--text-2);font-size:var(--fs-base);cursor:pointer;padding:0;font-weight:600;font-family:var(--font)">
                 <span style={`transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);display:inline-block;transform:rotate(${showRole()?'90':'0'}deg)`}>▸</span>
                 {t('mdl.specialize_topic')}
                 <Show when={savedTopic()}>
@@ -348,33 +353,33 @@ function SpecCard(props) {
               <Show when={showRole()}>
                 <div class="anim-slide" style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
                   <div>
-                    <label style="font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px">{t('mdl.topic_domain')}</label>
+                    <label style="font-size:var(--fs-xs);color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px">{t('mdl.topic_domain')}</label>
                     <input class="g-input" value={topic()} onInput={e => setTopic(e.target.value)}
                       placeholder={t('mdl.ph_topic')}
                       style="width:100%" />
                   </div>
                   <div>
-                    <label style="font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px">{t('mdl.specific_instr')}</label>
+                    <label style="font-size:var(--fs-xs);color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px">{t('mdl.specific_instr')}</label>
                     <textarea class="g-input" value={instructions()} onInput={e => setInstructions(e.target.value)}
                       placeholder={t('mdl.ph_instr')}
                       style="width:100%;min-height:64px;resize:vertical;font-family:var(--font)" />
                   </div>
                   <div style="display:flex;gap:8px;align-items:center">
-                    <button class="btn btn-primary" style="font-size:13px;padding:8px 16px" onClick={saveRole} disabled={!topic().trim()}>
+                    <button class="btn btn-primary" style="font-size:var(--fs-base);padding:8px 16px" onClick={saveRole} disabled={!topic().trim()}>
                       Guardar especialización
                     </button>
                     <Show when={savedTopic()}>
-                      <button class="btn btn-ghost" style="font-size:13px;padding:8px 14px" onClick={clearRole}>{t('mdl.remove')}</button>
+                      <button class="btn btn-ghost" style="font-size:var(--fs-base);padding:8px 14px" onClick={clearRole}>{t('mdl.remove')}</button>
                     </Show>
                     <Show when={roleSaved()}>
-                      <span class="anim-spring" style="font-size:12px;color:var(--green);font-weight:600">✓ Guardado</span>
+                      <span class="anim-spring" style="font-size:var(--fs-sm);color:var(--green);font-weight:600">✓ Guardado</span>
                     </Show>
                   </div>
 
                   {/* Hornear la especialización en el modelo (Modelfile) */}
                   <Show when={savedTopic() && props.ollamaOnline()}>
                     <div style="margin-top:6px;padding-top:10px;border-top:0.5px solid var(--glass-border)">
-                      <button class="btn btn-glass" style="font-size:13px;padding:8px 16px"
+                      <button class="btn btn-glass" style="font-size:var(--fs-base);padding:8px 16px"
                         disabled={baking()}
                         onClick={bakeSpecialized}
                         title={t('mdl.variant_hint')}>
@@ -386,12 +391,12 @@ function SpecCard(props) {
                           Cuando termine de crearse, selecciónala arriba en el desplegable y pulsa Activar. El topic queda horneado dentro.
                         </div>
                       </Show>
-                      <div style="font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.4">
+                      <div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:6px;line-height:1.4">
                         Diferencia: t('mdl.save_spec') se aplica al instante vía prompt. "Grabar en el modelo" crea una variante permanente con el topic horneado — más difícil de que se desvíe.
                       </div>
                     </div>
                   </Show>
-                  <div style="font-size:11px;color:var(--text-3);line-height:1.4">
+                  <div style="font-size:var(--fs-xs);color:var(--text-3);line-height:1.4">
                     {t('mdl.topic_applies')}
                   </div>
                 </div>
@@ -407,8 +412,8 @@ function SpecCard(props) {
 function InfoField(props) {
   return (
     <div style="padding:8px 11px;background:var(--inset-surface);border-radius:10px;border:1px solid var(--glass-border)">
-      <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em">{props.label}</div>
-      <div style="font-size:12px;color:var(--text-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{props.value}</div>
+      <div style="font-size:var(--fs-micro);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em">{props.label}</div>
+      <div style="font-size:var(--fs-sm);color:var(--text-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{props.value}</div>
     </div>
   )
 }

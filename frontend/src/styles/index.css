@@ -3,7 +3,7 @@
    Vidrio esmerilado, profundidad, translucidez, bordes suaves
    ════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Inter Tight y JetBrains Mono se empaquetan en src/index.jsx (sin Google Fonts). */
 
 :root {
   /* ── Acentos (paleta del logo: coral → violeta → azul). Comunes a ambos temas ── */
@@ -1809,3 +1809,1205 @@ body.theme-light pre {
   from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
   to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+
+/* ── InfoButton: popover contextual ────────────────────────────────────────
+   Anclado al botón en vez de centrado, para no perder de vista lo explicado. */
+
+.info-dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  cursor: pointer; font-size: 11.5px; font-weight: 700;
+  font-style: italic; font-family: Georgia, 'Times New Roman', serif;
+  flex-shrink: 0; line-height: 1; padding: 0;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease;
+}
+.info-dot:hover { color: var(--text-1); border-color: var(--text-3); transform: scale(1.08); }
+.info-dot:active { transform: scale(.94); }
+
+.info-pop {
+  position: fixed; z-index: 301;
+  background: var(--glass-bright, rgba(18, 20, 30, .97));
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45), 0 2px 8px rgba(0, 0, 0, .3);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  padding: 14px 16px 15px;
+  max-height: min(360px, 70vh); overflow-y: auto;
+  transform-origin: top center;
+  animation: infoPopIn .16s cubic-bezier(.32, 1.25, .5, 1);
+}
+.info-pop-above { transform: translateY(-100%); transform-origin: bottom center; }
+
+@keyframes infoPopIn {
+  from { opacity: 0; transform: translateY(-5px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.info-pop-above { animation-name: infoPopInAbove; }
+@keyframes infoPopInAbove {
+  from { opacity: 0; transform: translateY(calc(-100% + 5px)) scale(.97); }
+  to   { opacity: 1; transform: translateY(-100%) scale(1); }
+}
+
+/* Flecha que apunta al botón que abrió el popover. */
+.info-pop-arrow {
+  position: absolute; top: -5px; width: 9px; height: 9px;
+  margin-left: -4.5px; transform: rotate(45deg);
+  background: var(--glass-bright, rgba(18, 20, 30, .97));
+  border-left: 1px solid var(--glass-border);
+  border-top: 1px solid var(--glass-border);
+}
+.info-pop-above .info-pop-arrow {
+  top: auto; bottom: -5px; transform: rotate(225deg);
+}
+
+.info-pop-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px;
+}
+.info-pop-head h4 {
+  margin: 0; font-size: 13.5px; font-weight: 650;
+  color: var(--text-1); letter-spacing: -.01em;
+}
+.info-pop-head button {
+  width: 22px; height: 22px; border-radius: 6px; border: none;
+  background: transparent; color: var(--text-3); cursor: pointer;
+  font-size: 17px; line-height: 1; display: flex;
+  align-items: center; justify-content: center;
+  transition: background .12s ease, color .12s ease;
+}
+.info-pop-head button:hover { background: var(--hover-surface); color: var(--text-1); }
+
+.info-pop-intro {
+  margin: 0 0 12px; font-size: 12px; line-height: 1.55; color: var(--text-2);
+  padding-bottom: 11px; border-bottom: 1px solid var(--glass-border);
+}
+
+.info-pop-body { display: flex; flex-direction: column; gap: 11px; }
+
+/* Cada punto entra escalonado: guía la lectura de arriba abajo. */
+.info-pop-item {
+  opacity: 0;
+  animation: infoItemIn .22s ease forwards;
+}
+@keyframes infoItemIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.info-pop-item-h {
+  font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 2px;
+}
+.info-pop-item-d {
+  font-size: 11.5px; line-height: 1.55; color: var(--text-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .info-pop, .info-pop-item { animation: none; opacity: 1; }
+  .info-dot:hover, .info-dot:active { transform: none; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   ESCALA TIPOGRÁFICA Y DE ESPACIADO
+   Diez tamaños de fuente distintos repartidos por la app hacen que todo
+   parezca ligeramente descuadrado aunque cada pantalla, por separado, se
+   vea bien. Una escala corta y deliberada es lo que da sensación de
+   producto acabado. Estos tokens son la referencia para el código nuevo.
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  --fs-micro: 10.5px;   /* etiquetas, badges, notas al pie */
+  --fs-xs:    11.5px;   /* metadatos, ayudas secundarias */
+  --fs-sm:    12.5px;   /* texto de apoyo, descripciones */
+  --fs-base:  13.5px;   /* cuerpo por defecto */
+  --fs-md:    15px;     /* subtítulos, cifras destacadas */
+  --fs-lg:    18px;     /* títulos de sección */
+  --fs-xl:    24px;     /* títulos de pantalla */
+
+  /* Interlineado: más aire en textos largos, más compacto en titulares. */
+  --lh-tight: 1.25;
+  --lh-snug:  1.45;
+  --lh-body:  1.6;
+
+  /* Los titulares grandes necesitan tracking negativo para no verse sueltos;
+     el texto pequeño necesita lo contrario para respirar. */
+  --ls-tight: -0.02em;
+  --ls-snug:  -0.01em;
+  --ls-wide:   0.01em;
+
+  /* Espaciado en múltiplos de 4: evita los 7px/9px/13px arbitrarios. */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+
+  /* Curvas de animación compartidas: el movimiento coherente es la mitad de
+     la sensación de calidad de una interfaz. */
+  --ease-out:   cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.34, 1.25, .5, 1);
+  --dur-fast: .14s;
+  --dur:      .22s;
+}
+
+/* ── Refinado tipográfico base ─────────────────────────────────────────
+   Suavizado de fuentes y ligaduras: cambia poco en una captura, pero mucho
+   en la percepción de nitidez al usar la app durante un rato. */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+h1, h2, h3, h4 { letter-spacing: var(--ls-tight); line-height: var(--lh-tight); }
+h3 { font-size: var(--fs-lg); font-weight: 650; }
+h4 { font-size: var(--fs-base); font-weight: 600; }
+
+/* Las cifras en tablas y métricas deben alinearse verticalmente: sin esto,
+   una columna de números "baila" al cambiar de valor. */
+.ch-metric, .metric-value, .stat-value, [data-numeric] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ── Foco visible y accesible ──────────────────────────────────────────
+   Navegar con teclado sin ver dónde estás es una barrera real. Solo se
+   muestra en navegación por teclado, no al hacer clic. */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── Barras de scroll discretas ────────────────────────────────────────
+   Las barras nativas de Windows/Linux rompen la estética; se unifican con
+   las de macOS sin llegar a ocultarlas (ocultarlas perjudica la usabilidad). */
+* { scrollbar-width: thin; scrollbar-color: var(--glass-border) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; }
+
+/* ── Transiciones coherentes en controles ──────────────────────────────
+   Antes cada botón definía su propia duración; unificarlas hace que la
+   interfaz responda "igual" en todas partes. */
+button, .btn, input, textarea, select, a {
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              opacity var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+button:active, .btn:active { transform: scale(.975); }
+button:disabled, .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+/* Las tarjetas se elevan sutilmente al pasar por encima: da sensación de
+   material físico sin llegar a ser un efecto llamativo. */
+.card {
+  transition: transform var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out),
+              border-color var(--dur) var(--ease-out);
+}
+
+/* ── Entrada de contenido ──────────────────────────────────────────────
+   Los paneles aparecen con un desplazamiento mínimo en lugar de cortar en
+   seco: comunica jerarquía sin hacer esperar al usuario. */
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel-in { animation: panelIn var(--dur) var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FIRMA VISUAL DE ANDROMEDA
+   El gradiente de marca (coral → violeta → azul) aparece con moderación:
+   solo en el elemento principal de cada pantalla. Usado en todas partes
+   se vuelve ruido y deja de significar nada.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Texto con el gradiente de marca: para el nombre del producto y poco más. */
+.brand-text {
+  background: var(--grad-primary);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+
+/* Acento superior de sección: una línea fina de marca que encabeza los
+   paneles principales. Sutil, pero cose visualmente toda la aplicación. */
+.brand-rule {
+  height: 2px; border-radius: 2px; border: none;
+  background: var(--grad-primary);
+  opacity: .85;
+}
+
+/* Título de sección con acento de marca a la izquierda. */
+.section-title {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-lg); font-weight: 650;
+  letter-spacing: var(--ls-tight); color: var(--text-1);
+  margin: 0 0 var(--sp-1);
+}
+.section-title::before {
+  content: ''; width: 3px; height: 15px; border-radius: 2px;
+  background: var(--grad-primary); flex-shrink: 0;
+}
+
+.section-sub {
+  font-size: var(--fs-sm); color: var(--text-3);
+  line-height: var(--lh-snug); margin: 0 0 var(--sp-4);
+}
+
+/* Estado vacío: en vez de un hueco en blanco, una explicación de qué irá
+   ahí y cómo llenarlo. Los huecos vacíos hacen dudar de si algo se rompió. */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; padding: var(--sp-8) var(--sp-4);
+  color: var(--text-3);
+}
+.empty-state-icon {
+  font-size: 26px; margin-bottom: var(--sp-3); opacity: .55;
+}
+.empty-state-title {
+  font-size: var(--fs-base); font-weight: 600;
+  color: var(--text-2); margin-bottom: var(--sp-1);
+}
+.empty-state-desc {
+  font-size: var(--fs-sm); line-height: var(--lh-snug); max-width: 300px;
+}
+
+/* Badge de estado unificado: mismo tamaño y peso en toda la app. */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-micro); font-weight: 650;
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  padding: 2px 7px; border-radius: 6px;
+  background: var(--inset-surface); color: var(--text-3);
+  white-space: nowrap;
+}
+.badge-ok    { background: rgba(52, 211, 153, .14); color: var(--green); }
+.badge-warn  { background: rgba(251, 191, 36, .14); color: var(--amber); }
+.badge-error { background: rgba(255, 107, 107, .14); color: var(--red); }
+.badge-info  { background: rgba(123, 140, 240, .14); color: var(--blue); }
+
+/* Separador con más aire que un <hr> normal. */
+.divider {
+  height: 1px; border: none; margin: var(--sp-5) 0;
+  background: var(--glass-border);
+}
+
+/* Carga esqueleto: comunica "esto está llegando" mejor que un spinner,
+   porque anticipa la forma del contenido. */
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--inset-surface) 25%, var(--hover-surface) 50%, var(--inset-surface) 75%);
+  background-size: 200% 100%;
+  animation: skeletonSweep 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes skeletonSweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PANEL DE SALUD — tarjetas estilo iOS
+   Superficie de vidrio, luz superior sutil, y el estado comunicado por una
+   píldora legible en lugar de solo un borde de color: el color por sí solo
+   no es accesible para quien no lo distingue.
+   ════════════════════════════════════════════════════════════════════ */
+.ch-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+}
+
+.ch-card {
+  position: relative; overflow: hidden;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  padding: 13px 14px 14px;
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  transition: transform var(--dur) var(--ease-out),
+              border-color var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out);
+}
+.ch-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--glass-hi);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+}
+
+/* Reflejo superior: un solo trazo de luz da la sensación de material físico
+   sin recurrir a sombras pesadas. */
+.ch-card::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-hi), transparent);
+  opacity: .8;
+}
+
+/* Halo de color del estado, muy tenue, en la esquina superior. */
+.ch-card-glow {
+  position: absolute; top: -34px; right: -34px;
+  width: 90px; height: 90px; border-radius: 50%;
+  filter: blur(26px); opacity: .3; pointer-events: none;
+  transition: opacity var(--dur) var(--ease-out);
+}
+.ch-card[data-status="ok"]       .ch-card-glow { background: var(--green); }
+.ch-card[data-status="degraded"] .ch-card-glow { background: var(--amber); }
+.ch-card[data-status="error"]    .ch-card-glow { background: var(--red); }
+.ch-card[data-status="off"]      .ch-card-glow { background: var(--text-3); opacity: .12; }
+.ch-card:hover .ch-card-glow { opacity: .45; }
+
+.ch-card-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-2); margin-bottom: 10px;
+}
+
+/* El icono vive en su propia superficie redondeada, como en iOS. */
+.ch-icon-wrap {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 9px;
+  background: var(--inset-surface);
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+.ch-icon { font-size: 14px; line-height: 1; }
+
+/* Píldora de estado: texto + punto. Comunicar el estado solo con color deja
+   fuera a quien no lo percibe; el texto lo hace legible siempre. */
+.ch-status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 9.5px; font-weight: 650; letter-spacing: .02em;
+  text-transform: uppercase; white-space: nowrap;
+  padding: 3px 8px 3px 6px; border-radius: 99px;
+  background: var(--inset-surface); color: var(--text-3);
+}
+.ch-status-pill[data-status="ok"]       { background: rgba(52,211,153,.13); color: var(--green); }
+.ch-status-pill[data-status="degraded"] { background: rgba(251,191,36,.13);  color: var(--amber); }
+.ch-status-pill[data-status="error"]    { background: rgba(255,107,107,.13); color: var(--red); }
+
+.ch-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+/* Solo el estado sano late: llamar la atención sobre lo que funciona bien
+   es innecesario, pero un sistema vivo debe notarse vivo. */
+.ch-status-pill[data-status="ok"] .ch-dot { animation: chPulse 2.4s ease-in-out infinite; }
+@keyframes chPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .45; transform: scale(.82); }
+}
+
+.ch-name {
+  font-size: var(--fs-xs); font-weight: 500;
+  color: var(--text-3); letter-spacing: var(--ls-wide);
+  margin-bottom: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ch-metric {
+  font-size: 17px; font-weight: 620;
+  letter-spacing: var(--ls-tight); color: var(--text-1);
+  margin-bottom: 5px; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.ch-card[data-status="off"] .ch-metric { color: var(--text-3); font-weight: 550; }
+
+.ch-detail {
+  font-size: var(--fs-micro); line-height: 1.5; color: var(--text-3);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-status-pill .ch-dot { animation: none; }
+  .ch-card:hover { transform: none; }
+}
+
+/* ── Expansión de tarjeta de componente ────────────────────────────────
+   La tarjeta crece ocupando toda la fila y las demás se reacomodan solas:
+   la rejilla ya sabe redistribuir, así que no hace falta calcular nada en JS.
+   Se atenúan las demás para dirigir la atención sin ocultarlas. */
+
+.ch-card { cursor: pointer; z-index: 1; }
+.ch-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.ch-grid-has-open .ch-card { transition: opacity var(--dur) var(--ease-out),
+                                         transform var(--dur) var(--ease-out); }
+
+.ch-card-dim { opacity: .42; }
+.ch-card-dim:hover { opacity: .7; transform: none; }
+
+.ch-card-open {
+  grid-column: 1 / -1;               /* ocupa la fila completa */
+  z-index: 2; cursor: default;
+  border-color: var(--glass-hi);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, .34);
+  animation: chExpand var(--dur) var(--ease-spring);
+}
+.ch-card-open:hover { transform: none; }
+.ch-card-open .ch-card-glow { opacity: .5; width: 150px; height: 150px; }
+.ch-card-open .ch-metric { font-size: var(--fs-xl); }
+
+@keyframes chExpand {
+  from { transform: scale(.985); }
+  to   { transform: scale(1); }
+}
+
+/* Cerrada, el detalle se recorta a dos líneas; abierta se muestra entero. */
+.ch-detail-full { -webkit-line-clamp: unset; overflow: visible; }
+
+.ch-close {
+  width: 22px; height: 22px; border-radius: 7px; border: none;
+  background: var(--inset-surface); color: var(--text-3);
+  cursor: pointer; font-size: 16px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.ch-close:hover { background: var(--hover-surface); color: var(--text-1); }
+
+.ch-expand {
+  display: grid; gap: var(--sp-4);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin-top: var(--sp-3); padding-top: var(--sp-3);
+  border-top: 1px solid var(--glass-border);
+  animation: chExpandIn .24s var(--ease-out) both;
+}
+@keyframes chExpandIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ch-expand-h {
+  font-size: var(--fs-micro); font-weight: 650; text-transform: uppercase;
+  letter-spacing: var(--ls-wide); color: var(--text-3); margin-bottom: 5px;
+}
+.ch-expand-d {
+  font-size: var(--fs-sm); line-height: var(--lh-body); color: var(--text-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-card-open, .ch-expand { animation: none; }
+}
+
+/* ── Indicador de "pensando" ────────────────────────────────────────────
+   Un brillo que recorre el texto, como el indicador de Claude: comunica que
+   hay trabajo en curso sin distraer tanto como un spinner. La frase cambia
+   con la fase real (buscando en internet, pensando…) y entra suavemente. */
+.think-text {
+  background: linear-gradient(90deg,
+    var(--text-3) 0%, var(--text-3) 38%, var(--text-1) 50%,
+    var(--text-3) 62%, var(--text-3) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: thinkShimmer 2.2s linear infinite, thinkIn .35s var(--ease-out, ease-out);
+}
+@keyframes thinkShimmer {
+  from { background-position: 100% 0; }
+  to   { background-position: -150% 0; }
+}
+@keyframes thinkIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.think-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--grad-primary, var(--blue));
+  animation: thinkPulse 1.4s ease-in-out infinite;
+}
+@keyframes thinkPulse {
+  0%, 100% { opacity: .35; transform: scale(.8); }
+  50%      { opacity: 1;   transform: scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .think-text { animation: none; -webkit-text-fill-color: var(--text-3); color: var(--text-3); }
+  .think-dot { animation: none; opacity: .7; }
+}
+
+/* ── Adjuntos en los mensajes ───────────────────────────────────────── */
+.msg-attachments {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
+  margin-bottom: 6px; max-width: 100%;
+}
+.att-image {
+  padding: 0; border: 1px solid var(--glass-border); border-radius: 12px;
+  overflow: hidden; cursor: zoom-in; background: var(--inset-surface);
+  width: 132px; height: 132px; transition: transform .15s var(--ease-out, ease-out);
+}
+.att-image:hover { transform: scale(1.02); }
+.att-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.att-file {
+  display: flex; align-items: center; gap: 8px; max-width: 220px;
+  padding: 9px 12px; border-radius: 12px; font-size: var(--fs-xs);
+  background: var(--inset-surface); border: 1px solid var(--glass-border);
+}
+.att-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.att-zoom {
+  position: fixed; inset: 0; z-index: 1000; cursor: zoom-out;
+  background: rgba(8, 9, 14, .72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  display: flex; align-items: center; justify-content: center; padding: 48px;
+  animation: fadeIn .2s ease-out;
+}
+.att-zoom.out { animation: fadeOut .18s ease-in forwards; }
+.att-zoom img {
+  max-width: min(1200px, 100%); max-height: 100%; border-radius: 14px; cursor: default;
+  box-shadow: 0 30px 80px rgba(0,0,0,.55); animation: zoomIn .26s cubic-bezier(.2,.8,.2,1);
+}
+.att-zoom.out img { animation: zoomOut .18s ease-in forwards; }
+.att-zoom-close {
+  position: absolute; top: max(18px, env(safe-area-inset-top)); right: 18px; width: 38px; height: 38px;
+  border-radius: 50%; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+  color: #fff; font-size: 15px; cursor: pointer; transition: background .15s;
+}
+.att-zoom-close:hover { background: rgba(255,255,255,.18); }
+@keyframes zoomIn  { from { transform: scale(.94); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes zoomOut { to { transform: scale(.96); opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .att-zoom, .att-zoom img { animation: none !important; } }
+
+/* Modelo concreto bajo cada nivel de potencia */
+.ias-seg-power .ias-seg-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ias-seg-model {
+  font-size: var(--fs-micro); font-family: var(--mono); opacity: .6;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Botón para volver al final del chat (aparece si el usuario sube) */
+.jump-bottom {
+  position: sticky; bottom: 12px; margin-left: auto; margin-right: 12px; display: flex;
+  align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-1); color: var(--text-1); border: 1px solid var(--glass-border);
+  box-shadow: 0 6px 20px rgba(0,0,0,.35); cursor: pointer; z-index: 5; font-size: 16px;
+  animation: thinkIn .2s ease-out;
+}
+.jump-bottom:hover { background: var(--inset-surface); }
+
+/* ── Panel lateral de vista previa ─────────────────────────────────────── */
+.preview-backdrop { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.35);
+  animation: fadeIn .2s ease-out; }
+.preview-backdrop.out { animation: fadeOut .18s ease-in forwards; }
+.preview-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 901;
+  width: min(760px, 58vw); display: flex; flex-direction: column;
+  background: var(--bg-1); border-left: 1px solid var(--glass-border);
+  box-shadow: -18px 0 50px rgba(0,0,0,.35); animation: slideIn .26s cubic-bezier(.2,.8,.2,1); }
+.preview-panel.out { animation: slideOut .18s ease-in forwards; }
+@media (max-width: 900px) { .preview-panel { width: 100vw; } }
+.preview-head { display: flex; align-items: center; gap: 6px; padding: 12px 14px 12px 20px;
+  border-bottom: 1px solid var(--glass-border); padding-top: max(12px, env(safe-area-inset-top)); }
+.preview-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-btn { font-size: var(--fs-sm); padding: 6px 11px; }
+.preview-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.preview-frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.preview-img { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: var(--inset-surface); }
+.preview-img img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; }
+.preview-code { margin: 0; padding: 18px 20px; font-family: var(--mono); font-size: var(--fs-sm);
+  line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.preview-md { padding: 20px 28px; line-height: 1.65; }
+.preview-empty { padding: 24px; color: var(--text-3); }
+@keyframes slideIn  { from { transform: translateX(40px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes slideOut { to { transform: translateX(40px); opacity: 0 } }
+@keyframes fadeIn   { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fadeOut  { to { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) {
+  .preview-panel, .preview-panel.out, .preview-backdrop, .preview-backdrop.out { animation: none; }
+}
+.file-chip.clickable { cursor: pointer; transition: border-color .15s, transform .15s; }
+.file-chip.clickable:hover { border-color: var(--blue, #6aa0ff) !important; transform: translateY(-1px); }
+
+/* ── Catálogo de prompts ──────────────────────────────────────────────── */
+.pcat { display: flex; flex-direction: column; gap: 10px; }
+.pcat-search { width: 100%; padding: 9px 12px; border-radius: 10px; font-size: var(--fs-base);
+  background: var(--inset-surface); border: 1px solid var(--glass-border); color: var(--text-1); }
+.pcat-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.pcat-chip { padding: 5px 11px; border-radius: 999px; font-size: var(--fs-xs); cursor: pointer;
+  background: var(--inset-surface); border: 1px solid var(--glass-border); color: var(--text-2); }
+.pcat-chip.on { background: var(--text-1); color: var(--bg-1); border-color: transparent; }
+.pcat-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 60vh; }
+.pcat-item { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--glass-border);
+  background: var(--hover-surface); }
+.pcat-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pcat-title { font-weight: 600; font-size: var(--fs-sm); flex: 1; }
+.pcat-tag { font-size: var(--fs-micro); color: var(--text-3); }
+.pcat-body { font-size: var(--fs-xs); color: var(--text-3); white-space: pre-wrap; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pcat-actions { display: flex; gap: 6px; margin-top: 8px; }
+.pcat-btn { font-size: var(--fs-xs); padding: 5px 11px; }
+.pcat-empty { padding: 20px; text-align: center; color: var(--text-3); font-size: var(--fs-sm); }
+.pcat-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.dl-toast { margin: 8px 16px; padding: 8px 12px; border-radius: 10px; font-size: var(--fs-xs);
+  background: rgba(74, 222, 128, .1); border: 1px solid rgba(74, 222, 128, .3); color: var(--green, #4ade80);
+  word-break: break-all; animation: thinkIn .2s ease-out; }
+
+/* Estado de la memoria por significado */
+.sem-status { display: flex; align-items: center; gap: 9px; padding: 9px 13px; margin-bottom: 14px;
+  border-radius: 11px; font-size: var(--fs-xs); background: var(--hover-surface);
+  border: 1px solid var(--glass-border); color: var(--text-2); }
+.sem-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--text-3); }
+.sem-ready .sem-dot { background: var(--green, #4ade80); }
+.sem-downloading .sem-dot, .sem-pending .sem-dot, .sem-waiting_ollama .sem-dot {
+  background: var(--amber, #fbbf24); animation: thinkPulse 1.4s ease-in-out infinite; }
+.sem-error .sem-dot, .sem-offline .sem-dot { background: var(--red, #f87171); }
+
+/* ── Memoria estilo Claude ────────────────────────────────────────────── */
+.memf-import { margin: 6px 0 16px; padding: 14px; border-radius: 12px; background: var(--hover-surface);
+  border: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 8px; }
+.memf-step { font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.memf-prompt { margin: 0; padding: 10px 12px; border-radius: 9px; background: var(--inset-surface);
+  font-size: var(--fs-xs); white-space: pre-wrap; line-height: 1.5; color: var(--text-2); }
+.memf-section { margin-top: 26px; }
+.memf-section-title { font-size: var(--fs-lg, 1.05rem); font-weight: 650; margin-bottom: 8px; }
+.memf-empty { font-size: var(--fs-sm); color: var(--text-3); padding: 6px 0; }
+.memf-table { border: 1px solid var(--glass-border); border-radius: 12px; overflow: hidden; }
+.memf-row { display: grid; grid-template-columns: minmax(130px, 1.1fr) 2.6fr 110px 56px; gap: 12px;
+  align-items: center; padding: 10px 14px; border-top: 1px solid var(--glass-border); font-size: var(--fs-sm); }
+.memf-row:first-child { border-top: 0; }
+.memf-head { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; background: var(--inset-surface); }
+.memf-name { text-align: left; background: none; border: 0; color: var(--text-1); font-weight: 600;
+  cursor: pointer; padding: 0; font-size: var(--fs-sm); }
+.memf-summary { color: var(--text-3); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; line-height: 1.45; }
+.memf-date { color: var(--text-3); font-size: var(--fs-xs); }
+.memf-actions { display: flex; justify-content: flex-end; }
+.memf-facts { padding: 4px 14px 10px 30px; background: var(--hover-surface); border-top: 1px solid var(--glass-border); }
+.memf-fact { display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: var(--fs-sm); }
+.memf-fact-text { flex: 1; color: var(--text-2); }
+@media (max-width: 720px) {
+  .memf-row { grid-template-columns: 1fr 70px 44px; }
+  .memf-row .memf-summary, .memf-head span:nth-child(2) { display: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Apariencia macOS — inspirada en el Finder de macOS
+   Barra lateral flotante y redondeada con fondo translúcido, selección en
+   azul del sistema, botones tipo cápsula y tipografía del sistema. Se apoya
+   en la base oscura (theme-dark) y solo cambia lo necesario.
+   ══════════════════════════════════════════════════════════════════════ */
+body.design-11 {
+  /* Apple primero; en Windows, su tipografía nativa (Segoe UI Variable). */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable Text', 'Segoe UI', 'Helvetica Neue', Inter, sans-serif;
+}
+body.design-11.theme-dark {
+  --bg-0: #1e1e1e;
+  --bg-1: #262626;
+  --bg-2: #2d2d2d;
+  --surface-1: #2a2a2a;
+  --surface-2: #323232;
+  --glass: rgba(40, 40, 44, 0.72);
+  --glass-bright: rgba(58, 58, 62, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --hairline: rgba(255, 255, 255, 0.07);
+  --titlebar-bg: rgba(30, 30, 30, 0.82);
+  --sidebar-bg: rgba(44, 44, 48, 0.62);
+  --hover-surface: rgba(255, 255, 255, 0.06);
+  --inset-surface: rgba(0, 0, 0, 0.22);
+  --chip-surface: rgba(255, 255, 255, 0.08);
+  --field-bg: rgba(255, 255, 255, 0.06);
+  --text-1: #f2f2f7;
+  --text-2: rgba(235, 235, 245, 0.78);
+  --text-3: rgba(235, 235, 245, 0.5);
+  --blue: #0a84ff;
+  --green: #30d158;
+  --amber: #ffd60a;
+  --red: #ff453a;
+  --grad-primary: linear-gradient(135deg, #0a84ff, #5e5ce6);
+  --toggle-off: rgba(120, 120, 128, 0.36);
+  --scroll-thumb: rgba(255, 255, 255, 0.18);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.3);
+  background: var(--bg-0);
+}
+
+/* Sin fondos animados: el Finder usa superficies lisas */
+body.design-11 .bg-bands { display: none !important; }
+
+/* Barra lateral flotante, separada de los bordes y redondeada */
+body.design-11 .sidebar-anim {
+  margin: 10px 0 10px 10px;
+  height: calc(100% - 20px);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+body.design-11 .sidebar-anim.sidebar-closed { margin: 10px 0; border-width: 0; box-shadow: none; }
+
+/* Elementos de navegación compactos; el activo en azul del sistema */
+body.design-11 .sb-nav {
+  padding: 7px 12px !important;
+  border-radius: 9px !important;
+  gap: 11px !important;
+}
+body.design-11 .sb-nav span { font-size: 14px !important; font-weight: 500 !important; }
+body.design-11 .sb-nav svg { width: 18px; height: 18px; color: var(--blue); }
+body.design-11 .sb-nav.active {
+  background: var(--blue) !important;
+  color: #fff !important;
+}
+body.design-11 .sb-nav.active svg { color: #fff; }
+
+/* Títulos de sección pequeños y grises, como "Favoritos" o "Ubicaciones" */
+body.design-11 .sb-section {
+  font-size: 11px !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  padding: 16px 14px 6px !important;
+}
+
+/* Conversaciones del historial como filas del Finder */
+body.design-11 .sb-chat { padding: 6px 12px !important; }
+body.design-11 .sb-chat span { font-size: 13px !important; }
+body.design-11 .sb-chat.active { background: rgba(10, 132, 255, 0.28) !important; border-radius: 8px; }
+
+/* Barra superior: fondo liso con desenfoque y botones tipo cápsula */
+body.design-11 header {
+  background: var(--titlebar-bg) !important;
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-bottom: 1px solid var(--hairline) !important;
+}
+body.design-11 header button {
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+body.design-11 header button:hover { background: rgba(255, 255, 255, 0.12) !important; }
+
+/* Botones y tarjetas con las proporciones de macOS */
+body.design-11 .btn { border-radius: 8px; }
+body.design-11 .btn-primary { background: var(--blue); color: #fff; }
+body.design-11 .card { border-radius: 12px; background: var(--surface-1); }
+
+/* Selección de texto y foco en azul del sistema */
+body.design-11 ::selection { background: rgba(10, 132, 255, 0.45); }
+body.design-11 :focus-visible { outline: 3px solid rgba(10, 132, 255, 0.5); outline-offset: 1px; }
+
+/* Burbuja del usuario en azul, como Mensajes */
+body.design-11 .bubble-user { background: var(--blue) !important; color: #fff !important; }
+
+/* Barras de desplazamiento finas */
+body.design-11 ::-webkit-scrollbar { width: 10px; height: 10px; }
+body.design-11 ::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb); border-radius: 10px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body.design-11 .sidebar-anim, body.design-11 header {
+    backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg-1) !important;
+  }
+}
+
+/* ── Isla de botones de ventana ─────────────────────────────────────────
+   Se pinta en <body> por encima de cualquier capa (Configuración, Sistema,
+   vista previa): el resto se difumina y la isla queda nítida y usable. */
+.titlebar-traffic-spacer { width: 96px; flex-shrink: 0; }
+.titlebar-controls-spacer { width: 138px; flex-shrink: 0; }
+.tl-island {
+  position: fixed; top: 5px; left: 10px; z-index: 10000;
+  height: 26px; padding: 0 10px; display: flex; align-items: center; gap: 8px;
+  border-radius: 999px;
+  background: rgba(40, 40, 46, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+body.theme-light .tl-island {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+/* Iconos de los semáforos al pasar por encima de la isla, como en macOS */
+.tl-island .tl { position: relative; }
+.tl-island:hover .tl::after {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; line-height: 12px; font-weight: 700; color: rgba(0, 0, 0, 0.55);
+}
+.tl-island:hover .tl-close::after { content: "×"; font-size: 11px; }
+.tl-island:hover .tl-min::after { content: "−"; }
+.tl-island:hover .tl-max::after { content: "+"; }
+.tl-island-right { position: fixed; top: 0; right: 0; height: 36px; z-index: 10000; }
+
+/* ── Diseño 1.1 · modo claro (estilo macOS claro) ──────────────────────── */
+body.design-11.theme-light {
+  --bg-0: #f5f5f7;
+  --bg-1: #ffffff;
+  --bg-2: #f0f0f2;
+  --surface-1: #ffffff;
+  --surface-2: #f2f2f4;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-bright: rgba(255, 255, 255, 0.86);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --hairline: rgba(0, 0, 0, 0.06);
+  --titlebar-bg: rgba(245, 245, 247, 0.8);
+  --sidebar-bg: rgba(236, 236, 240, 0.72);
+  --hover-surface: rgba(0, 0, 0, 0.05);
+  --inset-surface: rgba(0, 0, 0, 0.04);
+  --chip-surface: rgba(0, 0, 0, 0.05);
+  --field-bg: rgba(0, 0, 0, 0.04);
+  --text-1: #1d1d1f;
+  --text-2: rgba(29, 29, 31, 0.78);
+  --text-3: rgba(29, 29, 31, 0.5);
+  --blue: #007aff;
+  --green: #34c759;
+  --amber: #ff9f0a;
+  --red: #ff3b30;
+  --grad-primary: linear-gradient(135deg, #007aff, #5856d6);
+  --toggle-off: rgba(120, 120, 128, 0.24);
+  --scroll-thumb: rgba(0, 0, 0, 0.18);
+  --scroll-thumb-hover: rgba(0, 0, 0, 0.3);
+  background: var(--bg-0);
+}
+body.design-11.theme-light .sidebar-anim {
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+body.design-11.theme-light header button {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.07) !important;
+}
+body.design-11.theme-light .sb-chat.active { background: rgba(0, 122, 255, 0.16) !important; }
+
+/* ── Diseño 1.1 · incógnito: grafito neutro, sin azul ──────────────────── */
+body.design-11.incognito {
+  --bg-0: #161618 !important;
+  --bg-1: #1c1c1f !important;
+  --bg-2: #232326 !important;
+  --sidebar-bg: rgba(30, 30, 33, 0.7);
+  --titlebar-bg: rgba(22, 22, 24, 0.85);
+  --hover-surface: rgba(255, 255, 255, 0.05) !important;
+  --glass-border: rgba(255, 255, 255, 0.07) !important;
+  --blue: #8e8e93;
+  --grad-primary: linear-gradient(135deg, #636366, #48484a);
+}
+body.design-11.incognito .sb-nav.active { background: #3a3a3c !important; }
+body.design-11.incognito .sb-nav svg { color: var(--text-2); }
+body.design-11.incognito .sb-nav.active svg { color: #fff; }
+body.design-11.incognito .sb-chat.active { background: rgba(255, 255, 255, 0.1) !important; }
+body.design-11.incognito .bubble-user { background: #3a3a3c !important; }
+body.design-11.incognito .titlebar { background: var(--titlebar-bg) !important; }
+
+/* ── Diseño 1.1 · barras superiores sin línea divisoria ─────────────────── */
+body.design-11 .titlebar,
+body.design-11 header {
+  border-bottom: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Diseño 1.1 · caja de mensaje con cristal de macOS ─────────────────── */
+body.design-11 .liquid-glass {
+  border-radius: 22px !important;
+  background: rgba(58, 58, 64, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(40px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(190%) !important;
+  transition: border-color .2s, box-shadow .2s;
+}
+body.design-11 .liquid-glass:focus-within {
+  border-color: rgba(10, 132, 255, 0.55) !important;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.35),
+    0 0 0 4px rgba(10, 132, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+body.design-11.theme-light .liquid-glass {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+body.design-11.theme-light .liquid-glass:focus-within {
+  border-color: rgba(0, 122, 255, 0.5) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.1), 0 0 0 4px rgba(0, 122, 255, 0.15) !important;
+}
+body.design-11.incognito .liquid-glass:focus-within {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 0 4px rgba(255, 255, 255, 0.06) !important;
+}
+body.design-11 .liquid-glass textarea { font-size: 15px; }
+
+/* ── Memoria por temas (como en Claude) ───────────────────────────────── */
+.memf-list { display: flex; flex-direction: column; }
+.memf-item { display: grid; grid-template-columns: minmax(150px, 1fr) 1.9fr auto 76px; gap: 18px;
+  align-items: center; padding: 14px 14px; border-bottom: 1px solid var(--hairline, var(--glass-border));
+  border-radius: 10px; cursor: pointer; transition: background .15s; }
+.memf-item:hover, .memf-item:focus-visible { background: var(--hover-surface); outline: none; }
+.memf-item-name { font-size: var(--fs-base); color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.memf-item-desc { font-size: var(--fs-base); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.memf-item-date { font-size: var(--fs-sm); color: var(--text-3); white-space: nowrap; }
+.memf-item-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
+.memf-item:hover .memf-item-actions, .memf-item:focus-within .memf-item-actions { opacity: 1; }
+.memf-icon { background: none; border: 0; color: var(--text-2); cursor: pointer; padding: 6px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; }
+.memf-icon:hover { background: var(--hover-surface); color: var(--text-1); }
+.memf-modal-bg { position: fixed; inset: 0; z-index: 950; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center; padding: 24px; animation: fadeIn .18s ease-out; }
+.memf-modal { width: min(640px, 100%); max-height: 82vh; overflow: auto; background: var(--bg-1);
+  border: 1px solid var(--glass-border); border-radius: 18px; padding: 22px 24px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.45); animation: zoomIn .22s cubic-bezier(.2,.8,.2,1); }
+.memf-modal-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.memf-modal-title { font-size: 1.15rem; font-weight: 650; }
+.memf-modal-desc { font-size: var(--fs-sm); color: var(--text-3); margin-top: 3px; }
+.memf-content { margin: 0 0 14px; padding-left: 20px; line-height: 1.7; color: var(--text-2); font-size: var(--fs-base); }
+.memf-textarea { width: 100%; font-family: var(--mono); font-size: var(--fs-sm); resize: vertical; margin-bottom: 12px; }
+.memf-prompt-bar { display: flex; gap: 8px; align-items: center; margin: 4px 0 12px; padding: 6px 6px 6px 14px;
+  border-radius: 14px; border: 1px solid var(--glass-border); background: var(--field-bg, var(--inset-surface)); }
+.memf-prompt-input { flex: 1; background: none; border: 0; outline: none; color: var(--text-1); font-size: var(--fs-base); }
+.memf-modal-foot { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .memf-item { grid-template-columns: 1fr auto 70px; }
+  .memf-item-desc { display: none; }
+}
+
+/* ── Diseño 1.1 · bienvenida del chat ─────────────────────────────────── */
+/* Logo sin recuadro, como en 1.0; título con la tipografía de marca. */
+body.design-11 .welcome-logo {
+  width: 84px !important; height: 84px !important;
+  filter: drop-shadow(0 10px 28px rgba(10, 132, 255, 0.18));
+}
+body.design-11 .welcome-title {
+  font-family: 'Playfair Display', Georgia, serif !important;
+  font-size: 40px !important; font-weight: 600 !important; letter-spacing: 0.01em !important;
+}
+body.design-11 .welcome-sub { font-size: 15px !important; color: var(--text-2) !important; }
+body.design-11 .welcome-chips button {
+  border-radius: 999px !important; background: var(--glass) !important;
+  border: 1px solid var(--glass-border) !important;
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  transition: background .15s, transform .15s;
+}
+body.design-11 .welcome-chips button:hover { background: var(--glass-bright) !important; transform: translateY(-1px); }
+
+/* ── Estado de componentes: brillo dentro de las esquinas ──────────────────
+   El halo era un hijo con filter: blur(); dentro de una tarjeta con
+   backdrop-filter, WebKit ignora el redondeo y asomaba como un cuadrado.
+   Ahora es un degradado del propio fondo: respeta siempre las esquinas. */
+.ch-card-glow { display: none; }
+.ch-card { isolation: isolate; will-change: transform; }
+.ch-card[data-status="ok"] {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(52, 211, 153, .16), transparent 55%), var(--glass);
+}
+.ch-card[data-status="degraded"] {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(251, 191, 36, .16), transparent 55%), var(--glass);
+}
+.ch-card[data-status="error"] {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(255, 107, 107, .18), transparent 55%), var(--glass);
+}
+.ch-card[data-status="ok"].ch-card-open {
+  background: radial-gradient(70% 120% at 100% 0%, rgba(52, 211, 153, .14), transparent 60%), var(--glass);
+}
+.ch-card-open { animation: none; }
+.ch-expand { animation: chExpandIn .32s .08s cubic-bezier(.2, .9, .25, 1) both; }
+.ch-card-dim { transition: opacity .3s ease; }
+
+/* ── Diseño 1.1 · color de acento ──────────────────────────────────────── */
+.accent-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
+.accent-dot { width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer; position: relative;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); transition: transform .15s; }
+.accent-dot:hover { transform: scale(1.1); }
+.accent-dot.active::after { content: ''; position: absolute; inset: -5px; border-radius: 50%;
+  border: 2px solid var(--text-2); }
+body.design-11 .sb-nav.active,
+body.design-11 .bubble-user,
+body.design-11 .btn-primary { background: var(--accent-fill, var(--blue)) !important; }
+body.design-11.accent-light .sb-nav.active,
+body.design-11.accent-light .bubble-user,
+body.design-11.accent-light .btn-primary { color: #1d1d1f !important; }
+body.design-11.accent-light .sb-nav.active svg { color: #1d1d1f; }
+body.design-11 .sb-chat.active { background: color-mix(in srgb, var(--accent, #0a84ff) 26%, transparent) !important; }
+body.design-11 .liquid-glass:focus-within {
+  border-color: color-mix(in srgb, var(--accent, #0a84ff) 60%, transparent) !important;
+}
+body.design-11 ::selection { background: color-mix(in srgb, var(--accent, #0a84ff) 45%, transparent); }
+
+/* ── Panel de Potencia de IA: apertura y cierre animados ──────────────── */
+.ias-expand {
+  animation: iasOpen .34s cubic-bezier(.2, .9, .25, 1) both;
+  transform-origin: bottom center;
+}
+.ias-expand.closing { animation: iasClose .19s cubic-bezier(.4, 0, 1, 1) both; }
+@keyframes iasOpen {
+  from { opacity: 0; transform: translateY(14px) scale(.96); filter: blur(4px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+@keyframes iasClose {
+  from { opacity: 1; transform: none; filter: none; }
+  to   { opacity: 0; transform: translateY(10px) scale(.97); filter: blur(3px); }
+}
+
+/* ── Diseño 1.1 · Potencia de IA con controles de macOS ────────────────── */
+body.design-11 .ias-expand {
+  border-bottom: 0 !important;
+  padding: 6px 6px 14px !important;
+}
+body.design-11 .ias-expand > div:first-child { font-size: 15px !important; font-weight: 650 !important; }
+/* Control segmentado: pista gris y selección en cápsula con sombra suave */
+body.design-11 .ias-seg {
+  background: rgba(118, 118, 128, 0.24) !important;
+  border-radius: 10px !important;
+  padding: 2px !important;
+  gap: 0 !important;
+  border: 0 !important;
+}
+body.design-11.theme-light .ias-seg { background: rgba(118, 118, 128, 0.12) !important; }
+body.design-11 .ias-seg-btn {
+  border-radius: 8px !important;
+  padding: 7px 6px !important;
+  background: transparent !important;
+  color: var(--text-2) !important;
+  font-size: 13px !important; font-weight: 500 !important;
+  box-shadow: none !important;
+  transition: background .2s, color .2s, box-shadow .2s !important;
+}
+body.design-11 .ias-seg-btn.on {
+  background: rgba(99, 99, 102, 0.9) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18), 0 0 0 .5px rgba(0, 0, 0, 0.04) !important;
+}
+body.design-11.theme-light .ias-seg-btn.on {
+  background: #fff !important; color: var(--text-1) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 .5px rgba(0, 0, 0, 0.04) !important;
+}
+body.design-11 .ias-seg-model {
+  font-family: inherit !important; font-size: 11px !important;
+  color: var(--text-3) !important; opacity: 1 !important;
+}
+body.design-11 .ias-seg-btn.on .ias-seg-model { color: rgba(255, 255, 255, 0.72) !important; }
+body.design-11.theme-light .ias-seg-btn.on .ias-seg-model { color: var(--text-3) !important; }
+body.design-11 .ias-config select {
+  border-radius: 8px !important; padding: 7px 10px !important;
+  background: rgba(118, 118, 128, 0.18) !important; border: 0 !important;
+}
+body.design-11 .ias-hint { font-size: 12.5px !important; color: var(--text-3) !important; }
+
+/* Conectores MCP: preparación manual y riesgo */
+.mcp-badge { display: inline-block; margin: 0 6px 0 0; padding: 1px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; background: var(--chip-surface); color: var(--text-2); vertical-align: middle; }
+.mcp-badge-risk { background: rgba(255, 69, 58, .14); color: var(--red, #ff453a); }
+
+/* ── Pack de potencia ─────────────────────────────────────────────────── */
+.power-pack { margin-bottom: 18px; }
+.power-pack-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+.power-pack-title { font-size: var(--fs-md, 1rem); font-weight: 650; }
+.power-pack-sub { font-size: var(--fs-sm); color: var(--text-3); margin-top: 4px; line-height: 1.5; max-width: 560px; }
+.power-pack-ok { font-size: var(--fs-sm); color: var(--green); font-weight: 600; white-space: nowrap; }
+.power-pack-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.power-pack-level { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; border-radius: 12px;
+  background: var(--inset-surface); border: 1px solid var(--glass-border); }
+.power-pack-level.installed { border-color: color-mix(in srgb, var(--green) 35%, transparent); }
+.power-pack-lvl { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.power-pack-model { font-family: var(--mono); font-size: var(--fs-sm); color: var(--text-1); }
+.power-pack-state { font-size: var(--fs-xs); color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+.power-pack-level.installed .power-pack-state { color: var(--green); }
+.power-pack-bar { flex: 1; height: 4px; border-radius: 99px; background: var(--hover-surface); overflow: hidden; }
+.power-pack-bar > span { display: block; height: 100%; background: var(--accent-fill, var(--blue)); transition: width .6s ease; }
+
+/* ── Zoom de imágenes: toda la ventana desenfocada ─────────────────────── */
+.att-zoom {
+  position: fixed !important; inset: 0 !important; z-index: 9000 !important;
+  display: flex !important; align-items: center; justify-content: center; padding: 48px;
+  background: rgba(10, 10, 14, 0.55) !important;
+  backdrop-filter: blur(28px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(140%) !important;
+  animation: zoomBgIn .28s ease-out both !important;
+  cursor: zoom-out;
+}
+body.theme-light .att-zoom { background: rgba(245, 245, 247, 0.6) !important; }
+.att-zoom img {
+  max-width: min(92vw, 1600px) !important; max-height: 88vh !important;
+  width: auto; height: auto; object-fit: contain;
+  border-radius: 14px; cursor: default;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: zoomImgIn .42s cubic-bezier(.2, .9, .25, 1.12) both !important;
+}
+.att-zoom.out { animation: zoomBgOut .22s ease-in forwards !important; }
+.att-zoom.out img { animation: zoomImgOut .22s ease-in forwards !important; }
+@keyframes zoomBgIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes zoomBgOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes zoomImgIn { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: none; } }
+@keyframes zoomImgOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.94); } }
+
+/* ── Estado de componentes: rejilla que se adapta al cuadro abierto ──────
+   Con "dense" los cuadros cerrados rellenan los huecos que deja el abierto, y
+   con filas de altura automática se estiran a la altura de su fila. */
+.ch-grid { grid-auto-flow: row dense; align-items: stretch; gap: 12px; }
+.ch-grid-has-open { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.ch-card { transition: border-color .3s, box-shadow .45s cubic-bezier(.2, .9, .25, 1), opacity .45s ease; }
+.ch-card-open { box-shadow: 0 22px 60px rgba(0, 0, 0, .38) !important; }
+.ch-grid-has-open .ch-card:not(.ch-card-open) { opacity: .62; }
+.ch-grid-has-open .ch-card:not(.ch-card-open):hover { opacity: .9; }
+/* El contenido del cuadro abierto aparece después de que el cuadro se coloque */
+.ch-expand { animation: chContentIn .45s .22s cubic-bezier(.2, .9, .25, 1) both !important; }
+@keyframes chContentIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ── Potencia de IA: despliegue al estilo Apple ──────────────────────────
+   El envoltorio anima la altura (0fr → 1fr) y el panel entra con un muelle
+   suave; al cerrar, lo inverso. */
+.ias-wrap {
+  display: grid; grid-template-rows: 1fr;
+  animation: iasWrapOpen .55s cubic-bezier(.22, 1, .36, 1) both;
+}
+.ias-wrap > .ias-expand { min-height: 0; overflow: hidden; }
+.ias-wrap.closing { animation: iasWrapClose .38s cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes iasWrapOpen { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+@keyframes iasWrapClose { from { grid-template-rows: 1fr; opacity: 1; } to { grid-template-rows: 0fr; opacity: 0; } }
+.ias-expand { animation: iasOpenApple .6s cubic-bezier(.22, 1.12, .36, 1) both !important; }
+.ias-expand.closing { animation: iasCloseApple .34s cubic-bezier(.4, 0, 1, 1) both !important; }
+@keyframes iasOpenApple {
+  from { opacity: 0; transform: translateY(16px) scale(.97); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+@keyframes iasCloseApple {
+  from { opacity: 1; transform: none; filter: none; }
+  to   { opacity: 0; transform: translateY(12px) scale(.98); filter: blur(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ias-wrap, .ias-wrap.closing, .ias-expand, .ias-expand.closing { animation: none !important; }
+}
+
+/* Sugerencias que rotan con fundido */
+.welcome-chips { transition: opacity .32s ease, transform .32s ease, filter .32s ease; }
+.welcome-chips.fading { opacity: 0; transform: translateY(6px); filter: blur(3px); }
+.welcome-chips > * { animation: chipIn .45s cubic-bezier(.2, .9, .25, 1) both; }
+.welcome-chips > *:nth-child(2) { animation-delay: .05s; }
+.welcome-chips > *:nth-child(3) { animation-delay: .1s; }
+.welcome-chips > *:nth-child(4) { animation-delay: .15s; }
+@keyframes chipIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ── Rendimiento ─────────────────────────────────────────────────────────
+   Animaciones de fondo en pausa con la ventana oculta; los focos, en su propia
+   capa de composición (animan transform sin repintar el desenfoque). */
+body.app-hidden .bg-orb, body.app-hidden .bg-wave, body.app-hidden .bg-band { animation-play-state: paused !important; }
+.bg-orb { will-change: transform; contain: strict; }
+
+/* Windows (WebView2): desenfoques más contenidos, casi iguales a la vista. */
+body.os-win .bg-orb { filter: blur(70px) !important; }
+body.os-win.design-11 .sidebar-anim,
+body.os-win.design-11 .liquid-glass,
+body.os-win .tl-island {
+  backdrop-filter: blur(22px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+}
+body.os-win .att-zoom { backdrop-filter: blur(18px) !important; -webkit-backdrop-filter: blur(18px) !important; }

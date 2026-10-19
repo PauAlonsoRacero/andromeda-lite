@@ -4,13 +4,18 @@
  * Incluye: General, MCP Tools, Memoria, Contexto, Alertas, Visuales, Código.
  */
 import { createSignal, Show, For, onMount } from 'solid-js'
+import PromptCatalog from './PromptCatalog.jsx'
+import { Toggle, SettingRow } from './SettingControls.jsx'
+import { setPendingPrompt } from '../stores/chat.js'
 import * as S from '../stores/settings'
-import { session, authRequired, logout } from '../stores/auth'
+import { session, logout } from '../stores/auth'
 import { editionLabel, isPro, editionHolder } from '../stores/edition'
 import { t, lang, setLang, LANGS } from '../stores/i18n.js'
+import { errorMessage } from '../services/errors.js'
 import { exportConversations, importConversations } from '../stores/chat'
 import axios from 'axios'
 import ContextPanel from './ContextPanel.jsx'
+import SkillsPanel from './SkillsPanel.jsx'
 import MemoryPanel  from './MemoryPanel.jsx'
 import ABPanel      from './ABPanel.jsx'
 import InfoButton from './InfoButton.jsx'
@@ -32,33 +37,74 @@ const SECTIONS = [
   { id: 'capabilities', label: 'Capacidades', icon: () => <SIcon><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></SIcon> },
   { id: 'abtesting', label: 'A/B Testing', icon: () => <SIcon><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></SIcon> },
   { id: 'registry',  label: 'Model Registry', icon: () => <SIcon><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></SIcon> },
+  { id: 'prompts',    label: 'Biblioteca de prompts', icon: () => <SIcon><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></SIcon> },
   { id: 'alerts',     label: 'Alertas',      icon: () => <SIcon><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></SIcon> },
   { id: 'plan',       label: 'Plan',         icon: () => <SIcon><path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></SIcon> },
 ]
 
 // ── Capacidades (toggles funcionales que gatean comportamiento del backend) ──
 function CapabilitiesSettings() {
+  // Buscador: instancias públicas de SearXNG por defecto; el usuario puede
+  // apuntar a la suya para que sus búsquedas no salgan de su máquina.
+  const [sxUrl, setSxUrl] = createSignal('')
+  const [sxBusy, setSxBusy] = createSignal(false)
+  const [sxNote, setSxNote] = createSignal('')
+  // Retención del modelo en memoria: es el ajuste que más afecta a la latencia
+  // percibida, porque evita recargar el modelo entre mensajes.
+  const [keepAlive, setKeepAlive] = createSignal('30m')
+  // Corpus de entrenamiento para Apolo: guarda conversaciones completas en
+  // local, así que va desactivado hasta que el usuario lo encienda.
+  const [corpus, setCorpus] = createSignal(null)
+  const [corpusNote, setCorpusNote] = createSignal('')
+  async function loadCorpus() {
+    try { setCorpus((await axios.get('/api/training')).data) } catch { /* opcional */ }
+  }
+  async function toggleCorpus() {
+    try { setCorpus((await axios.put('/api/training', { enabled: !corpus()?.enabled })).data) }
+    catch (e) { setCorpusNote(errorMessage(e)) }
+  }
+  async function exportCorpus() {
+    try {
+      const r = (await axios.post('/api/training/export', {})).data
+      setCorpusNote(`${r.train} + ${r.valid} → ${r.path}`)
+    } catch (e) { setCorpusNote(errorMessage(e)) }
+  }
+
+  onMount(async () => {
+    try { setSxUrl((await axios.get('/api/settings/searxng')).data.url || '') } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
+    try { setKeepAlive((await axios.get('/api/settings/keep-alive')).data.keep_alive || '30m') } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
+    loadCorpus()
+  })
+
+  async function saveKeepAlive(valor) {
+    setKeepAlive(valor)
+    try { await axios.put('/api/settings/keep-alive', { keep_alive: valor }) } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
+  }
+
+  async function saveSearxng() {
+    setSxBusy(true); setSxNote('')
+    try {
+      const r = await axios.put('/api/settings/searxng', { url: sxUrl().trim() })
+      if (!sxUrl().trim())      setSxNote(t('sx.using_public'))
+      else if (r.data.reachable) setSxNote(t('sx.ok'))
+      else                       setSxNote(t('sx.unreachable'))
+    } catch (e) {
+      setSxNote(errorMessage(e) || t('sx.unreachable'))
+    } finally { setSxBusy(false) }
+  }
+
   return (
     <div class="panel-page" style="max-width:760px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><div style="font-size:22px;font-weight:700">{t('cap.title')}</div><InfoButton title={t('cap.title')} intro={t('info.cap.intro')} tip={t('info.cap.tip')} items={[
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><div style="font-size:var(--fs-lg);font-weight:700">{t('cap.title')}</div><InfoButton title={t('cap.title')} intro={t('info.cap.intro')} tip={t('info.cap.tip')} items={[
         { h: t('info.cap.1h'), d: t('info.cap.1d') },
         { h: t('info.cap.2h'), d: t('info.cap.2d') },
         { h: t('info.cap.3h'), d: t('info.cap.3d') },
         { h: t('info.cap.4h'), d: t('info.cap.4d') },
       ]} /></div>
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:18px">{t('cap.sub')}</div>
-
-      {/* Memoria */}
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:18px 0 4px">{t('cap.memory')}</div>
-      <SettingRow title={t('cap.mem_autogen')} desc={t('cap.mem_autogen_d')}>
-        <Toggle checked={S.memAutogenerate()} onChange={S.setMemAutogenerate} />
-      </SettingRow>
-      <SettingRow title={t('cap.mem_search')} desc={t('cap.mem_search_d')}>
-        <Toggle checked={S.memConversationSearch()} onChange={S.setMemConversationSearch} />
-      </SettingRow>
+      <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:18px">{t('cap.sub')}</div>
 
       {/* Visuales */}
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('cap.visuals')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('cap.visuals')}</div>
       <SettingRow title={t('cap.artifacts')} desc={t('cap.artifacts_d')}>
         <Toggle checked={S.artifactsEnabled()} onChange={S.setArtifactsEnabled} />
       </SettingRow>
@@ -67,7 +113,7 @@ function CapabilitiesSettings() {
       </SettingRow>
 
       {/* Ejecución de archivos y red */}
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('cap.exec')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('cap.exec')}</div>
       <SettingRow title={t('cap.file_creation')} desc={t('cap.file_creation_d')}>
         <Toggle checked={S.fileCreation()} onChange={S.setFileCreation} />
       </SettingRow>
@@ -75,13 +121,66 @@ function CapabilitiesSettings() {
         <Toggle checked={S.networkEgress()} onChange={S.setNetworkEgress} />
       </SettingRow>
 
+      {/* Corpus para Apolo: pares pregunta-respuesta + valoraciones, en local. */}
+      <SettingRow title={t('tr.title')} desc={t('tr.desc')}>
+        <Toggle checked={!!corpus()?.enabled} onChange={toggleCorpus} />
+      </SettingRow>
+      <Show when={corpus()?.enabled}>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--text-3);margin:-4px 0 10px">
+          <span>{corpus().total} {t('tr.samples')} · 👍 {corpus().positive} · 👎 {corpus().negative}</span>
+          <button class="btn btn-glass" style="font-size:var(--fs-xs);padding:4px 10px"
+                  disabled={!corpus().positive} onClick={exportCorpus}>{t('tr.export')}</button>
+          <Show when={corpusNote()}><span style="font-family:var(--mono);font-size:var(--fs-micro)">{corpusNote()}</span></Show>
+        </div>
+      </Show>
+
+      {/* Retención del modelo: el ajuste con más impacto en la latencia. */}
+      <SettingRow title={t('ka.title')} desc={t('ka.desc')}>
+        <select value={keepAlive()} onChange={e => saveKeepAlive(e.target.value)}
+                style="background:var(--inset-surface);border:1px solid var(--glass-border);border-radius:10px;padding:6px 10px;font-size:var(--fs-xs);color:var(--text-1)">
+          <option value="0" selected={keepAlive() === '0'}>{t('ka.never')}</option>
+          <option value="5m" selected={keepAlive() === '5m'}>5 min</option>
+          <option value="30m" selected={keepAlive() === '30m'}>30 min</option>
+          <option value="2h" selected={keepAlive() === '2h'}>2 h</option>
+          <option value="-1" selected={keepAlive() === '-1'}>{t('ka.always')}</option>
+        </select>
+      </SettingRow>
+
+      {/* Buscador: por defecto usa instancias públicas de SearXNG. Quien quiera
+          privacidad total puede levantar la suya con un solo comando. */}
+      <Show when={S.networkEgress()}>
+        <div style="background:var(--bg-2);border-radius:14px;padding:12px 14px;margin-top:8px">
+          <div style="font-size:var(--fs-sm);font-weight:600;color:var(--text-1);margin-bottom:3px">
+            {t('sx.title')}
+          </div>
+          <div style="font-size:var(--fs-xs);color:var(--text-3);line-height:1.55;margin-bottom:10px">
+            {t('sx.desc')}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input value={sxUrl()} onInput={e => setSxUrl(e.target.value)}
+                   placeholder="http://localhost:8888"
+                   style="flex:1;min-width:0;background:var(--inset-surface);border:1px solid var(--glass-border);border-radius:10px;padding:7px 10px;font-size:var(--fs-xs);color:var(--text-1);font-family:var(--mono)" />
+            <button class="btn btn-glass" style="font-size:var(--fs-xs);padding:6px 12px"
+                    disabled={sxBusy()} onClick={saveSearxng}>
+              {sxBusy() ? t('sx.checking') : t('sx.save')}
+            </button>
+          </div>
+          <Show when={sxNote()}>
+            <div style="font-size:var(--fs-micro);color:var(--text-3);margin-top:7px">{sxNote()}</div>
+          </Show>
+          <div style="font-size:var(--fs-micro);color:var(--text-3);margin-top:7px;font-family:var(--mono)">
+            docker run -d -p 8888:8080 searxng/searxng
+          </div>
+        </div>
+      </Show>
+
       {/* General */}
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('cap.general')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('cap.general')}</div>
       <SettingRow title={t('cap.model_fallback')} desc={t('cap.model_fallback_d')}>
         <Toggle checked={S.modelFallback()} onChange={S.setModelFallback} />
       </SettingRow>
 
-      <div style="margin-top:20px;padding:12px 14px;border-radius:10px;background:var(--surface-1);border:1px solid var(--hairline);font-size:12px;color:var(--text-3);line-height:1.6">
+      <div style="margin-top:20px;padding:12px 14px;border-radius:10px;background:var(--surface-1);border:1px solid var(--hairline);font-size:var(--fs-sm);color:var(--text-3);line-height:1.6">
         {t('cap.note')}
       </div>
     </div>
@@ -95,7 +194,7 @@ export default function SettingsPanel(props) {
     <div style="height:100%;display:flex;overflow:hidden">
       {/* Sub-navegación izquierda */}
       <div style="width:220px;flex-shrink:0;padding:24px 12px;border-right:1px solid var(--glass-border);overflow-y:auto">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;padding:0 12px 12px">{t("settings.title")}</div>
+        <div style="font-size:var(--fs-xs);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;padding:0 12px 12px">{t("settings.title")}</div>
         <For each={SECTIONS}>
           {(s) => (
             <button
@@ -112,7 +211,7 @@ export default function SettingsPanel(props) {
               onMouseLeave={e => { if(section()!==s.id) e.currentTarget.style.background='transparent' }}
             >
               <span style="display:flex;width:18px;justify-content:center">{s.icon()}</span>
-              <span style="font-size:14px;font-weight:500">{t('settings.' + (s.id === 'mcp' ? 'mcp' : s.id)) || s.label}</span>
+              <span style="font-size:var(--fs-base);font-weight:500">{t('settings.' + (s.id === 'mcp' ? 'mcp' : s.id)) || s.label}</span>
             </button>
           )}
         </For>
@@ -125,11 +224,20 @@ export default function SettingsPanel(props) {
         <Show when={section()==='appearance'}><AppearanceSettings /></Show>
         <Show when={section()==='models'}><ModelsPanel /></Show>
         <Show when={section()==='mcp'}><MCPPanel /></Show>
-        <Show when={section()==='memory'}><div><MemoryPanel /><div style="height:8px" /><ContextPanel /></div></Show>
+        <Show when={section()==='memory'}><div><MemoryPanel /><div style="height:8px" /><ContextPanel /><div style="height:8px" /><SkillsPanel /></div></Show>
         <Show when={section()==='capabilities'}><CapabilitiesSettings /></Show>
         <Show when={section()==='abtesting'}><ABPanel /></Show>
         <Show when={section()==='registry'}><RegistryPanel /></Show>
         <Show when={section()==='alerts'}><AlertsWidget /></Show>
+        {/* Catálogo de prompts prefabricados: se guardan en la biblioteca propia
+            para tenerlos a mano en el chat. */}
+        <Show when={section()==='prompts'}>
+          <div class="panel-page" style="max-width:860px">
+            <h3 class="section-title">{t('pcat.title')}</h3>
+            <p class="section-sub">{t('pcat.desc')}</p>
+            <PromptCatalog maxHeight="64vh" onUse={(body) => { setPendingPrompt(body); window.dispatchEvent(new CustomEvent('andromeda:go-chat')) }} />
+          </div>
+        </Show>
         <Show when={section()==='plan'}><PlanSettings /></Show>
       </div>
     </div>
@@ -137,37 +245,6 @@ export default function SettingsPanel(props) {
 }
 
 // ── Toggle estilo iOS ──────────────────────────────────────────────────────
-function Toggle(props) {
-  return (
-    <button
-      onClick={() => props.onChange(!props.checked)}
-      style={{
-        width: '46px', height: '28px', 'border-radius': '14px', border: 'none',
-        cursor: 'pointer', position: 'relative', transition: 'all 0.2s', 'flex-shrink': 0,
-        background: props.checked ? 'var(--green)' : 'var(--toggle-off)',
-      }}
-    >
-      <span style={{
-        position: 'absolute', top: '3px', left: props.checked ? '21px' : '3px',
-        width: '22px', height: '22px', 'border-radius': '50%', background: 'white',
-        transition: 'all 0.2s', 'box-shadow': '0 1px 3px rgba(0,0,0,0.3)',
-      }} />
-    </button>
-  )
-}
-
-function SettingRow(props) {
-  return (
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:16px 0;border-bottom:1px solid var(--glass-border)">
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:3px">{props.title}</div>
-        <div style="font-size:12px;color:var(--text-3);line-height:1.5">{props.desc}</div>
-      </div>
-      <div style="flex-shrink:0;padding-top:2px">{props.children}</div>
-    </div>
-  )
-}
-
 // ── General ────────────────────────────────────────────────────────────────
 function GeneralSettings(props) {
   // Todos los ajustes viven en el store compartido (stores/settings.js)
@@ -176,8 +253,8 @@ function GeneralSettings(props) {
 
   return (
     <div class="panel-page" style="max-width:760px">
-      <div style="font-size:22px;font-weight:700;margin-bottom:6px">{t('settings.general')}</div>
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:24px">{t('set.general_title')}</div>
+      <div style="font-size:var(--fs-lg);font-weight:700;margin-bottom:6px">{t('settings.general')}</div>
+      <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:24px">{t('set.general_title')}</div>
 
       <Show when={session()}>
         <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px;position:relative">
@@ -188,11 +265,11 @@ function GeneralSettings(props) {
               {(session()?.username || '?')[0].toUpperCase()}
             </div>
             <div style="min-width:0">
-              <div style="font-size:14px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px">
+              <div style="font-size:var(--fs-base);font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px">
                 {session()?.username}
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={`transition:transform .2s;transform:rotate(${userMenu() ? 180 : 0}deg)`}><polyline points="6 9 12 15 18 9"/></svg>
               </div>
-              <div style="font-size:11px;color:var(--text-3)">
+              <div style="font-size:var(--fs-xs);color:var(--text-3)">
                 Plan <span style={`font-weight:700;${session()?.plan === 'pro' ? 'color:var(--purple)' : 'color:var(--text-2)'}`}>{(session()?.plan || 'free').toUpperCase()}</span>
               </div>
             </div>
@@ -202,14 +279,14 @@ function GeneralSettings(props) {
           <Show when={userMenu()}>
             <div style="position:absolute;top:100%;left:14px;margin-top:8px;min-width:240px;background:var(--bg-2);border:1px solid var(--glass-border);border-radius:14px;box-shadow:var(--shadow-lg);padding:6px;z-index:50;animation:fadeUp .18s ease">
               <button onClick={() => { setUserMenu(false); props.onOpenProfile?.() }}
-                style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;background:none;border:none;cursor:pointer;color:var(--text-1);font-size:13px;font-family:var(--font);text-align:left"
+                style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;background:none;border:none;cursor:pointer;color:var(--text-1);font-size:var(--fs-base);font-family:var(--font);text-align:left"
                 onMouseEnter={e => e.currentTarget.style.background='var(--hover-surface)'}
                 onMouseLeave={e => e.currentTarget.style.background='none'}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 Ver y editar perfil
               </button>
               <button onClick={() => { setUserMenu(false); props.onOpenAppearance?.() }}
-                style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;background:none;border:none;cursor:pointer;color:var(--text-1);font-size:13px;font-family:var(--font);text-align:left"
+                style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;background:none;border:none;cursor:pointer;color:var(--text-1);font-size:var(--fs-base);font-family:var(--font);text-align:left"
                 onMouseEnter={e => e.currentTarget.style.background='var(--hover-surface)'}
                 onMouseLeave={e => e.currentTarget.style.background='none'}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -217,7 +294,7 @@ function GeneralSettings(props) {
               </button>
               <div style="height:1px;background:var(--hairline);margin:4px 8px" />
               <button onClick={() => { setUserMenu(false); logout() }}
-                style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;font-family:var(--font);text-align:left"
+                style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;background:none;border:none;cursor:pointer;color:var(--red);font-size:var(--fs-base);font-family:var(--font);text-align:left"
                 onMouseEnter={e => e.currentTarget.style.background='var(--hover-surface)'}
                 onMouseLeave={e => e.currentTarget.style.background='none'}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -237,14 +314,14 @@ function GeneralSettings(props) {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               <div style="min-width:0">
-                <div style="font-size:14px;font-weight:600;color:var(--text-1)">{t('gen.account')}</div>
-                <div style="font-size:11.5px;color:var(--text-3)">{t('set.local_hint')}</div>
+                <div style="font-size:var(--fs-base);font-weight:600;color:var(--text-1)">{t('gen.account')}</div>
+                <div style="font-size:var(--fs-xs);color:var(--text-3)">{t('set.local_hint')}</div>
               </div>
             </div>
-            <button class="btn btn-glass" style="font-size:13px" onClick={() => setAcctMsg(v => !v)}>{t('ui2.create_account')}</button>
+            <button class="btn btn-glass" style="font-size:var(--fs-base)" onClick={() => setAcctMsg(v => !v)}>{t('ui2.create_account')}</button>
           </div>
           <Show when={acctMsg()}>
-            <div class="ios-note" style="margin-top:12px;font-size:12px;display:flex;align-items:flex-start;gap:8px">
+            <div class="ios-note" style="margin-top:12px;font-size:var(--fs-sm);display:flex;align-items:flex-start;gap:8px">
               <span style="flex-shrink:0">🚧</span>
               <span>{t('ui2.cloud_soon')}<b>Andromeda Pro</b>{t('set.sync_note')}</span>
             </div>
@@ -253,18 +330,18 @@ function GeneralSettings(props) {
       </Show>
 
       <Show when={isPro()}>
-        <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px">{t('set.advanced')}</div>
+        <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px">{t('set.advanced')}</div>
         <SettingRow title={t('set.advanced_mode')} desc={t('gen.advanced_desc')}>
           <Toggle checked={S.advancedMode()} onChange={S.setAdvancedMode} />
         </SettingRow>
         <Show when={S.advancedMode()}>
-          <div class="ios-note ios-note-ok" style="margin-bottom:20px;font-size:12px">
+          <div class="ios-note ios-note-ok" style="margin-bottom:20px;font-size:var(--fs-sm)">
             Laboratorio de IA, Estadísticas y MLOps activados. Aparecerán en la barra lateral.
           </div>
         </Show>
       </Show>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('ui2.chat_behavior')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('ui2.chat_behavior')}</div>
       <SettingRow title={t('set.streaming_tok')} desc={t('gen.stream_desc')}>
         <Toggle checked={S.streamTokens()} onChange={S.setStreamTokens} />
       </SettingRow>
@@ -276,7 +353,7 @@ function GeneralSettings(props) {
       </SettingRow>
       <SettingRow title={t('set.backup_migrate')} desc={t('gen.backup_desc')}>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-glass" style="font-size:12px" onClick={async () => {
+          <button class="btn btn-glass" style="font-size:var(--fs-sm)" onClick={async () => {
             try {
               const r = await exportConversations()
               if (r?.method === 'file') {
@@ -284,7 +361,7 @@ function GeneralSettings(props) {
               }
             } catch (e) { alert('No se pudo exportar: ' + (e?.message || 'error')) }
           }}>{t('set.export')}</button>
-          <button class="btn btn-glass" style="font-size:12px" onClick={() => document.getElementById('conv-import').click()}>{t('set.restore')}</button>
+          <button class="btn btn-glass" style="font-size:var(--fs-sm)" onClick={() => document.getElementById('conv-import').click()}>{t('set.restore')}</button>
           <input id="conv-import" type="file" accept="application/json" style="display:none"
             onChange={async (e) => {
               const f = e.target.files?.[0]; if (!f) return
@@ -300,7 +377,7 @@ function GeneralSettings(props) {
         </div>
       </SettingRow>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('set.chat_view')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('set.chat_view')}</div>
       <SettingRow title={t('set.show_latency')} desc={t('gen.show_latency_desc')}>
         <Toggle checked={S.showLatency()} onChange={S.setShowLatency} />
       </SettingRow>
@@ -313,7 +390,7 @@ function GeneralSettings(props) {
         <Toggle checked={S.compactMode()} onChange={S.setCompactMode} />
       </SettingRow>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{isPro() ? t('gen.orchestration') : t('gen.responses')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{isPro() ? t('gen.orchestration') : t('gen.responses')}</div>
       <Show when={isPro()}>
         <SettingRow title={t('set.parallel_default')} desc={t('gen.parallel_desc')}>
           <Selector value={S.defaultParallel()} onChange={S.setDefaultParallel} options={[['auto','Auto'],['1','1'],['2','2'],['3','3'],['4','4']]} />
@@ -332,7 +409,7 @@ function GeneralSettings(props) {
 function Selector(props) {
   return (
     <select value={props.value} onChange={e => props.onChange(e.target.value)}
-      class="g-input" style="width:auto;min-width:120px;font-size:13px;padding:6px 10px">
+      class="g-input" style="width:auto;min-width:120px;font-size:var(--fs-base);padding:6px 10px">
       <For each={props.options}>{(o) => <option value={o[0]}>{o[1]}</option>}</For>
     </select>
   )
@@ -351,92 +428,116 @@ const ORB_PRESETS = [
 function AppearanceSettings() {
   return (
     <div class="panel-page" style="max-width:760px">
-      <div style="font-size:22px;font-weight:700;margin-bottom:6px">{t('settings.appearance')}</div>
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:24px">{t('set.general_sub')}</div>
+      <div style="font-size:var(--fs-lg);font-weight:700;margin-bottom:6px">{t('settings.appearance')}</div>
+      <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:24px">{t('set.general_sub')}</div>
 
       {/* Idioma */}
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 10px">{t('settings.language')}</div>
-      <div style="font-size:12.5px;color:var(--text-3);margin-bottom:12px">{t('settings.language_desc')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 10px">{t('settings.language')}</div>
+      <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:12px">{t('settings.language_desc')}</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px">
         <For each={LANGS}>
           {(l) => (
             <button onClick={() => setLang(l.id)}
-              style={`display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:12px;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:600;transition:all .15s;
+              style={`display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:var(--font);font-size:var(--fs-base);font-weight:600;transition:all .15s;
                 border:1.5px solid ${lang()===l.id ? 'var(--blue)' : 'var(--glass-border)'};
                 background:${lang()===l.id ? 'var(--hover-surface)' : 'transparent'};
                 color:${lang()===l.id ? 'var(--text-1)' : 'var(--text-2)'}`}>
-              <span style="font-size:10px;font-weight:800;letter-spacing:0.04em;opacity:0.7">{l.flag}</span>
+              <span style="font-size:var(--fs-micro);font-weight:800;letter-spacing:0.04em;opacity:0.7">{l.flag}</span>
               {l.label}
             </button>
           )}
         </For>
       </div>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 10px">{t('settings.appearance')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 10px">{t('settings.appearance')}</div>
+      {/* Diseño de la interfaz y, dentro de cada uno, modo claro u oscuro */}
+      <div style="font-size:var(--fs-sm);color:var(--text-3);margin:-4px 0 10px">{t('ap.design')}</div>
+      <div style="display:flex;gap:12px;margin-bottom:18px">
+        <ThemeCard active={S.design()==='1.0'} onClick={() => S.setDesign('1.0')} name="1.0" bg="#13141f" fg="#a78bfa" />
+        <ThemeCard active={S.design()==='1.1'} onClick={() => S.setDesign('1.1')} name="1.1" bg="#1e1e1e" fg="#0a84ff" />
+      </div>
+      <Show when={S.design() === '1.1'}>
+        <div style="font-size:var(--fs-sm);color:var(--text-3);margin:0 0 10px">{t('ap.accent')}</div>
+        <div class="accent-row" role="radiogroup" aria-label={t('ap.accent')}>
+          <For each={S.ACCENTS}>
+            {(a) => (
+              <button role="radio" aria-checked={S.accent() === a.id} title={t('ap.accent_' + a.id)}
+                      class={`accent-dot${S.accent() === a.id ? ' active' : ''}`}
+                      style={{ background: a.fill || a.color }}
+                      onClick={() => S.setAccent(a.id)} />
+            )}
+          </For>
+        </div>
+      </Show>
+      <div style="font-size:var(--fs-sm);color:var(--text-3);margin:0 0 10px">{t('ap.mode')}</div>
       <div style="display:flex;gap:12px;margin-bottom:24px">
-        <ThemeCard active={S.theme()==='dark'}  onClick={() => S.setTheme('dark')}  name={t("ui2.theme_dark")} bg="#13141f" fg="#f5f5f7" />
-        <ThemeCard active={S.theme()==='light'} onClick={() => S.setTheme('light')} name={t("ui2.theme_light")}  bg="#f4f6fb" fg="#14151f" />
+        <ThemeCard active={S.theme()!=='light'} onClick={() => S.setTheme('dark')}  name={t("ui2.theme_dark")}
+                   bg={S.design()==='1.1' ? '#1e1e1e' : '#13141f'} fg="#f5f5f7" />
+        <ThemeCard active={S.theme()==='light'} onClick={() => S.setTheme('light')} name={t("ui2.theme_light")}
+                   bg={S.design()==='1.1' ? '#f5f5f7' : '#f4f6fb'} fg="#14151f" />
       </div>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px">{t('ui2.animated_bg')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px">{t('ui2.animated_bg')}</div>
       <SettingRow title={t('set.bg_color')} desc={t('set.bg_desc')}>
         <Toggle checked={S.orbsOn()} onChange={S.setOrbsOn} />
       </SettingRow>
 
       <Show when={S.orbsOn()}>
         <div style="padding:16px 0;border-bottom:1px solid var(--hairline)">
-          <div style="font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:12px">{t('ui2.bg_style')}</div>
+          <div style="font-size:var(--fs-base);font-weight:600;color:var(--text-1);margin-bottom:12px">{t('ui2.bg_style')}</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+            <Show when={S.design() !== '1.1'}>
             <button onClick={() => S.setBgStyle('bands')}
               style={{
                 display:'flex','flex-direction':'column','align-items':'center',gap:'8px',
                 padding:'14px','border-radius':'14px',cursor:'pointer',transition:'all .18s',
-                border: S.bgStyle()==='bands' ? '1.5px solid var(--blue)' : '1px solid var(--glass-border)',
-                background: S.bgStyle()==='bands' ? 'var(--hover-surface)' : 'transparent',
+                border: S.effectiveBgStyle()==='bands' ? '1.5px solid var(--blue)' : '1px solid var(--glass-border)',
+                background: S.effectiveBgStyle()==='bands' ? 'var(--hover-surface)' : 'transparent',
               }}>
-              <div style="position:relative;height:32px;width:56px;overflow:hidden;border-radius:8px">
+              <div style="position:relative;height:32px;width:56px;overflow:hidden;border-radius:10px">
                 <div style="position:absolute;inset:-40%;transform:rotate(40deg)">
                   <div style="position:absolute;top:4%;left:-20%;width:140%;height:26%;background:linear-gradient(90deg,transparent,#f0795f,transparent);filter:blur(3px)" />
                   <div style="position:absolute;top:38%;left:-20%;width:140%;height:26%;background:linear-gradient(90deg,transparent,#c87bd8,transparent);filter:blur(3px)" />
                   <div style="position:absolute;top:72%;left:-20%;width:140%;height:26%;background:linear-gradient(90deg,transparent,#5b78f5,transparent);filter:blur(3px)" />
                 </div>
               </div>
-              <span style="font-size:12px;font-weight:600;color:var(--text-1)">{t("ui2.bg_bands")}</span>
+              <span style="font-size:var(--fs-sm);font-weight:600;color:var(--text-1)">{t("ui2.bg_bands")}</span>
             </button>
+            </Show>
             <button onClick={() => S.setBgStyle('orbs')}
               style={{
                 display:'flex','flex-direction':'column','align-items':'center',gap:'8px',
                 padding:'14px','border-radius':'14px',cursor:'pointer',transition:'all .18s',
-                border: S.bgStyle()==='orbs' ? '1.5px solid var(--blue)' : '1px solid var(--glass-border)',
-                background: S.bgStyle()==='orbs' ? 'var(--hover-surface)' : 'transparent',
+                border: S.effectiveBgStyle()==='orbs' ? '1.5px solid var(--blue)' : '1px solid var(--glass-border)',
+                background: S.effectiveBgStyle()==='orbs' ? 'var(--hover-surface)' : 'transparent',
               }}>
-              <div style="position:relative;height:32px;width:56px;overflow:hidden;border-radius:8px">
+              <div style="position:relative;height:32px;width:56px;overflow:hidden;border-radius:10px">
                 <span style="position:absolute;width:24px;height:24px;border-radius:50%;background:#f0795f;filter:blur(4px);top:-2px;left:2px" />
                 <span style="position:absolute;width:22px;height:22px;border-radius:50%;background:#c87bd8;filter:blur(4px);bottom:-2px;left:16px" />
                 <span style="position:absolute;width:20px;height:20px;border-radius:50%;background:#5b78f5;filter:blur(4px);top:4px;right:2px" />
               </div>
-              <span style="font-size:12px;font-weight:600;color:var(--text-1)">{t("ui2.bg_orbs")}</span>
+              <span style="font-size:var(--fs-sm);font-weight:600;color:var(--text-1)">{t("ui2.bg_orbs")}</span>
             </button>
             <button onClick={() => S.setBgStyle('waves')}
               style={{
                 display:'flex','flex-direction':'column','align-items':'center',gap:'8px',
                 padding:'14px','border-radius':'14px',cursor:'pointer',transition:'all .18s',
-                border: S.bgStyle()==='waves' ? '1.5px solid var(--blue)' : '1px solid var(--glass-border)',
-                background: S.bgStyle()==='waves' ? 'var(--hover-surface)' : 'transparent',
+                border: S.effectiveBgStyle()==='waves' ? '1.5px solid var(--blue)' : '1px solid var(--glass-border)',
+                background: S.effectiveBgStyle()==='waves' ? 'var(--hover-surface)' : 'transparent',
               }}>
-              <div style="position:relative;height:32px;width:56px;overflow:hidden;border-radius:8px">
+              <div style="position:relative;height:32px;width:56px;overflow:hidden;border-radius:10px">
                 <div style="position:absolute;bottom:-30%;left:-10%;width:120%;height:60%;background:radial-gradient(ellipse 60% 100% at 50% 100%,#f0795f,transparent 70%);filter:blur(4px)" />
                 <div style="position:absolute;bottom:-20%;left:-10%;width:120%;height:55%;background:radial-gradient(ellipse 60% 100% at 50% 100%,#5b78f5,transparent 70%);filter:blur(4px)" />
                 <div style="position:absolute;bottom:-10%;left:-10%;width:120%;height:50%;background:radial-gradient(ellipse 60% 100% at 50% 100%,#c87bd8,transparent 70%);filter:blur(4px)" />
               </div>
-              <span style="font-size:12px;font-weight:600;color:var(--text-1)">{t("ui2.bg_waves")}</span>
+              <span style="font-size:var(--fs-sm);font-weight:600;color:var(--text-1)">{t("ui2.bg_waves")}</span>
             </button>
           </div>
 
           {/* Nº de colores cuando el estilo es Olas */}
-          <Show when={S.bgStyle()==='waves'}>
+          <Show when={S.effectiveBgStyle()==='waves'}>
             <div style="margin-top:14px">
-              <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">{t('ui2.wave_colors')}</div>
+              <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:8px">{t('ui2.wave_colors')}</div>
               <div style="display:flex;gap:8px">
                 <For each={[2,3,4]}>
                   {(n) => (
@@ -453,7 +554,7 @@ function AppearanceSettings() {
               </div>
               {/* Altura de las olas */}
               <div style="margin-top:14px">
-                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:6px">
+                <div style="display:flex;justify-content:space-between;font-size:var(--fs-sm);color:var(--text-3);margin-bottom:6px">
                   <span>{t('ui2.wave_height')}</span><span>{S.waveHeight()}%</span>
                 </div>
                 <input type="range" min="30" max="70" step="5" value={S.waveHeight()}
@@ -465,10 +566,10 @@ function AppearanceSettings() {
         </div>
       </Show>
 
-      <Show when={S.orbsOn() && S.bgStyle()==='orbs'}>
+      <Show when={S.orbsOn() && S.effectiveBgStyle()==='orbs'}>
         <div style="padding:16px 0;border-bottom:1px solid var(--hairline)" classList={{ 'orb-palette-hidden': S.orbCustom() }}>
           <Show when={!S.orbCustom()}>
-          <div style="font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:12px">{t('ui2.orb_palette')}</div>
+          <div style="font-size:var(--fs-base);font-weight:600;color:var(--text-1);margin-bottom:12px">{t('ui2.orb_palette')}</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
             <For each={ORB_PRESETS}>
               {(p) => (
@@ -486,7 +587,7 @@ function AppearanceSettings() {
                     <span style={`width:28px;height:28px;border-radius:50%;background:${p.colors[1]};filter:blur(2px);position:absolute;left:14px`} />
                     <span style={`width:28px;height:28px;border-radius:50%;background:${p.colors[2]};filter:blur(2px);position:absolute;left:28px`} />
                   </div>
-                  <span style={`font-size:12px;font-weight:600;color:${S.orbPalette()===p.id?'var(--text-1)':'var(--text-2)'}`}>{p.label}</span>
+                  <span style={`font-size:var(--fs-sm);font-weight:600;color:${S.orbPalette()===p.id?'var(--text-1)':'var(--text-2)'}`}>{p.label}</span>
                 </button>
               )}
             </For>
@@ -516,11 +617,11 @@ function AppearanceSettings() {
           <div style="display:flex;gap:14px;padding:4px 0 16px;align-items:center">
             <For each={[0,1,2]}>
               {(i) => (
-                <label style="display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:var(--text-3);cursor:pointer">
+                <label style="display:flex;flex-direction:column;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--text-3);cursor:pointer">
                   Orbe {i+1}
                   <input type="color" value={S.orbColors()[i]}
                     onInput={e => { const c = [...S.orbColors()]; c[i] = e.target.value; S.setOrbColors(c) }}
-                    style="width:44px;height:44px;border:none;border-radius:12px;background:none;cursor:pointer;padding:0" />
+                    style="width:44px;height:44px;border:none;border-radius:14px;background:none;cursor:pointer;padding:0" />
                 </label>
               )}
             </For>
@@ -532,7 +633,7 @@ function AppearanceSettings() {
         <Toggle checked={S.animationsOn()} onChange={S.setAnimationsOn} />
       </SettingRow>
 
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('set.code_blocks')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:24px 0 4px">{t('set.code_blocks')}</div>
       <SettingRow title={t('set.syntax_hl')} desc={t('set.codecolor_desc')}>
         <Toggle checked={S.syntaxHl()} onChange={S.setSyntaxHl} />
       </SettingRow>
@@ -560,7 +661,7 @@ function ThemeCard(props) {
       }}>
         <span style={{ 'font-family': 'Playfair Display, Georgia, serif', 'font-size': '20px', 'font-weight': 600, color: props.fg }}>Aa</span>
       </div>
-      <div style={`font-size:13px;font-weight:600;padding-bottom:6px;color:${props.active?'var(--text-1)':'var(--text-2)'}`}>{props.name}</div>
+      <div style={`font-size:var(--fs-base);font-weight:600;padding-bottom:6px;color:${props.active?'var(--text-1)':'var(--text-2)'}`}>{props.name}</div>
     </button>
   )
 }
@@ -569,26 +670,26 @@ function ThemeCard(props) {
 function PlanSettings() {
   const [cat, setCat] = createSignal([])
   onMount(async () => {
-    try { const r = await axios.get('/api/edition/catalog'); setCat(r.data.features || []) } catch {}
+    try { const r = await axios.get('/api/edition/catalog'); setCat(r.data.features || []) } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
   })
 
   const Check = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-  const Dash  = () => <span style="color:var(--text-3);font-size:15px">—</span>
+  const Dash  = () => <span style="color:var(--text-3);font-size:var(--fs-md)">—</span>
 
   return (
     <div class="panel-page" style="max-width:760px">
-      <div style="font-size:22px;font-weight:700;margin-bottom:6px">{t('settings.plan')}</div>
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:20px">{t('set.edition_sub')}</div>
+      <div style="font-size:var(--fs-lg);font-weight:700;margin-bottom:6px">{t('settings.plan')}</div>
+      <div style="font-size:var(--fs-base);color:var(--text-3);margin-bottom:20px">{t('set.edition_sub')}</div>
 
       {/* Edición activa */}
       <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:22px">
         <div style="display:flex;align-items:center;gap:14px">
-          <div style="width:44px;height:44px;border-radius:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <div style="width:44px;height:44px;border-radius:14px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
           </div>
           <div>
-            <div style="font-size:16px;font-weight:700;color:var(--text-1)">{editionLabel()}</div>
-            <div style="font-size:12px;color:var(--text-3)">
+            <div style="font-size:var(--fs-md);font-weight:700;color:var(--text-1)">{editionLabel()}</div>
+            <div style="font-size:var(--fs-sm);color:var(--text-3)">
               <Show when={isPro()} fallback={t('plan.lite_tagline')}>
                 {editionHolder() ? `Licencia: ${editionHolder()}` : 'Edición comercial activa'}
               </Show>
@@ -601,9 +702,9 @@ function PlanSettings() {
       </div>
 
       {/* Comparativa */}
-      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">{t('plan.comparison')}</div>
+      <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">{t('plan.comparison')}</div>
       <div class="card" style="padding:0;overflow:hidden">
-        <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:0;align-items:center;padding:12px 16px;border-bottom:1px solid var(--hairline);font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em">
+        <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:0;align-items:center;padding:12px 16px;border-bottom:1px solid var(--hairline);font-size:var(--fs-sm);font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em">
           <span>{t('set.feature')}</span>
           <span style="text-align:center">Lite</span>
           <span style="text-align:center">Pro</span>
@@ -612,8 +713,8 @@ function PlanSettings() {
           {(f) => (
             <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:0;align-items:center;padding:13px 16px;border-bottom:1px solid var(--hairline)">
               <div style="min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:var(--text-1)">{(() => { const k=`plan.${f.key}.label`; const v=t(k); return v!==k?v:f.label })()}</div>
-                <Show when={f.description}><div style="font-size:11.5px;color:var(--text-3);margin-top:2px">{(() => { const k=`plan.${f.key}.desc`; const v=t(k); return v!==k?v:f.description })()}</div></Show>
+                <div style="font-size:var(--fs-base);font-weight:600;color:var(--text-1)">{(() => { const k=`plan.${f.key}.label`; const v=t(k); return v!==k?v:f.label })()}</div>
+                <Show when={f.description}><div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:2px">{(() => { const k=`plan.${f.key}.desc`; const v=t(k); return v!==k?v:f.description })()}</div></Show>
               </div>
               <div style="display:flex;justify-content:center"><Show when={f.lite} fallback={<Dash/>}><Check/></Show></div>
               <div style="display:flex;justify-content:center"><Show when={f.pro} fallback={<Dash/>}><Check/></Show></div>

@@ -14,6 +14,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
+def _data_path(filename: str) -> str:
+    """Ruta a un fichero dentro del directorio de datos del usuario.
+
+    Antes estas rutas eran literales ("data/memory.db"), es decir RELATIVAS al
+    directorio desde el que se lanza el proceso. Eso significaba que los datos
+    acababan en sitios distintos según cómo se arrancara la aplicación, y que
+    ANDROMEDA_DATA_DIR se ignoraba para la memoria, las trazas y los runs.
+    """
+    import os
+    from pathlib import Path
+
+    base = os.environ.get("ANDROMEDA_DATA_DIR")
+    if not base:
+        # Sin variable, el sitio correcto es el perfil del usuario, no el
+        # directorio de trabajo actual.
+        base = str(Path.home() / ".andromeda")
+    return str(Path(base) / filename)
+
+
 class Settings(BaseSettings):
     """
     Todas las variables de configuración del sistema.
@@ -30,7 +49,7 @@ class Settings(BaseSettings):
 
     # ── Identidad ─────────────────────────────────────────────────────────────
     app_name: str = Field(default="Andromeda", description="Nombre del sistema")
-    app_version: str = Field(default="1.0.0", description="Versión actual")
+    app_version: str = Field(default="1.1.0", description="Versión actual")
     environment: str = Field(
         default="development",
         description="Entorno de ejecución: development | production",
@@ -79,7 +98,7 @@ class Settings(BaseSettings):
         description="Activar o desactivar el sistema de traces OpenTelemetry",
     )
     telemetry_db_path: str = Field(
-        default="data/traces.db",
+        default_factory=lambda: _data_path("traces.db"),
         description="Ruta al archivo SQLite donde se guardan los traces",
     )
     trace_history_limit: int = Field(
@@ -93,11 +112,11 @@ class Settings(BaseSettings):
         description="Activar tracking de experimentos MLOps (SQLite local)",
     )
     mlops_db_path: str = Field(
-        default="data/mlops_runs.db",
+        default_factory=lambda: _data_path("mlops_runs.db"),
         description="Ruta al SQLite de runs MLOps",
     )
     memory_db_path: str = Field(
-        default="data/memory.db",
+        default_factory=lambda: _data_path("memory.db"),
         description="Ruta al SQLite de memoria semántica",
     )
     specialists_writable_path: str = Field(

@@ -10,6 +10,7 @@ Endpoints:
   GET  /api/models/ollama    → modelos disponibles en Ollama ahora mismo
 """
 
+from app.core.background import spawn
 import logging
 import time
 
@@ -294,12 +295,36 @@ async def get_warm_status(request: Request) -> JSONResponse:
     })
 
 
+async def refresh_available_models(app) -> list[str]:
+    """Relee de Ollama los modelos instalados y reasigna los niveles de potencia.
+
+    Antes solo se refrescaba de vez en cuando al enviar un mensaje: tras
+    descargar el pack recomendado, el selector de potencia seguía mostrando los
+    modelos antiguos.
+    """
+    try:
+        from app.ollama_resolver import resolve_ollama_url
+        url = await resolve_ollama_url(app.state.settings.ollama_base_url)
+        if not url:
+            return []
+        async with httpx.AsyncClient(trust_env=False) as c:
+            r = await c.get(f"{url}/api/tags", timeout=5.0)
+        nombres = [m.get("name", "") for m in r.json().get("models", []) if m.get("name")]
+        if nombres:
+            app.state.registry.set_available_models(nombres)
+        return nombres
+    except Exception as exc:                              # noqa: BLE001
+        logger.debug(f"No se pudo refrescar la lista de modelos: {exc}")
+        return []
+
+
 @router.get("/levels/{specialist_id}")
 async def get_specialist_levels(specialist_id: str, request: Request) -> JSONResponse:
     """
     Retorna los 4 niveles de potencia de un especialista y
     cuál se usaría con el hardware actual.
     """
+    await refresh_available_models(request.app)       # lo recién descargado, ya visible
     registry = request.app.state.registry
     hardware = request.app.state.hardware
 
@@ -444,8 +469,7 @@ async def set_warm(specialist_id: str, request: Request) -> JSONResponse:
     registry.set_warm(specialist_id, warm)
 
     if warm:
-        import asyncio
-        asyncio.create_task(warmup_models(
+        spawn(warmup_models(
             registry=registry,
             ollama_url=request.app.state.settings.ollama_base_url,
             hardware_tier=hardware.max_tier,
@@ -503,7 +527,7 @@ async def pull_model(request: Request) -> JSONResponse:
     body = await request.json()
     model_name = body.get("model_name", "").strip()
     if not model_name:
-        return JSONResponse(content={"error": "model_name requerido"}, status_code=400)
+        return JSONResponse(content={"error_key": "err.model_required"}, status_code=400)
 
     # Resolver URL de Ollama
     try:
@@ -545,13 +569,14 @@ async def pull_model(request: Request) -> JSONResponse:
                         }
                         if status == "success":
                             _pull_jobs[model_name]["pct"] = 100
+                            # El modelo nuevo entra ya en los niveles de potencia.
+                            await refresh_available_models(request.app)
                             _pull_jobs[model_name]["status"] = "completado"
         except Exception as exc:
             _pull_jobs[model_name] = {"status": f"error: {str(exc)[:80]}",
                                       "pct": -1, "total_mb": 0, "done_mb": 0}
 
-    import asyncio
-    asyncio.create_task(do_pull())
+    spawn(do_pull(), name="model-pull")
     return JSONResponse(content={"status": "descargando", "model": model_name,
                                  "message": f"Descarga de {model_name} iniciada."})
 
@@ -645,7 +670,7 @@ async def bake_identity(request: Request) -> JSONResponse:
     body = await request.json()
     model_name = body.get("model_name", "").strip()
     if not model_name:
-        return JSONResponse(content={"error": "model_name requerido"}, status_code=400)
+        return JSONResponse(content={"error_key": "err.model_required"}, status_code=400)
     if model_name.endswith("-andromeda") or "-andromeda-" in model_name:
         return JSONResponse(content={"variant": model_name, "message": "Ya es una variante Andromeda."})
 
@@ -691,8 +716,7 @@ async def bake_identity(request: Request) -> JSONResponse:
         except Exception:
             pass
 
-    import asyncio
-    asyncio.create_task(do_create())
+    spawn(do_create(), name="model-create")
 
     msg = f"Creando {variant} con identidad grabada"
     if topic:
@@ -701,61 +725,58 @@ async def bake_identity(request: Request) -> JSONResponse:
     return JSONResponse(content={"variant": variant, "topic": topic or None, "message": msg})
 
 
-@router.get("/recommended-setup")
-async def recommended_setup(request: Request) -> JSONResponse:
-    """
-    Recomendación de modelos y variantes según el hardware y caso de uso.
-    Devuelve: qué descargar, qué variantes crear, en qué orden.
-    """
-    from ..specialists.personality_profiles import get_all_personalities
-    import psutil
-    
-    # Detectar VRAM disponible aproximadamente
-    cpu_count = psutil.cpu_count()
-    memory_gb = psutil.virtual_memory().total / (1024**3)
-    
-    # Sugerencias por capacidad
-    if memory_gb >= 32 and cpu_count >= 12:
-        # Setup premium: 3 modelos, 6 variantes
-        setup = "premium"
-        models = [
-            {"name": "qwen2.5-coder:7b", "description": "Código (base)", "vram": 5, "purpose": "Engineer + Reviewer"},
-            {"name": "llama3.1:8b", "description": "Generalista (base)", "vram": 6, "purpose": "Generalist + DevOps + Writer"},
-            {"name": "mistral:7b", "description": "Análisis (base)", "vram": 5, "purpose": "Analyst"},
-        ]
-    elif memory_gb >= 16:
-        # Setup estándar: 2 modelos, 4-5 variantes
-        setup = "standard"
-        models = [
-            {"name": "qwen2.5-coder:7b", "description": "Código (base)", "vram": 5, "purpose": "Engineer + Reviewer"},
-            {"name": "llama3.1:8b", "description": "Generalista (base)", "vram": 6, "purpose": "Generalist + DevOps + Writer"},
-        ]
-    else:
-        # Setup ligero: 1-2 modelos, 2-3 variantes
-        setup = "lite"
-        models = [
-            {"name": "mistral:7b", "description": "Modelo eficiente", "vram": 5, "purpose": "Generalist + Engineer"},
-        ]
-    
-    personalities = get_all_personalities()
-    
-    return JSONResponse(content={
-        "setup": setup,
-        "hardware": {"memory_gb": round(memory_gb), "cpu_count": cpu_count},
-        "models_to_download": models,
-        "total_vram_recommended": sum(m["vram"] for m in models),
-        "variants_to_create": [
-            {
-                "variant": k,
-                "name": v["name"],
-                "role": v["role"],
-                "from_base": "ej: qwen2.5-coder:7b (ver arriba)"
-            }
-            for k, v in personalities.items()
-        ],
-        "note": "Descarga los modelos con Ollama, luego ejecuta GRABAR-VARIANTES-ESPECIALIZADAS.ps1"
-    })
+# ── Pack de potencia ──────────────────────────────────────────────────────
+# Un modelo por nivel de potencia, elegido según la memoria del equipo. Así la
+# potencia automática tiene de dónde escoger sin que el usuario sepa de modelos.
+# (Sustituye a /recommended-setup, que nadie usaba y sugería modelos antiguos.)
+_PACK_MODELOS = {   # nombre → (GB de descarga aproximados, GB de memoria para ejecutarlo)
+    "qwen3:1.7b": (1.4, 3), "qwen3:4b": (2.6, 5), "qwen3:8b": (5.2, 8),
+    "qwen3:14b": (9.3, 12), "gemma3:27b": (17.0, 22), "qwen3:32b": (20.0, 26),
+}
 
+
+def _memoria_para_modelos(hw=None) -> tuple[float, str]:
+    """GB utilizables por los modelos: la VRAM con GPU dedicada; con memoria
+    unificada (Apple Silicon) o sin GPU, el 75 % de la RAM."""
+    import sys
+    import psutil
+    ram = psutil.virtual_memory().total / (1024 ** 3)
+    # El hardware ya detectado al arrancar (volver a detectarlo relanza nvidia-smi).
+    vram = float(getattr(hw, "total_vram_gb", 0) or 0)
+    if sys.platform == "darwin" or vram < 4:
+        return round(ram * 0.75, 1), "ram"
+    return round(vram, 1), "vram"
+
+
+def power_pack_for(memoria: float) -> dict:
+    if memoria < 6:
+        pack = {"low": "qwen3:1.7b", "mid": "qwen3:4b"}
+    elif memoria < 12:
+        pack = {"low": "qwen3:1.7b", "mid": "qwen3:4b", "high": "qwen3:8b"}
+    elif memoria < 24:
+        pack = {"low": "qwen3:4b", "mid": "qwen3:8b", "high": "qwen3:14b"}
+    elif memoria < 40:
+        pack = {"low": "qwen3:4b", "mid": "qwen3:8b", "high": "gemma3:27b"}
+    else:
+        pack = {"low": "qwen3:4b", "mid": "qwen3:8b", "high": "gemma3:27b", "ultra": "qwen3:32b"}
+    return pack
+
+
+@router.get("/power-pack")
+async def power_pack(request: Request) -> JSONResponse:
+    """Pack recomendado para este equipo, con lo que ya está instalado."""
+    memoria, origen = _memoria_para_modelos(getattr(request.app.state, "hardware", None))
+    pack = power_pack_for(memoria)
+    instalados = set(getattr(request.app.state.registry, "available_models", []) or [])
+    niveles = []
+    for nivel, modelo in pack.items():
+        descarga, _ = _PACK_MODELOS[modelo]
+        niveles.append({"level": nivel, "model": modelo, "download_gb": descarga,
+                        "installed": modelo in instalados})
+    return JSONResponse({
+        "memory_gb": memoria, "memory_source": origen, "levels": niveles,
+        "missing_download_gb": round(sum(n["download_gb"] for n in niveles if not n["installed"]), 1),
+    })
 
 @router.get("/role/{specialist_id}")
 async def get_custom_role(specialist_id: str) -> JSONResponse:
@@ -776,7 +797,7 @@ async def set_custom_role(specialist_id: str, request: Request) -> JSONResponse:
     topic = body.get("topic", "").strip()
     instructions = body.get("instructions", "").strip()
     if not topic:
-        return JSONResponse(content={"error": "topic requerido"}, status_code=400)
+        return JSONResponse(content={"error_key": "err.topic_required"}, status_code=400)
     role = set_role(specialist_id, topic, instructions)
     return JSONResponse(content={"specialist_id": specialist_id, "role": role,
                                  "message": f"Especialista enfocado en: {topic}"})

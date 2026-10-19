@@ -3,6 +3,7 @@
  * Botón "▶ Ejecutar" aparece bajo los bloques de código.
  * Muestra stdout/stderr y tiempo de ejecución.
  */
+import { t } from '../stores/i18n.js'
 import { createSignal, Show } from 'solid-js'
 import axios from 'axios'
 
@@ -34,7 +35,7 @@ export default function CodeSandbox({ code, language = 'python' }) {
         onClick={run}
         disabled={running()}
         style={`
-          font-size:10px;padding:3px 10px;border-radius:6px;
+          font-size:var(--fs-micro);padding:3px 10px;border-radius:6px;
           background:${running() ? 'var(--surface)' : 'rgba(0,212,170,.12)'};
           border:1px solid ${running() ? 'var(--border)' : 'rgba(0,212,170,.3)'};
           color:${running() ? 'var(--text-3)' : 'var(--teal)'};
@@ -69,7 +70,7 @@ export default function CodeSandbox({ code, language = 'python' }) {
             </div>
           </Show>
           <Show when={!result()?.stdout && !result()?.stderr}>
-            <div class="sandbox-body" style="color:var(--text-3)">(sin output)</div>
+            <div class="sandbox-body" style="color:var(--text-3)">{t('code.no_output')}</div>
           </Show>
         </div>
       </Show>

@@ -6,6 +6,7 @@
 import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
 import axios from 'axios'
 import { t } from '../stores/i18n.js'
+import { errorMessage } from '../services/errors.js'
 
 export default function LabPanel() {
   const [models, setModels] = createSignal([])
@@ -39,7 +40,7 @@ export default function LabPanel() {
   const [assignTo, setAssignTo] = createSignal({})
 
   const PRESETS = [
-    { name: '🎯 Preciso',     desc: 'Determinista, para código y datos', t: 0.2, p: 0.85, k: 20, rp: 1.15 },
+    { name: '🎯 Preciso',     desc: t('lab.deterministic_hint'), t: 0.2, p: 0.85, k: 20, rp: 1.15 },
     { name: '⚖️ Equilibrado', desc: 'Uso general',                        t: 0.7, p: 0.9,  k: 40, rp: 1.1 },
     { name: '🎨 Creativo',    desc: 'Escritura, brainstorming',           t: 1.1, p: 0.95, k: 60, rp: 1.05 },
   ]
@@ -87,7 +88,7 @@ export default function LabPanel() {
       } else {
         setNote({ ok: false, text: 'No se detectaron ejemplos. Formato esperado: JSONL con {"prompt","response"} por línea.' })
       }
-    } catch (e) { setNote({ ok: false, text: 'Error al parsear: ' + (e.response?.data?.error || e.message) }) }
+    } catch (e) { setNote({ ok: false, text: 'Error al parsear: ' + (errorMessage(e)) }) }
   }
 
   async function train() {
@@ -110,7 +111,7 @@ export default function LabPanel() {
       setNote({ ok: true, text: r.data.message })
       await refreshJobs()
     } catch (e) {
-      setNote({ ok: false, text: 'Error: ' + (e.response?.data?.error || e.message) })
+      setNote({ ok: false, text: 'Error: ' + (errorMessage(e)) })
     }
     setTraining(false)
   }
@@ -129,7 +130,7 @@ export default function LabPanel() {
       const r = await axios.post('/api/lab/test', { variant: name, prompt })
       setTestResult(p => ({ ...p, [name]: r.data }))
     } catch (e) {
-      setTestResult(p => ({ ...p, [name]: { error: e.response?.data?.error || e.message } }))
+      setTestResult(p => ({ ...p, [name]: { error: errorMessage(e) } }))
     }
   }
 
@@ -142,13 +143,13 @@ export default function LabPanel() {
       const rs = await axios.get('/api/lab/specialists')
       setSpecialists(rs.data.specialists || [])
     } catch (e) {
-      setNote({ ok: false, text: e.response?.data?.error || e.message })
+      setNote({ ok: false, text: errorMessage(e) })
     }
   }
 
   const Slider = (p) => (
     <div style="flex:1;min-width:150px">
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">
         <span>{p.label}</span><span style="font-family:var(--mono);color:var(--text-2)">{p.value()}</span>
       </div>
       <input type="range" min={p.min} max={p.max} step={p.step} value={p.value()}
@@ -173,13 +174,13 @@ export default function LabPanel() {
       <div class="card stagger">
         <div class="card-title">1 · Modelo base</div>
         <Show when={models().length > 0} fallback={
-          <div style="font-size:13px;color:var(--text-3)">{t('ui2.lab_no_ollama')}</div>
+          <div style="font-size:var(--fs-base);color:var(--text-3)">{t('ui2.lab_no_ollama')}</div>
         }>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <For each={models()}>
               {(m) => (
                 <button class="anim-spring" onClick={() => setBaseModel(m)}
-                  style={`padding:8px 14px;border-radius:12px;font-size:12px;font-family:var(--mono);cursor:pointer;transition:all 0.2s;border:1.5px solid ${baseModel()===m?'var(--blue)':'var(--glass-border)'};background:${baseModel()===m?'rgba(123,140,240,0.12)':'transparent'};color:${baseModel()===m?'var(--text-1)':'var(--text-3)'}`}>
+                  style={`padding:8px 14px;border-radius:14px;font-size:var(--fs-sm);font-family:var(--mono);cursor:pointer;transition:all 0.2s;border:1.5px solid ${baseModel()===m?'var(--blue)':'var(--glass-border)'};background:${baseModel()===m?'rgba(123,140,240,0.12)':'transparent'};color:${baseModel()===m?'var(--text-1)':'var(--text-3)'}`}>
                   {m}
                 </button>
               )}
@@ -201,7 +202,7 @@ export default function LabPanel() {
           <For each={PRESETS}>
             {(pr) => (
               <button class="anim-spring" onClick={() => applyPreset(pr)} title={pr.desc}
-                style="padding:8px 14px;border-radius:12px;font-size:12px;cursor:pointer;border:1.5px solid var(--glass-border);background:transparent;color:var(--text-2);transition:all 0.2s">
+                style="padding:8px 14px;border-radius:14px;font-size:var(--fs-sm);cursor:pointer;border:1.5px solid var(--glass-border);background:transparent;color:var(--text-2);transition:all 0.2s">
                 {pr.name}
               </button>
             )}
@@ -217,35 +218,35 @@ export default function LabPanel() {
 
         {/* Avanzado plegable */}
         <button onClick={() => setShowAdv(!showAdv())}
-          style="margin-top:16px;background:none;border:none;color:var(--text-3);font-size:12px;cursor:pointer;padding:0;display:flex;align-items:center;gap:6px">
+          style="margin-top:16px;background:none;border:none;color:var(--text-3);font-size:var(--fs-sm);cursor:pointer;padding:0;display:flex;align-items:center;gap:6px">
           <span style={`display:inline-block;transition:transform 0.25s;transform:rotate(${showAdv() ? 90 : 0}deg)`}>▸</span>
           Parámetros avanzados
         </button>
         <Show when={showAdv()}>
           <div class="anim-slide" style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
             <div>
-              <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">{t('lab.max_tokens')}</div>
-              <input class="g-input" type="number" placeholder={t('lab.ph_auto')} value={numPredict()}
+              <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">{t('lab.max_tokens')}</div>
+              <input aria-label={t('lab.ph_auto')} class="g-input" type="number" placeholder={t('lab.ph_auto')} value={numPredict()}
                 onInput={e => setNumPredict(e.target.value)} style="width:100%" />
             </div>
             <div>
-              <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">Min P (0-1)</div>
-              <input class="g-input" type="number" step="0.01" placeholder={t('lab.ph_auto')} value={minP()}
+              <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Min P (0-1)</div>
+              <input aria-label={t('lab.ph_auto')} class="g-input" type="number" step="0.01" placeholder={t('lab.ph_auto')} value={minP()}
                 onInput={e => setMinP(e.target.value)} style="width:100%" />
             </div>
             <div>
-              <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">{t('lab.anti_repeat')}</div>
-              <input class="g-input" type="number" placeholder={t('lab.ph_auto')} value={repeatLastN()}
+              <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">{t('lab.anti_repeat')}</div>
+              <input aria-label={t('lab.ph_auto')} class="g-input" type="number" placeholder={t('lab.ph_auto')} value={repeatLastN()}
                 onInput={e => setRepeatLastN(e.target.value)} style="width:100%" />
             </div>
             <div>
-              <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">Seed (reproducibilidad)</div>
-              <input class="g-input" type="number" placeholder={t('lab.ph_random')} value={seed()}
+              <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Seed (reproducibilidad)</div>
+              <input aria-label={t('lab.ph_random')} class="g-input" type="number" placeholder={t('lab.ph_random')} value={seed()}
                 onInput={e => setSeed(e.target.value)} style="width:100%" />
             </div>
             <div style="grid-column:1/-1">
-              <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">{t('lab.stop_seqs')}</div>
-              <input class="g-input" placeholder={t('lab.ph_stop')} value={stops()}
+              <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">{t('lab.stop_seqs')}</div>
+              <input aria-label={t('lab.ph_stop')} class="g-input" placeholder={t('lab.ph_stop')} value={stops()}
                 onInput={e => setStops(e.target.value)} style="width:100%" />
             </div>
           </div>
@@ -255,38 +256,38 @@ export default function LabPanel() {
       {/* 3. Entrenamiento con ejemplos */}
       <div class="card stagger">
         <div class="card-title">3 · Entrenamiento con ejemplos (few-shot)</div>
-        <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">
+        <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:14px">
           Los ejemplos se hornean en el modelo: aprenderá a responder siguiendo estos patrones.
         </div>
         <For each={examples()}>
           {(ex, i) => (
             <div class="anim-slide" style="display:flex;gap:8px;margin-bottom:10px;align-items:flex-start">
               <textarea value={ex.user} onInput={e => setEx(i(), 'user', e.target.value)}
-                placeholder={t('lab.ph_user_q')} class="g-input" style="flex:1;min-height:54px;resize:vertical;font-size:12px" />
+                placeholder={t('lab.ph_user_q')} class="g-input" style="flex:1;min-height:54px;resize:vertical;font-size:var(--fs-sm)" />
               <textarea value={ex.assistant} onInput={e => setEx(i(), 'assistant', e.target.value)}
-                placeholder={t('lab.ph_ideal_a')} class="g-input" style="flex:1;min-height:54px;resize:vertical;font-size:12px" />
+                placeholder={t('lab.ph_ideal_a')} class="g-input" style="flex:1;min-height:54px;resize:vertical;font-size:var(--fs-sm)" />
               <button onClick={() => removeEx(i())} title={t('lab.remove')}
-                style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:15px;padding:6px">✕</button>
+                style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:var(--fs-md);padding:6px">✕</button>
             </div>
           )}
         </For>
         <button class="btn btn-ghost" onClick={addExample}>{t('lab.add_example')}</button>
 
         <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--glass-border)">
-          <div style="font-size:12px;font-weight:700;margin-bottom:8px">{t('ui2.import_dataset')}</div>
-          <div style="font-size:11px;color:var(--text-3);margin-bottom:8px">
+          <div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">{t('ui2.import_dataset')}</div>
+          <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:8px">
             Pega un dataset de internet (HuggingFace, Kaggle...) con una línea JSON por ejemplo: {`{"prompt": "...", "response": "..."}`}
           </div>
           <textarea value={rawDataset()} onInput={e => setRawDataset(e.target.value)}
             placeholder={'{"prompt": "¿Qué es Docker?", "response": "Docker es..."}\n{"prompt": "...", "response": "..."}'}
-            class="g-input" style="width:100%;min-height:70px;resize:vertical;font-family:var(--mono);font-size:11px" />
+            class="g-input" style="width:100%;min-height:70px;resize:vertical;font-family:var(--mono);font-size:var(--fs-xs)" />
           <button class="btn btn-glass" onClick={importDataset} style="margin-top:8px">↓ Importar ejemplos</button>
         </div>
       </div>
 
       {/* 4. Entrenar */}
       <div class="card stagger" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
-        <div style="font-size:12px;color:var(--text-3)">
+        <div style="font-size:var(--fs-sm);color:var(--text-3)">
           {examples().filter(e => e.user.trim() && e.assistant.trim()).length} ejemplos válidos · modelo: <span style="font-family:var(--mono);color:var(--text-2)">{baseModel() || '—'}</span>
         </div>
         <button class="btn btn-primary anim-spring" onClick={train} disabled={training() || !baseModel()}>
@@ -298,22 +299,22 @@ export default function LabPanel() {
       <div class="card stagger">
         <div class="card-title">{t('ui2.lab_variants')}</div>
         <Show when={jobs().length > 0} fallback={
-          <div style="text-align:center;padding:28px;color:var(--text-3);font-size:13px">{t('lab.no_variants')}</div>
+          <div style="text-align:center;padding:28px;color:var(--text-3);font-size:var(--fs-base)">{t('lab.no_variants')}</div>
         }>
           <For each={jobs()}>
             {(j) => (<>
               <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;gap:12px">
                 <div style="min-width:0">
-                  <div style="font-family:var(--mono);font-size:12px;color:var(--text-1);overflow:hidden;text-overflow:ellipsis">{j.variant}</div>
-                  <div style="font-size:11px;color:var(--text-3)">{j.base_model} · {j.n_examples} ejemplos · {j.progress}</div>
+                  <div style="font-family:var(--mono);font-size:var(--fs-sm);color:var(--text-1);overflow:hidden;text-overflow:ellipsis">{j.variant}</div>
+                  <div style="font-size:var(--fs-xs);color:var(--text-3)">{j.base_model} · {j.n_examples} ejemplos · {j.progress}</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-                  <span style={`font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;${j.status==='finished'?'background:rgba(52,211,153,0.15);color:var(--green)':j.status==='failed'?'background:rgba(248,113,113,0.15);color:var(--red)':'background:rgba(251,191,36,0.15);color:var(--amber)'}`}>
+                  <span style={`font-size:var(--fs-xs);font-weight:700;padding:4px 10px;border-radius:10px;${j.status==='finished'?'background:rgba(52,211,153,0.15);color:var(--green)':j.status==='failed'?'background:rgba(248,113,113,0.15);color:var(--red)':'background:rgba(251,191,36,0.15);color:var(--amber)'}`}>
                     {j.status === 'finished' ? '✓ Lista' : j.status === 'failed' ? '✗ Error' : '⟳ En curso'}
                   </span>
                   <Show when={j.status !== 'running'}>
                     <button onClick={() => deleteVariant(j.variant)} title={t('lab.delete_variant')}
-                      style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px">🗑</button>
+                      style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:var(--fs-base)">🗑</button>
                   </Show>
                 </div>
               </div>
@@ -321,24 +322,24 @@ export default function LabPanel() {
                 <div class="anim-slide" style="padding:12px 0 16px;border-bottom:1px solid var(--glass-border)">
                   {/* Probar en vivo */}
                   <div style="display:flex;gap:8px;margin-bottom:10px">
-                    <input class="g-input" placeholder={t('lab.ph_test')}
+                    <input aria-label={t('lab.ph_test')} class="g-input" placeholder={t('lab.ph_test')}
                       value={testPrompt()[j.variant] || ''}
                       onInput={e => setTestPrompt(p => ({ ...p, [j.variant]: e.target.value }))}
                       onKeyDown={e => e.key === 'Enter' && testVariant(j.variant)}
-                      style="flex:1;font-size:12px" />
-                    <button class="btn btn-glass" style="font-size:12px;padding:8px 14px"
+                      style="flex:1;font-size:var(--fs-sm)" />
+                    <button class="btn btn-glass" style="font-size:var(--fs-sm);padding:8px 14px"
                       disabled={testResult()[j.variant]?.loading}
                       onClick={() => testVariant(j.variant)}>
                       {testResult()[j.variant]?.loading ? '…' : '▶ Probar'}
                     </button>
                   </div>
                   <Show when={testResult()[j.variant] && !testResult()[j.variant].loading}>
-                    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--glass-border);border-radius:12px;padding:12px;font-size:12.5px;line-height:1.55;color:var(--text-2);margin-bottom:12px;white-space:pre-wrap;max-height:180px;overflow-y:auto">
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--glass-border);border-radius:14px;padding:12px;font-size:var(--fs-sm);line-height:1.55;color:var(--text-2);margin-bottom:12px;white-space:pre-wrap;max-height:180px;overflow-y:auto">
                       {testResult()[j.variant].error
                         ? <span style="color:var(--red)">{testResult()[j.variant].error}</span>
                         : testResult()[j.variant].response}
                       <Show when={testResult()[j.variant].total_ms}>
-                        <div style="font-size:10px;color:var(--text-3);margin-top:8px;font-family:var(--mono)">
+                        <div style="font-size:var(--fs-micro);color:var(--text-3);margin-top:8px;font-family:var(--mono)">
                           {testResult()[j.variant].eval_count} tokens · {testResult()[j.variant].total_ms} ms
                         </div>
                       </Show>
@@ -346,8 +347,8 @@ export default function LabPanel() {
                   </Show>
                   {/* Asignar a especialista */}
                   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                    <span style="font-size:12px;color:var(--text-3)">{t('ui2.use_as')}</span>
-                    <select class="g-input" style="font-size:12px;flex:1;min-width:160px"
+                    <span style="font-size:var(--fs-sm);color:var(--text-3)">{t('ui2.use_as')}</span>
+                    <select class="g-input" style="font-size:var(--fs-sm);flex:1;min-width:160px"
                       value={assignTo()[j.variant] || ''}
                       onChange={e => setAssignTo(p => ({ ...p, [j.variant]: e.target.value }))}>
                       <option value="">— elegir especialista —</option>
@@ -355,7 +356,7 @@ export default function LabPanel() {
                         {(s) => <option value={s.id}>{s.name}{s.override === j.variant ? ' (asignado ✓)' : ''}</option>}
                       </For>
                     </select>
-                    <button class="btn btn-primary" style="font-size:12px;padding:8px 16px"
+                    <button class="btn btn-primary" style="font-size:var(--fs-sm);padding:8px 16px"
                       disabled={!assignTo()[j.variant]}
                       onClick={() => assignVariant(j.variant)}>Asignar</button>
                   </div>
@@ -364,7 +365,7 @@ export default function LabPanel() {
               <div style="border-bottom:1px solid var(--glass-border)" />
             </>)}
           </For>
-          <div style="font-size:11px;color:var(--text-3);margin-top:12px">
+          <div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:12px">
             Las variantes terminadas aparecen en IAs → Asignación para usarlas como especialistas.
           </div>
         </Show>

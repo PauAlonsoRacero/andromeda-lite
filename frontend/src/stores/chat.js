@@ -8,10 +8,15 @@
 
 import { createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
+import { t } from './i18n.js'
 
 // ── Historial de conversaciones ───────────────────────────────────────────────
 const STORAGE_KEY = 'andromeda_conversations'
-const MAX_CONVERSATIONS = 20
+// Antes 20: la 21.ª conversación y anteriores se borraban sin avisar. Ahora
+// se guardan hasta 100 y el límite real es el tamaño (el backend rechaza
+// cuerpos de más de 15 MB: por encima el guardado fallaría en silencio).
+const MAX_CONVERSATIONS = 100
+const MAX_BYTES = 12 * 1024 * 1024
 
 function loadConversations() {
   try {
@@ -21,14 +26,20 @@ function loadConversations() {
 }
 
 function saveConversations(convs) {
-  const slice = convs.slice(0, MAX_CONVERSATIONS)
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(slice)) }
+  let slice = convs.slice(0, MAX_CONVERSATIONS)
+  // Si no cabe, se descartan las más antiguas (nunca la actual, que es la primera).
+  let json = JSON.stringify(slice)
+  while (json.length > MAX_BYTES && slice.length > 1) {
+    slice = slice.slice(0, Math.max(1, Math.floor(slice.length * 0.9)))
+    json = JSON.stringify(slice)
+  }
+  try { localStorage.setItem(STORAGE_KEY, json) }
   catch {}
   // Respaldo en disco vía backend (en el binario localStorage no persiste).
   try {
     fetch(`/api/uistate/${STORAGE_KEY}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: slice }),
+      body: `{"value":${json}}`,
     }).catch(() => {})
   } catch {}
 }
@@ -47,7 +58,7 @@ export async function hydrateConversationsFromBackend() {
 }
 
 function generateTitle(firstUserMessage) {
-  if (!firstUserMessage) return 'Nueva conversación'
+  if (!firstUserMessage) return t('chat.new_conversation')
   return firstUserMessage.slice(0, 42) + (firstUserMessage.length > 42 ? '…' : '')
 }
 
@@ -74,14 +85,17 @@ const [activeConvId, setActiveConvId]   = createSignal(null)
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
 
-export function addUserMessage(content) {
+export function addUserMessage(content, attachments = null) {
+  // attachments: { images: [dataURL], files: [{name, size}] }. Se guardan en el
+  // mensaje para mostrarlos en la burbuja, como hace Claude: antes la imagen se
+  // enviaba pero desaparecía del chat.
   // Si no hay conversación activa, crear una nueva
   if (!activeConvId()) {
     newConversation()
   }
   setChatState('messages', msgs => [
     ...msgs,
-    { id: crypto.randomUUID(), role: 'user', content, timestamp: new Date().toISOString(), metadata: null }
+    { id: crypto.randomUUID(), role: 'user', attachments: attachments || undefined, content, timestamp: new Date().toISOString(), metadata: null }
   ])
 }
 
@@ -176,9 +190,12 @@ export function clearMessages() {
 
 // ── Gestión de conversaciones ─────────────────────────────────────────────────
 
-export function newConversation() {
-  // Si ya hay una conversación vacía, cárgala en lugar de crear otra
-  const emptyConv = conversations().find(c => c.messages.length === 0)
+export function newConversation(projectId = null) {
+  // Si ya hay una conversación vacía DEL MISMO proyecto (o sin proyecto), se
+  // reutiliza. Sin comparar el proyecto, una conversación vacía de otro
+  // proyecto se habría reaprovechado con las instrucciones equivocadas.
+  const emptyConv = conversations().find(c => c.messages.length === 0
+                                           && (c.projectId || null) === (projectId || null))
   if (emptyConv) {
     setActiveConvId(emptyConv.id)
     setChatState('conversationId', emptyConv.id)
@@ -190,11 +207,33 @@ export function newConversation() {
   setActiveConvId(id)
   setChatState('conversationId', id)
   setChatState('messages', [])
-  const conv = { id, title: 'Nueva conversación', createdAt: new Date().toISOString(), messages: [] }
+  const conv = { id, title: t('chat.new_conversation'), createdAt: new Date().toISOString(),
+                 messages: [], ...(projectId ? { projectId } : {}) }
   const updated = [conv, ...conversations()]
   setConversations(updated)
   saveConversations(updated)
+  if (projectId) linkConversationToProject(projectId, id)
   return id
+}
+
+/** Proyecto de la conversación activa (o null). */
+export function activeProject() {
+  const conv = conversations().find(c => c.id === activeConvId())
+  if (!conv?.projectId) return null
+  try {
+    const lista = JSON.parse(localStorage.getItem('andromeda_projects') || '[]')
+    return lista.find(p => p.id === conv.projectId) || null
+  } catch { return null }
+}
+
+function linkConversationToProject(projectId, convId) {
+  try {
+    const lista = JSON.parse(localStorage.getItem('andromeda_projects') || '[]')
+    const nueva = lista.map(p => p.id === projectId
+      ? { ...p, conversationIds: [convId, ...(p.conversationIds || []).filter(x => x !== convId)] }
+      : p)
+    localStorage.setItem('andromeda_projects', JSON.stringify(nueva))
+  } catch { /* sin almacenamiento: la conversación funciona igual */ }
 }
 
 export function loadConversation(id) {
@@ -263,9 +302,9 @@ export async function exportConversations() {
  *  por id; las importadas que ya existen se omiten. Devuelve cuántas añadió. */
 export async function importConversations(jsonText) {
   let parsed
-  try { parsed = JSON.parse(jsonText) } catch { throw new Error('Archivo no válido') }
+  try { parsed = JSON.parse(jsonText) } catch { throw new Error(t('err.invalid_file')) }
   const incoming = Array.isArray(parsed) ? parsed : parsed.conversations
-  if (!Array.isArray(incoming)) throw new Error('El archivo no contiene conversaciones')
+  if (!Array.isArray(incoming)) throw new Error(t('err.no_conversations'))
   const existingIds = new Set(conversations().map(c => c.id))
   const toAdd = incoming.filter(c => c && c.id && !existingIds.has(c.id))
   const merged = [...toAdd, ...conversations()].slice(0, MAX_CONVERSATIONS)
@@ -297,7 +336,7 @@ function _persistCurrentConversation() {
   if (msgs.length === 0) return
   // Auto-title from first user message
   const firstUser = msgs.find(m => m.role === 'user')
-  const title = firstUser ? generateTitle(firstUser.content) : 'Nueva conversación'
+  const title = firstUser ? generateTitle(firstUser.content) : t('chat.new_conversation')
   // Capturar el array actualizado y guardarlo (evita el bug de timing de signals)
   const updated = conversations().map(c =>
     c.id === id ? { ...c, title, messages: msgs, updatedAt: new Date().toISOString() } : c
@@ -316,3 +355,14 @@ export function showPlaceholder(phrase, powerLevel) {
 }
 
 export { chatState, streamContent, streamSpecialist, conversations, activeConvId, streamRaw, outputStarted, streamProgress, streamPlaceholder }
+
+
+// Prompt elegido fuera del chat (p. ej. en Configuración → Biblioteca) que el
+// chat debe escribir en su campo al abrirse.
+export const [pendingPrompt, setPendingPrompt] = createSignal(null)
+
+
+// Imagen original de cada miniatura enviada en esta sesión. El historial guarda
+// miniaturas para no llenar el almacenamiento; al ampliar se usa el original si
+// está disponible (ampliar una miniatura de 480 px se veía borroso).
+export const imagenesCompletas = new Map()

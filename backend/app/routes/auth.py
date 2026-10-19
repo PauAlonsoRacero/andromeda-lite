@@ -13,6 +13,7 @@ Diseño:
 from __future__ import annotations
 
 import hashlib
+import asyncio
 import hmac
 import os
 import secrets
@@ -115,9 +116,9 @@ async def register(request: Request) -> JSONResponse:
     username = (body.get("username") or "").strip().lower()
     password = body.get("password") or ""
     if len(username) < 3 or len(username) > 32 or not username.replace("_", "").replace(".", "").isalnum():
-        return JSONResponse(status_code=400, content={"error": "Usuario: 3-32 caracteres alfanuméricos."})
+        return JSONResponse(status_code=400, content={"error_key": "err.username_format"})
     if len(password) < 8:
-        return JSONResponse(status_code=400, content={"error": "La contraseña debe tener al menos 8 caracteres."})
+        return JSONResponse(status_code=400, content={"error_key": "err.password_short"})
 
     salt = secrets.token_bytes(16)
     with _conn() as c:
@@ -125,7 +126,7 @@ async def register(request: Request) -> JSONResponse:
             c.execute("INSERT INTO users (username, salt, pwhash, created_at) VALUES (?,?,?,?)",
                       (username, salt, _hash_pw(password, salt), time.time()))
         except sqlite3.IntegrityError:
-            return JSONResponse(status_code=409, content={"error": "Ese usuario ya existe."})
+            return JSONResponse(status_code=409, content={"error_key": "err.user_exists"})
         user_id = c.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()["id"]
         token = secrets.token_urlsafe(32)
         c.execute("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?,?,?)",
@@ -140,9 +141,13 @@ async def login(request: Request) -> JSONResponse:
     password = body.get("password") or ""
     with _conn() as c:
         row = c.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
-        if not row or not hmac.compare_digest(_hash_pw(password, row["salt"]), row["pwhash"]):
-            time.sleep(0.4)   # frenar fuerza bruta
-            return JSONResponse(status_code=401, content={"error": "Usuario o contraseña incorrectos."})
+        valido = bool(row) and hmac.compare_digest(_hash_pw(password, row["salt"]), row["pwhash"])
+    if not valido:
+        # Frenar la fuerza bruta SIN bloquear: time.sleep congelaba el servidor
+        # entero (también las respuestas que se estaban generando).
+        await asyncio.sleep(0.4)
+        return JSONResponse(status_code=401, content={"error_key": "err.bad_credentials"})
+    with _conn() as c:
         token = secrets.token_urlsafe(32)
         c.execute("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?,?,?)",
                   (_hash_token(token), row["id"], time.time() + _SESSION_TTL))
@@ -164,7 +169,7 @@ async def logout(request: Request) -> JSONResponse:
 async def get_profile(request: Request) -> JSONResponse:
     user = current_user(request)
     if not user:
-        return JSONResponse(status_code=401, content={"error": "No autenticado"})
+        return JSONResponse(status_code=401, content={"error_key": "err.not_authenticated"})
     with _conn() as c:
         row = c.execute("SELECT * FROM profiles WHERE user_id=?", (user["id"],)).fetchone()
     profile = {
@@ -180,7 +185,7 @@ async def get_profile(request: Request) -> JSONResponse:
 async def update_profile(request: Request) -> JSONResponse:
     user = current_user(request)
     if not user:
-        return JSONResponse(status_code=401, content={"error": "No autenticado"})
+        return JSONResponse(status_code=401, content={"error_key": "err.not_authenticated"})
     body = await request.json()
     fields = {
         "display_name": str(body.get("display_name", ""))[:120],
@@ -205,16 +210,16 @@ async def update_profile(request: Request) -> JSONResponse:
 async def change_password(request: Request) -> JSONResponse:
     user = current_user(request)
     if not user:
-        return JSONResponse(status_code=401, content={"error": "No autenticado"})
+        return JSONResponse(status_code=401, content={"error_key": "err.not_authenticated"})
     body = await request.json()
     current = str(body.get("current_password", ""))
     new_pw  = str(body.get("new_password", ""))
     if len(new_pw) < 8:
-        return JSONResponse(status_code=400, content={"error": "La nueva contraseña debe tener al menos 8 caracteres"})
+        return JSONResponse(status_code=400, content={"error_key": "err.new_password_short"})
     with _conn() as c:
         row = c.execute("SELECT salt, pwhash FROM users WHERE id=?", (user["id"],)).fetchone()
         if not row or _hash_pw(current, row["salt"]) != row["pwhash"]:
-            return JSONResponse(status_code=403, content={"error": "La contraseña actual no es correcta"})
+            return JSONResponse(status_code=403, content={"error_key": "err.wrong_current_password"})
         new_salt = secrets.token_bytes(16)
         c.execute("UPDATE users SET salt=?, pwhash=? WHERE id=?",
                   (new_salt, _hash_pw(new_pw, new_salt), user["id"]))

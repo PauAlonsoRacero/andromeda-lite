@@ -43,7 +43,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
         # 3) Cabeceras de seguridad
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
+        # DENY impedía mostrar cualquier archivo en el visor de artefactos (salía
+        # en blanco). Las vistas previas se permiten dentro de la propia app y
+        # van aisladas por su cabecera CSP "sandbox"; el resto sigue en DENY.
+        if "/view/" in request.url.path:
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        else:
+            response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers.setdefault("Permissions-Policy",
                                     "camera=(), microphone=(), geolocation=()")

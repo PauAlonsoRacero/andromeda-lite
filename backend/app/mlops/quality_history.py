@@ -22,6 +22,8 @@ from pathlib import Path
 _lock = threading.Lock()
 _MAX_POINTS = 500
 _BUCKET_SECONDS = 300   # 1 snapshot cada 5 min como máximo
+# Peticiones mínimas para evaluar el SLO con algo de sentido estadístico.
+MIN_REQUESTS_FOR_SLO = 20
 
 # Objetivos de nivel de servicio (SLO) por defecto. Ajustables por entorno.
 DEFAULT_SLO = {
@@ -92,6 +94,13 @@ class QualityHistory:
             return out
 
         recent = pts[-1]
+        # Con muy pocas peticiones, "cumple/incumple" no significa nada: con 2
+        # mensajes, uno lento ya "rompe" el p95. Se exige una muestra mínima.
+        out["min_requests"] = MIN_REQUESTS_FOR_SLO
+        if (recent.get("requests") or 0) < MIN_REQUESTS_FOR_SLO:
+            out["insufficient"] = True
+            out["requests"] = recent.get("requests") or 0
+            return out
         # Estado SLO con el punto más reciente.
         def _ok(val, thr, mode):
             if val is None:
@@ -131,14 +140,27 @@ class QualityHistory:
             if a is None or b is None:
                 continue
             delta = b - a
-            # "degrading" si va en el sentido malo de forma apreciable (>3% relativo).
-            rel = (delta / a * 100) if a else 0.0
-            if abs(rel) < 3:
+
+            # Las métricas que YA son un porcentaje se comparan en PUNTOS
+            # porcentuales, no en variación relativa: pasar del 8% al 41% de
+            # satisfacción no es "+510%", es "+33 puntos". El número relativo
+            # se dispara con bases pequeñas y resulta absurdo en pantalla.
+            es_porcentaje = key in ("satisfaction", "success_rate")
+            if es_porcentaje:
+                cambio = delta                      # puntos porcentuales
+                umbral = 3                          # 3 puntos
+            else:
+                cambio = (delta / a * 100) if a else 0.0    # variación relativa
+                umbral = 3                          # 3 %
+
+            if abs(cambio) < umbral:
                 direction = "stable"
             elif (delta > 0 and better == "up") or (delta < 0 and better == "down"):
                 direction = "improving"
             else:
                 direction = "degrading"
             trend[key] = {"from": round(a, 1), "to": round(b, 1),
-                          "change_pct": round(rel, 1), "direction": direction}
+                          "change_pct": round(cambio, 1), "direction": direction,
+                          # La interfaz necesita saber cómo rotular el número.
+                          "unit": "pp" if es_porcentaje else "%"}
         return trend

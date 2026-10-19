@@ -4,6 +4,7 @@
  * (incluido el modo incógnito) automáticamente.
  */
 import { createSignal, onMount, Show } from 'solid-js'
+import { Portal } from 'solid-js/web'
 import { t } from '../stores/i18n.js'
 
 export default function TitleBar() {
@@ -34,17 +35,24 @@ export default function TitleBar() {
     <Show when={isDesktop()}>
       <div class="titlebar">
         <Show when={isMac}>
-          <div class="titlebar-traffic">
-            <button class="tl tl-close" title={t('title.close')} onClick={() => call('close')} />
-            <button class="tl tl-min" title={t('title.minimize')} onClick={() => call('minimize')} />
-            <button class="tl tl-max" title={t('title.maximize')} onClick={() => call('toggle_maximize')} />
-          </div>
+          {/* Hueco del mismo ancho: los botones viven en la isla de abajo. */}
+          <div class="titlebar-traffic-spacer" aria-hidden="true" />
+          {/* Isla de botones de ventana, pintada en <body> POR ENCIMA de cualquier
+              capa. Antes Configuración o Sistema la cubrían y difuminaban, y no
+              se podía cerrar, minimizar ni ampliar la ventana. */}
+          <Portal>
+            <div class="tl-island" role="toolbar" aria-label="window">
+              <button class="tl tl-close" title={t('title.close')} onClick={() => call('close')} />
+              <button class="tl tl-min" title={t('title.minimize')} onClick={() => call('minimize')} />
+              <button class="tl tl-max" title={t('title.maximize')} onClick={() => call('toggle_maximize')} />
+            </div>
+          </Portal>
         </Show>
         <div class="titlebar-drag pywebview-drag-region">
           <img src="/andromeda-logo.png" alt="" style="width:16px;height:16px;object-fit:contain;opacity:0.8" />
           <span class="titlebar-name">Andromeda</span>
         </div>
-        <Show when={!isMac}><div class="titlebar-controls">
+        <Show when={!isMac}><Portal><div class="titlebar-controls tl-island-right">
           <button class="tb-btn" title={t('title.minimize')} onClick={() => call('minimize')}>
             <svg width="11" height="11" viewBox="0 0 11 11"><line x1="1" y1="5.5" x2="10" y2="5.5" stroke="currentColor" stroke-width="1.1"/></svg>
           </button>
@@ -54,7 +62,7 @@ export default function TitleBar() {
           <button class="tb-btn tb-close" title={t('title.close')} onClick={() => call('close')}>
             <svg width="11" height="11" viewBox="0 0 11 11"><path d="M1.5 1.5 L9.5 9.5 M9.5 1.5 L1.5 9.5" stroke="currentColor" stroke-width="1.1"/></svg>
           </button>
-        </div></Show>
+        </div></Portal><div class="titlebar-controls-spacer" aria-hidden="true" /></Show>
       </div>
     </Show>
   )

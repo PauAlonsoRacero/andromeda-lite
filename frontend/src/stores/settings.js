@@ -72,6 +72,7 @@ export const [temperature, setTemperature]     = persisted('andromeda_temperatur
 // Memoria
 export const [memAutogenerate, setMemAutogenerate]       = persisted('andromeda_mem_autogenerate', true)
 export const [memConversationSearch, setMemConversationSearch] = persisted('andromeda_mem_conversation_search', true)
+export const [memSensitive, setMemSensitive] = persisted('andromeda_mem_sensitive', true)
 // General
 export const [connectorSearch, setConnectorSearch]       = persisted('andromeda_connector_search', false)
 export const [modelFallback, setModelFallback]           = persisted('andromeda_model_fallback', true)
@@ -82,7 +83,7 @@ export const [artifactsEnabled, setArtifactsEnabled]     = persisted('andromeda_
 export const [inlineViz, setInlineViz]                   = persisted('andromeda_inline_viz', true)
 // Ejecución de archivos y red
 export const [fileCreation, setFileCreation]             = persisted('andromeda_file_creation', true)
-export const [networkEgress, setNetworkEgress]           = persisted('andromeda_network_egress', false)
+export const [networkEgress, setNetworkEgress]           = persisted('andromeda_network_egress', true)
 
 // Tema: 'dark' | 'light'  (incógnito es un estado aparte, no un tema)
 export const [theme, setTheme]                 = persisted('andromeda_theme', 'dark')
@@ -91,6 +92,31 @@ export const [theme, setTheme]                 = persisted('andromeda_theme', 'd
 export const [orbsOn, setOrbsOn]               = persisted('andromeda_orbs', true)
 // Estilo de fondo animado: 'orbs' | 'bands' | 'waves' (olas)
 export const [bgStyle, setBgStyle]             = persisted('andromeda_bg_style', 'bands')
+
+// Diseño de la interfaz: 1.0 (el original) o 1.1 (inspirado en macOS). Es
+// independiente del modo claro/oscuro (`theme`). Quien eligió el tema "macos"
+// de la versión anterior pasa a 1.1 en modo oscuro.
+export const [design, setDesign]               = persisted('andromeda_design', '1.1')
+
+// Color de acento del diseño 1.1 (el "azul" del sistema), como en macOS.
+// 'andromeda' es el degradado del logo.
+export const ACCENTS = [
+  { id: 'blue',      color: '#0a84ff' },
+  { id: 'purple',    color: '#bf5af2' },
+  { id: 'pink',      color: '#ff375f' },
+  { id: 'red',       color: '#ff453a' },
+  { id: 'orange',    color: '#ff9f0a' },
+  { id: 'yellow',    color: '#ffd60a' },
+  { id: 'green',     color: '#30d158' },
+  { id: 'graphite',  color: '#8e8e93' },
+  { id: 'andromeda', color: '#b06bd6', fill: 'linear-gradient(120deg, #ff7a6b 0%, #b06bd6 50%, #4a7dd6 100%)' },
+]
+export const [accent, setAccent]               = persisted('andromeda_accent', 'blue')
+if (theme() === 'macos') { setDesign('1.1'); setTheme('dark') }
+
+// En 1.1 no hay fondo de bandas (sí focos de color y ondas): si estaba elegido,
+// se usan los focos.
+export const effectiveBgStyle = () => (design() === '1.1' && bgStyle() === 'bands') ? 'orbs' : bgStyle()
 // Nº de colores en el fondo de olas (2, 3 o 4)
 export const [waveCount, setWaveCount]         = persisted('andromeda_wave_count', 3)
 // Altura de las olas en % de la altura de la app (30–70)

@@ -31,13 +31,13 @@ async def list_experiments(request: Request) -> JSONResponse:
 async def create_experiment(request: Request) -> JSONResponse:
     ab = _ab(request)
     if not ab:
-        return JSONResponse(status_code=503, content={"error": "A/B no disponible"})
+        return JSONResponse(status_code=503, content={"error_key": "err.ab_unavailable"})
     body = await request.json()
     exp_id = (body.get("id") or "").strip()
     variants = body.get("variants") or []
     if not exp_id or len(variants) < 2:
         return JSONResponse(status_code=400,
-                            content={"error": "Se requiere 'id' y al menos 2 variantes"})
+                            content={"error_key": "err.ab_needs_variants"})
     exp = ab.create(exp_id, variants, active=bool(body.get("active", True)))
     return JSONResponse(content=exp)
 
@@ -47,7 +47,7 @@ async def experiment_results(exp_id: str, request: Request) -> JSONResponse:
     ab = _ab(request)
     res = ab.results(exp_id) if ab else None
     if res is None:
-        return JSONResponse(status_code=404, content={"error": "No encontrado"})
+        return JSONResponse(status_code=404, content={"error_key": "err.not_found"})
     return JSONResponse(content=res)
 
 

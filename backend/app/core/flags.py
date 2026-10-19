@@ -19,10 +19,16 @@ from pathlib import Path
 _DEFAULTS: dict[str, bool] = {
     "andromeda_mem_autogenerate":      True,   # generar memoria del historial
     "andromeda_mem_conversation_search": True, # buscar y referenciar conversaciones
+    # Guardar en memoria temas sensibles (salud, religión, política…). Activado por
+    # defecto porque Pau pidió explícitamente que se recuerden objetivos como
+    # "quiero bajar de peso"; al apagarlo se eliminan los ya guardados.
+    "andromeda_mem_sensitive":          True,
     "andromeda_artifacts_enabled":     True,   # panel de artefactos
     "andromeda_inline_viz":            True,   # visualizaciones integradas
     "andromeda_file_creation":         True,   # creación/edición de archivos
-    "andromeda_network_egress":        False,  # salida de red (búsqueda web)
+    "andromeda_network_egress":        True,   # búsqueda web: activa por defecto;
+                                              # el modo incógnito la desactiva
+                                              # aparte, sin tocar este flag
     "andromeda_model_fallback":        True,   # cambiar de modelo al fallar
     "andromeda_serve_production":      False,  # servir el modelo promovido a producción (registry)
 }
@@ -33,14 +39,28 @@ def _state_path(settings) -> Path:
     return base / "ui_state.json"
 
 
+_cache: dict = {}   # ruta → (mtime, datos)
+
+
 def _load(settings) -> dict:
+    """Estado de las capacidades. Se consulta varias veces por mensaje: se
+    cachea y solo se vuelve a leer si el archivo cambió (por fecha de
+    modificación), así que un cambio en Ajustes se ve al instante."""
     p = _state_path(settings)
-    if not p.exists():
-        return {}
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        st = p.stat()
+        mtime = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return {}
+    guardado = _cache.get(str(p))
+    if guardado and guardado[0] == mtime:
+        return dict(guardado[1])
+    try:
+        datos = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return {}
+    _cache[str(p)] = (mtime, datos)
+    return dict(datos)
 
 
 def get_flag(settings, key: str) -> bool:
@@ -55,6 +75,3 @@ def get_flag(settings, key: str) -> bool:
         return bool(v)
     return _DEFAULTS.get(key, False)
 
-
-def all_flags(settings) -> dict[str, bool]:
-    return {k: get_flag(settings, k) for k in _DEFAULTS}

@@ -134,6 +134,62 @@ def lookup_bandwidth(gpu_name: str) -> float:
 
 # ── Catálogo curado de modelos ──────────────────────────────────────────────
 CATALOG = [
+    # ── Generaciones de 2026 (verificadas contra la biblioteca de Ollama en
+    #    agosto de 2026; comprobar la etiqueta exacta antes de descargar) ──
+    {
+        "name": "qwen3.8:27b", "family": "Qwen 3.8", "params_b": 27,
+        "description": "Newest Qwen (Aug 2026): strong all-rounder with text AND image input and 256K context.",
+        "uses": ["General", "Visión", "Código", "Documentos largos"], "tags": ["general", "vision", "coding"],
+        "context": 262144, "license": "Apache 2.0",
+    },
+    {
+        "name": "qwen3.6:27b", "family": "Qwen 3.6", "params_b": 27,
+        "description": "Best local coder for a 24 GB GPU or 32 GB Mac: top SWE-bench in its class, 256K context.",
+        "uses": ["Código", "Agentes", "Razonamiento"], "tags": ["coding", "general", "reasoning"],
+        "context": 262144, "license": "Apache 2.0",
+    },
+    {
+        "name": "gemma4:e4b", "family": "Gemma 4", "params_b": 4,
+        "description": "Google's Gemma 4 nano: vision, audio, tools and thinking on modest hardware.",
+        "uses": ["General", "Visión", "Equipos modestos"], "tags": ["general", "vision"],
+        "context": 131072, "license": "Gemma",
+    },
+    {
+        "name": "gemma4:12b", "family": "Gemma 4", "params_b": 12,
+        "description": "Gemma 4 with vision, audio, tools and thinking. Fits a 12 GB GPU. Great multilingual.",
+        "uses": ["General", "Visión", "Multilingüe", "Documentos"], "tags": ["general", "vision"],
+        "context": 262144, "license": "Gemma",
+    },
+    {
+        "name": "gemma4:26b", "family": "Gemma 4", "params_b": 26,
+        "description": "Gemma 4 mixture-of-experts (~4B active): big-model quality at small-model speed.",
+        "uses": ["General", "Visión", "Razonamiento"], "tags": ["general", "vision", "reasoning"],
+        "context": 262144, "license": "Gemma",
+    },
+    {
+        "name": "gpt-oss:20b", "family": "gpt-oss", "params_b": 20,
+        "description": "OpenAI's open-weight model. Runs on 16 GB of RAM, 128K context, good at tools.",
+        "uses": ["General", "Razonamiento", "Herramientas"], "tags": ["general", "reasoning"],
+        "context": 131072, "license": "Apache 2.0",
+    },
+    {
+        "name": "qwen3-coder:30b", "family": "Qwen 3 Coder", "params_b": 30,
+        "description": "Coding MoE with 3.3B active params: excellent code quality per GB, 256K context.",
+        "uses": ["Código", "Refactorización", "Repositorios grandes"], "tags": ["coding"],
+        "context": 262144, "license": "Apache 2.0",
+    },
+    {
+        "name": "devstral:24b", "family": "Devstral", "params_b": 24,
+        "description": "Mistral's agentic coder: 46.8% SWE-bench Verified at 14 GB.",
+        "uses": ["Código", "Agentes"], "tags": ["coding"],
+        "context": 131072, "license": "Apache 2.0",
+    },
+    {
+        "name": "glm-4.7-flash", "family": "GLM 4.7", "params_b": 30,
+        "description": "Fast GLM model with a 198K context, strong at coding and long documents.",
+        "uses": ["Código", "Documentos largos", "General"], "tags": ["coding", "general"],
+        "context": 202752, "license": "MIT",
+    },
     # ── Generación reciente ──────────────────────────────────────────────────
     {
         "name": "qwen3:8b", "family": "Qwen 3", "params_b": 8,
@@ -320,6 +376,7 @@ CATALOG = [
 # instrucciones, y excluimos modelos viejos/diminutos/especializados que fallan
 # (p. ej. llama2) o que no son de chat (embeddings, visión pura).
 _TOOL_CAPABLE = (
+    "qwen3.8", "qwen3.6", "qwen3.5", "gemma4", "gpt-oss", "glm-4", "devstral", "qwen3-coder",
     "qwen2.5", "qwen3", "qwen2", "qwq",          # Qwen modernos
     "llama3.1", "llama3.2", "llama3.3", "llama-3.1", "llama-3.2", "llama-3.3",
     "mistral", "mixtral", "ministral", "mathstral",  # Mistral (0.3+)

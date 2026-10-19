@@ -389,23 +389,3 @@ class PolicyEngine:
         if "confidence_weighted" in policy.eligible_strategies:
             return "confidence_weighted"
         return "synthesis"
-
-    def get_vram_breakdown(
-        self, specialists: list[SpecialistProfile], registry, hardware_tier: int, vram_free: float
-    ) -> list[dict]:
-        """
-        Retorna un desglose de VRAM por especialista.
-        Útil para la UI — mostrar cuánta VRAM usa cada IA.
-        """
-        result = []
-        for spec in specialists:
-            vram, level = self._get_specialist_vram(
-                spec.id, registry, hardware_tier, vram_free
-            )
-            result.append({
-                "specialist_id": spec.id,
-                "level":         level,
-                "vram_gb":       vram,
-                "model_name":    getattr(spec, "model_name", ""),
-            })
-        return result

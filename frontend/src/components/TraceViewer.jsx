@@ -2,6 +2,13 @@ import { createSignal, Show } from 'solid-js'
 import { chatState } from '../stores/chat.js'
 import { t } from '../stores/i18n.js'
 
+
+/** Latencia legible: "850ms" pero "12.3s" cuando pasa del segundo. */
+function fmtMs(ms) {
+  if (ms == null) return '—'
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
+}
+
 export default function TraceViewer() {
   const [open, setOpen] = createSignal(false)
 
@@ -11,9 +18,11 @@ export default function TraceViewer() {
     return last?.metadata || null
   }
 
-  if (!trace()) return null
-
+  // <Show> en vez de "if (!trace()) return null": un componente de Solid se
+  // ejecuta una sola vez, así que con el return temprano, si al montarse no
+  // había traza aún, el panel no aparecía nunca aunque llegara después.
   return (
+    <Show when={trace()}>
     <div class="trace-panel">
       <div class="trace-head" onClick={() => setOpen(v => !v)}>
         <div class="trace-head-left">
@@ -26,7 +35,7 @@ export default function TraceViewer() {
             <span style="color:var(--amber)">⚠ {t('trace.degraded')}</span>
           </Show>
         </div>
-        <span style="font-size:10px;color:var(--text-3)">{open() ? '▴' : '▾'}</span>
+        <span style="font-size:var(--fs-micro);color:var(--text-3)">{open() ? '▴' : '▾'}</span>
       </div>
 
       <Show when={open() && trace()}>
@@ -42,12 +51,12 @@ export default function TraceViewer() {
           <div class="trace-row">
             <span class="trace-k">Latencia</span>
             <span class={`trace-v ${trace().latency_ms > 20000 ? 'trace-warn' : 'trace-ok'}`}>
-              {trace().latency_ms ? Math.round(trace().latency_ms) + 'ms' : '—'}
+              {fmtMs(trace().latency_ms)}
             </span>
           </div>
           <div class="trace-row">
             <span class="trace-k">TTFT</span>
-            <span class="trace-v">{trace().ttft_ms ? Math.round(trace().ttft_ms) + 'ms' : '—'}</span>
+            <span class="trace-v">{fmtMs(trace().ttft_ms)}</span>
           </div>
           <div class="trace-row">
             <span class="trace-k">Tier</span>
@@ -68,5 +77,6 @@ export default function TraceViewer() {
         </div>
       </Show>
     </div>
+    </Show>
   )
 }

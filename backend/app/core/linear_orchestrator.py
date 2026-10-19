@@ -204,43 +204,97 @@ def fallback_chain(level: str, available_levels: set[str] | None = None) -> list
 # La UI las muestra durante la espera para que la experiencia sea fluida, en vez
 # de anunciar cambios de nivel o gastar tokens del modelo en mensajes de estado.
 # No se piden al modelo: son locales e instantáneas.
-_PLACEHOLDERS = {
-    "low":   ["Un momento…", "Enseguida…", "Voy…"],
-    "mid":   ["Pensando…", "Procesando tu petición…", "Dame un segundo…"],
-    "high":  ["Analizando con calma…", "Trabajando en ello…", "Razonando la respuesta…"],
-    "ultra": ["Esto requiere pensar a fondo…", "Procesando una tarea compleja…",
-              "Dame un momento, vale la pena hacerlo bien…"],
+# Frases por idioma. Antes estaban solo en español, igual que las palabras que
+# las activan: con la interfaz en inglés salían en español, y "create a file"
+# no disparaba la frase de creación de archivo.
+_FRASES = {
+    "es": {
+        "low": ["Un momento…", "Enseguida…"],
+        "mid": ["Pensando…", "Dame un segundo…"],
+        "high": ["Analizando con calma…", "Razonando la respuesta…"],
+        "ultra": ["Esto requiere pensar a fondo…", "Procesando una tarea compleja…"],
+        "fallback": "Ajustando para tu equipo…",
+        "web": ["Construyendo la página web…", "Diseñando la página…"],
+        "doc": ["Redactando el documento…"], "sheet": ["Montando la hoja de cálculo…"],
+        "pdf": ["Generando el PDF…"], "edit": ["Aplicando los cambios…", "Editando el contenido…"],
+        "organize": ["Organizando los archivos…"], "file": ["Creando el archivo…", "Preparando el archivo…"],
+        "code": ["Escribiendo el código…", "Programando la solución…"],
+    },
+    "en": {
+        "low": ["One moment…", "On it…"],
+        "mid": ["Thinking…", "Give me a second…"],
+        "high": ["Working through it…", "Reasoning it out…"],
+        "ultra": ["This needs careful thought…", "Working on a complex task…"],
+        "fallback": "Adjusting to your hardware…",
+        "web": ["Building the web page…", "Designing the page…"],
+        "doc": ["Drafting the document…"], "sheet": ["Building the spreadsheet…"],
+        "pdf": ["Generating the PDF…"], "edit": ["Applying the changes…", "Editing the content…"],
+        "organize": ["Organising the files…"], "file": ["Creating the file…", "Preparing the file…"],
+        "code": ["Writing the code…", "Working out the solution…"],
+    },
+    "de": {
+        "low": ["Einen Moment…"], "mid": ["Denke nach…"], "high": ["Analysiere…"],
+        "ultra": ["Das braucht gründliches Nachdenken…"], "fallback": "Passe mich deiner Hardware an…",
+        "web": ["Baue die Webseite…"], "doc": ["Verfasse das Dokument…"],
+        "sheet": ["Erstelle die Tabelle…"], "pdf": ["Erzeuge das PDF…"],
+        "edit": ["Wende die Änderungen an…"], "organize": ["Ordne die Dateien…"],
+        "file": ["Erstelle die Datei…"], "code": ["Schreibe den Code…"],
+    },
+    "zh": {
+        "low": ["稍等…"], "mid": ["思考中…"], "high": ["正在仔细分析…"],
+        "ultra": ["这需要深入思考…"], "fallback": "正在适配你的硬件…",
+        "web": ["正在构建网页…"], "doc": ["正在撰写文档…"], "sheet": ["正在制作表格…"],
+        "pdf": ["正在生成 PDF…"], "edit": ["正在应用修改…"], "organize": ["正在整理文件…"],
+        "file": ["正在创建文件…"], "code": ["正在编写代码…"],
+    },
+    "fr": {
+        "low": ["Un instant…"], "mid": ["Réflexion…"], "high": ["Analyse en cours…"],
+        "ultra": ["Cela demande une réflexion approfondie…"], "fallback": "Adaptation à ton matériel…",
+        "web": ["Construction de la page web…"], "doc": ["Rédaction du document…"],
+        "sheet": ["Création du tableur…"], "pdf": ["Génération du PDF…"],
+        "edit": ["Application des modifications…"], "organize": ["Organisation des fichiers…"],
+        "file": ["Création du fichier…"], "code": ["Écriture du code…"],
+    },
 }
-_PLACEHOLDER_FALLBACK = "Ajustando para tu equipo…"
+
+# Palabras que indican qué se está pidiendo, en los cinco idiomas. El orden
+# importa: lo más específico primero ("edita la web" es edición, no creación).
+_CATEGORIAS = (
+    ("web", ("página web", "pagina web", "html", "landing", "sitio web", "website",
+             "web page", "webpage", "webseite", "网页", "site web", "page web")),
+    ("doc", ("word", ".docx", "documento", "document", "dokument", "文档")),
+    ("sheet", ("excel", ".xlsx", "hoja de cálculo", "spreadsheet", "tabelle", "表格", "tableur")),
+    ("pdf", (".pdf", " pdf")),
+    ("edit", ("modifica", "edita", "mejora", "cambia", "actualiza", "corrige", "modify",
+              "edit ", "improve", "update", "fix ", "ändere", "bearbeite", "修改", "modifie", "corrige")),
+    ("organize", ("borra", "elimina", "mueve", "renombra", "delete", "remove", "move ",
+                  "rename", "lösche", "删除", "supprime", "renomme")),
+    ("file", ("crea", "genera", "guarda", "archivo", "fichero", "create", "generate",
+              "save", "file", "erstelle", "datei", "创建", "文件", "crée", "fichier")),
+    ("code", ("código", "codigo", "script", "función", "funcion", "programa", "code",
+              "function", "funktion", "代码", "fonction")),
+)
+
+
+def _idioma() -> str:
+    import os
+    lang = (os.environ.get("ANDROMEDA_LANGUAGE") or "en").lower()[:2]
+    return lang if lang in _FRASES else "en"
 
 
 def loading_phrase(level: str, *, downgraded: bool = False, prompt: str = "") -> str:
-    """Frase de espera. Si el prompt sugiere una acción concreta (crear archivo,
-    página web, etc.) devuelve una frase descriptiva tipo Claude; si no, una
-    frase acorde al nivel de potencia."""
+    """Frase de espera en el idioma de la interfaz.
+
+    Si el mensaje sugiere una acción concreta (crear un archivo, una página
+    web…) describe esa acción; si no, una frase acorde al nivel de potencia.
+    Son locales e instantáneas: no se piden al modelo.
+    """
     import random
+    frases = _FRASES[_idioma()]
     if downgraded:
-        return _PLACEHOLDER_FALLBACK
-    # Frases contextuales según lo que pide el usuario
+        return frases["fallback"]
     p = (prompt or "").lower()
-    if any(k in p for k in ("página web", "pagina web", "html", "web", "landing", "sitio")):
-        return random.choice(["Construyendo la página web…", "Escribiendo el HTML…",
-                              "Diseñando la página…"])
-    if any(k in p for k in ("word", ".docx", "documento")):
-        return random.choice(["Redactando el documento…", "Creando el Word…"])
-    if any(k in p for k in ("excel", ".xlsx", "hoja de cálculo", "tabla")):
-        return random.choice(["Montando la hoja de cálculo…", "Creando la tabla…"])
-    if any(k in p for k in (".pdf",)):
-        return "Generando el PDF…"
-    if any(k in p for k in ("modifica", "edita", "mejora", "cambia", "actualiza", "corrige")):
-        return random.choice(["Leyendo el archivo…", "Aplicando los cambios…",
-                              "Editando el contenido…"])
-    if any(k in p for k in ("borra", "elimina", "mueve", "renombra")):
-        return "Organizando los archivos…"
-    if any(k in p for k in ("crea", "genera", "escribe", "guarda", "archivo", "fichero")):
-        return random.choice(["Creando el archivo…", "Escribiendo el contenido…",
-                              "Preparando el archivo…"])
-    if any(k in p for k in ("código", "codigo", "script", "función", "funcion", "programa")):
-        return random.choice(["Escribiendo el código…", "Programando la solución…"])
-    options = _PLACEHOLDERS.get(level, _PLACEHOLDERS["mid"])
-    return random.choice(options)
+    for categoria, claves in _CATEGORIAS:
+        if any(k in p for k in claves):
+            return random.choice(frases[categoria])
+    return random.choice(frases.get(level, frases["mid"]))

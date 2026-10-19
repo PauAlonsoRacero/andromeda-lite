@@ -5,6 +5,8 @@
 import { createSignal, onMount, For, Show } from 'solid-js'
 import axios from 'axios'
 import { t } from '../stores/i18n.js'
+import { errorMessage } from '../services/errors.js'
+import { notifyChange } from '../stores/events.js'
 import InfoButton from './InfoButton.jsx'
 
 const _ic = (p) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{p}</svg>
@@ -35,18 +37,68 @@ export default function MCPPanel() {
   const [reconnecting, setReconnecting] = createSignal(false)
   const [msg, setMsg]           = createSignal(null)
   const [copied, setCopied]     = createSignal('')
+  const [keyDraft, setKeyDraft] = createSignal({})
+  const [diag, setDiag]         = createSignal(null)
+  const [installing, setInstalling] = createSignal(null)
+
+  /** Instala un runtime que falta (uv se instala solo; Node requiere al usuario). */
+  async function installRuntime(rt) {
+    setInstalling(rt)
+    setMsg(t('mcp.installing').replace('{rt}', rt))
+    try {
+      const r = await axios.post(`/api/mcp/install-runtime/${rt}`)
+      setMsg((r.data.installed ? '✓ ' : '') + r.data.message)
+      await loadAll({ silent: true })
+      notifyChange('mcp')
+    } catch (e) {
+      setMsg('Error: ' + (errorMessage(e)))
+    } finally {
+      setInstalling(null)
+    }
+  }
 
   onMount(loadAll)
 
-  async function loadAll() {
-    setLoading(true)
-    const [srv, st] = await Promise.allSettled([
+  /** Guarda una clave de API y reintenta la conexión del servidor que la usa. */
+  async function saveKey(keyName) {
+    const value = (keyDraft()[keyName] || '').trim()
+    if (!value) return
+    try {
+      await axios.put(`/api/mcp/keys/${encodeURIComponent(keyName)}`, { value })
+      setKeyDraft({ ...keyDraft(), [keyName]: '' })
+      setMsg(t('mcp.key_saved_msg'))
+      await loadAll({ silent: true })
+      notifyChange('mcp')
+      setTimeout(() => setMsg(null), 4000)
+    } catch (e) {
+      setMsg('Error: ' + (errorMessage(e)))
+    }
+  }
+
+  async function removeKey(keyName) {
+    try {
+      await axios.delete(`/api/mcp/keys/${encodeURIComponent(keyName)}`)
+      await loadAll({ silent: true })
+      notifyChange('mcp')
+    } catch (e) {
+      setMsg('Error: ' + (errorMessage(e)))
+    }
+  }
+
+  async function loadAll(opts = {}) {
+    // El spinner solo en la carga inicial. En un refresco tras activar un
+    // servidor, sustituir la lista por el spinner colapsa el DOM y el scroll
+    // salta al principio, perdiendo al usuario de vista.
+    if (!opts.silent) setLoading(true)
+    const [srv, st, dg] = await Promise.allSettled([
       axios.get('/api/mcp/servers').then(r => r.data),
       axios.get('/api/mcp/status').then(r => r.data),
+      axios.get('/api/mcp/diagnose').then(r => r.data),
     ])
     if (srv.status === 'fulfilled') setServers(srv.value.servers || [])
     if (st.status === 'fulfilled')  setStatus(st.value)
-    setLoading(false)
+    if (dg.status === 'fulfilled')  setDiag(dg.value)
+    if (!opts.silent) setLoading(false)
   }
 
   async function toggle(id, enabled) {
@@ -54,11 +106,16 @@ export default function MCPPanel() {
     setMsg(!enabled ? t('mcp.connecting_first') : null)
     try {
       const r = await axios.put(`/api/mcp/servers/${id}`, { enabled: !enabled })
-      setMsg((r.data.connected ? '✓ ' : '') + (r.data.message || t('mcp.done')))
-      await loadAll()
+      // Preferir la clave traducible; el texto del backend es solo respaldo.
+      const texto = r.data.message_key
+        ? t(r.data.message_key).replace('{count}', r.data.message_args?.count ?? '')
+        : (r.data.message || t('mcp.done'))
+      setMsg((r.data.connected ? '✓ ' : '') + texto)
+      await loadAll({ silent: true })
+      notifyChange('mcp')
       setTimeout(() => setMsg(null), 5000)
     } catch (e) {
-      setMsg('Error: ' + (e.response?.data?.message || e.message))
+      setMsg('Error: ' + (errorMessage(e)))
     } finally {
       setBusy(null)
     }
@@ -69,11 +126,12 @@ export default function MCPPanel() {
     setMsg(null)
     try {
       await axios.post('/api/mcp/reload')
-      setMsg('✓ Servidores reconectados')
-      await loadAll()
+      setMsg('✓ ' + t('mcp.reconnected'))
+      await loadAll({ silent: true })
+      notifyChange('mcp')
       setTimeout(() => setMsg(null), 3000)
     } catch (e) {
-      setMsg(t('mcp.reconnect_err') + (e.response?.data?.message || e.message))
+      setMsg(t('mcp.reconnect_err') + (errorMessage(e)))
     } finally {
       setReconnecting(false)
     }
@@ -134,13 +192,34 @@ export default function MCPPanel() {
         </div>
       </Show>
 
+      {/* Aviso de runtime faltante: es la causa más común de que NINGÚN
+          servidor conecte, y sin decirlo el usuario no puede resolverlo. */}
+      <Show when={diag() && Object.values(diag().runtimes || {}).some(r => !r.available)}>
+        <div class="banner banner-warn" style="font-size:var(--fs-sm);line-height:1.6">
+          <div style="font-weight:600;margin-bottom:4px">{t('mcp.runtime_missing')}</div>
+          <For each={Object.values(diag().runtimes || {}).filter(r => !r.available)}>{r => (
+            <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <code style="font-family:var(--mono);font-size:var(--fs-xs)">{r.tool}</code>
+              <Show when={r.tool === 'uvx'}
+                    fallback={<span style="font-size:var(--fs-xs);color:var(--text-3)">{r.install_hint}</span>}>
+                <button class="btn btn-glass" style="font-size:var(--fs-xs);padding:3px 10px"
+                        disabled={installing() === 'uv'}
+                        onClick={() => installRuntime('uv')}>
+                  {installing() === 'uv' ? t('mcp.installing_short') : t('mcp.install_now')}
+                </button>
+              </Show>
+            </div>
+          )}</For>
+        </div>
+      </Show>
+
       {/* Lista de servidores */}
       <Show when={!loading()} fallback={<div style="text-align:center;padding:40px"><span class="spin" /></div>}>
         <Show when={servers().length > 0} fallback={
           <div class="card" style="text-align:center;padding:36px">
             <div style="font-size:36px;opacity:0.25;margin-bottom:14px">⬡</div>
-            <div style="font-size:15px;font-weight:600;margin-bottom:6px">{t('ui2.no_servers')}</div>
-            <div style="font-size:13px;color:var(--text-3)">{t('ui2.check_mcp_yaml')}</div>
+            <div style="font-size:var(--fs-md);font-weight:600;margin-bottom:6px">{t('ui2.no_servers')}</div>
+            <div style="font-size:var(--fs-base);color:var(--text-3)">{t('ui2.check_mcp_yaml')}</div>
           </div>
         }>
           <For each={servers()}>
@@ -149,6 +228,8 @@ export default function MCPPanel() {
               const _nk = `mcps.${srv.id}.label`; const _nv = t(_nk); const name = _nv !== _nk ? _nv : (srv.label || srv.id)
               const install = srv.install || ''
               const needsKey = (srv.requires_key || []).length > 0
+              const missingKeys = () => (srv.requires_key || []).filter(k => !(srv.keys_status || {})[k])
+              const allKeysSet = () => needsKey && missingKeys().length === 0
               return (
                 <div class="card fade-up" style={`border-color:${srv.connected ? 'rgba(52,211,153,0.25)' : 'var(--glass-border)'}`}>
                   <div style="display:flex;align-items:flex-start;gap:14px">
@@ -157,49 +238,88 @@ export default function MCPPanel() {
                     </div>
                     <div style="flex:1;min-width:0">
                       <div style="display:flex;align-items:center;gap:10px;margin-bottom:3px;flex-wrap:wrap">
-                        <span style="font-size:15px;font-weight:700">{name}</span>
+                        <span style="font-size:var(--fs-md);font-weight:700">{name}</span>
                         <Show when={srv.connected}>
-                          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:7px;background:rgba(52,211,153,0.15);color:var(--green)">
+                          <span style="font-size:var(--fs-micro);font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(52,211,153,0.15);color:var(--green)">
                             {t('mcp.connected_n')} · {srv.tool_count} tools
                           </span>
                         </Show>
                         <Show when={srv.enabled && !srv.connected}>
-                          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:7px;background:rgba(251,191,36,0.15);color:var(--amber)">
-                            ACTIVADO (sin conectar)
+                          <span style="font-size:var(--fs-micro);font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(251,191,36,0.15);color:var(--amber)">
+                            {t('mcp.enabled_not_connected')}
                           </span>
                         </Show>
                         <Show when={needsKey}>
-                          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:7px;background:var(--inset-surface);color:var(--text-3)" title={`Requiere: ${(srv.requires_key||[]).join(', ')}`}>
-                            REQUIERE API KEY
+                          <span style={`font-size:var(--fs-micro);font-weight:700;padding:2px 8px;border-radius:6px;${allKeysSet() ? 'background:rgba(52,211,153,0.15);color:var(--green)' : 'background:var(--inset-surface);color:var(--text-3)'}`}
+                                title={`${t('mcp.requires')}: ${(srv.requires_key||[]).join(', ')}`}>
+                            {allKeysSet() ? t('mcp.key_set') : t('mcp.needs_key')}
                           </span>
                         </Show>
                         <Show when={srv.runtime}>
-                          <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:7px;background:var(--inset-surface);color:var(--text-3)">
+                          <span style="font-size:var(--fs-micro);font-weight:600;padding:2px 8px;border-radius:6px;background:var(--inset-surface);color:var(--text-3)">
                             {srv.runtime === 'python' ? 'Python · uvx' : 'Node · npx'}
                           </span>
                         </Show>
                       </div>
-                      <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">{(() => { const k=`mcps.${srv.id}.desc`; const v=t(k); return v!==k?v:(srv.description||name) })()}</div>
+                      <div style="font-size:var(--fs-sm);color:var(--text-3);margin-bottom:12px">{(() => { const k=`mcps.${srv.id}.desc`; const v=t(k); return v!==k?v:(srv.description||name) })()}</div>
 
                       <Show when={srv.tools && srv.tools.length > 0}>
                         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
                           <For each={srv.tools.slice(0, 8)}>
-                            {(t) => <span style="font-size:10px;font-family:var(--mono);padding:3px 8px;border-radius:7px;background:var(--inset-surface);color:var(--text-3)">{t}</span>}
+                            {(t) => <span style="font-size:var(--fs-micro);font-family:var(--mono);padding:3px 8px;border-radius:6px;background:var(--inset-surface);color:var(--text-3)">{t}</span>}
                           </For>
                         </div>
                       </Show>
 
-                      <Show when={needsKey && !srv.connected}>
-                        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;line-height:1.5">
-                          Define {(srv.requires_key||[]).map(k => <code style="font-family:var(--mono);background:var(--inset-surface);padding:1px 6px;border-radius:5px;margin:0 2px">{k}</code>)} como variable de entorno antes de abrir Andromeda.
+                      <Show when={srv.error && srv.enabled && !srv.connected}>
+                        <div style="background:rgba(248,113,113,0.10);border:1px solid rgba(248,113,113,0.25);border-radius:10px;padding:8px 11px;margin-bottom:10px;font-size:var(--fs-xs);color:var(--text-2);line-height:1.5">
+                          <strong style="color:#f87171">{t('mcp.why_failed')}:</strong> {srv.error}
+                        </div>
+                      </Show>
+
+                      <Show when={needsKey}>
+                        <div style="background:var(--inset-surface);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+                          <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:8px;line-height:1.5">
+                            {t('mcp.key_help')}
+                            <Show when={srv.risk === 'high'}>
+                              <span class="mcp-badge mcp-badge-risk">{t('mcp.risk_high')}</span>
+                            </Show>
+                            <Show when={srv.setup === 'manual'}>
+                              <span class="mcp-badge">{t('mcp.manual_setup')}</span>
+                            </Show>
+                            <Show when={srv.docs}>
+                              {' '}<a href={srv.docs} target="_blank" rel="noreferrer"
+                                     style="color:var(--accent);text-decoration:none">{t('mcp.get_key')} →</a>
+                            </Show>
+                          </div>
+                          <For each={srv.requires_key || []}>{(k) => (
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                              <code style="font-family:var(--mono);font-size:var(--fs-micro);color:var(--text-3);min-width:120px;flex-shrink:0">{k}</code>
+                              <Show when={(srv.keys_status||{})[k]}
+                                    fallback={
+                                <>
+                                  <input aria-label={t('mcp.key_ph')} type="password" placeholder={t('mcp.key_ph')}
+                                         value={keyDraft()[k] || ''}
+                                         onInput={e => setKeyDraft({ ...keyDraft(), [k]: e.target.value })}
+                                         style="flex:1;min-width:0;background:var(--bg-2);border:1px solid var(--glass-border);border-radius:6px;padding:5px 9px;font-size:var(--fs-xs);color:var(--text-1)" />
+                                  <button class="btn btn-glass" style="font-size:var(--fs-xs);padding:4px 10px"
+                                          onClick={() => saveKey(k)}>{t('mcp.key_save')}</button>
+                                </>
+                              }>
+                                <span style="flex:1;font-size:var(--fs-xs);color:var(--green)">✓ {t('mcp.key_configured')}</span>
+                                <button class="btn btn-ghost" style="font-size:var(--fs-xs);padding:4px 9px"
+                                        onClick={() => removeKey(k)}>{t('mcp.key_remove')}</button>
+                              </Show>
+                            </div>
+                          )}</For>
                         </div>
                       </Show>
 
                       {/* Comando de instalación */}
                       <Show when={!srv.connected && install}>
                         <div style="display:flex;align-items:center;gap:8px;background:var(--inset-surface);border-radius:10px;padding:8px 12px;margin-bottom:10px">
-                          <code style="flex:1;font-family:var(--mono);font-size:11px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{install}</code>
-                          <button onClick={() => copy(install, srv.id)} style="font-size:10px;color:var(--text-3);background:none;border:none;cursor:pointer;white-space:nowrap">
+                          <code style="flex:1;font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{install}</code>
+                          <button onClick={() => copy(install, srv.id)} style="font-size:var(--fs-micro);color:var(--text-3);background:none;border:none;cursor:pointer;white-space:nowrap">
                             {copied() === srv.id ? '✓' : '⎘'}
                           </button>
                         </div>
@@ -210,7 +330,7 @@ export default function MCPPanel() {
                         onClick={() => toggle(srv.id, srv.enabled)}
                         disabled={busy() === srv.id}
                         class={srv.enabled ? 'btn btn-danger' : 'btn btn-primary'}
-                        style="font-size:12px"
+                        style="font-size:var(--fs-sm)"
                       >
                         {busy() === srv.id ? <span class="spin" /> : (srv.enabled ? t('mcp.deactivate') : t('mcp.activate'))}
                       </button>
@@ -224,8 +344,8 @@ export default function MCPPanel() {
       </Show>
 
       <div class="banner banner-warn" style="margin-top:16px">
-        <span style="font-size:14px">💡</span>
-        <div style="font-size:12px">
+        <span style="font-size:var(--fs-base)">💡</span>
+        <div style="font-size:var(--fs-sm)">
           Pulsa <strong>{t('btn.enable')}</strong> y Andromeda conecta el servidor solo (la primera vez descarga lo necesario con npx/uvx; ten Node y uv instalados). No hace falta nada más.
         </div>
       </div>

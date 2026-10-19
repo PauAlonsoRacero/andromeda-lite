@@ -14,13 +14,16 @@ function StatRow({ label, value, ok, warn }) {
   const color = ok === true ? 'var(--green)' : ok === false ? 'var(--red)' : warn ? 'var(--amber)' : 'var(--text-2)'
   return (
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--hairline)">
-      <span style="font-size:12px;color:var(--text-3)">{label}</span>
-      <span style={`font-size:12px;font-family:var(--mono);color:${color}`}>{value}</span>
+      <span style="font-size:var(--fs-sm);color:var(--text-3)">{label}</span>
+      <span style={`font-size:var(--fs-sm);font-family:var(--mono);color:${color}`}>{value}</span>
     </div>
   )
 }
 
-export default function SystemStatus({ onClose, closing }) {
+// props sin desestructurar: `closing` cambia con el tiempo y, leído una sola
+// vez, la animación de cierre no se aplicaba nunca (el panel se cerraba de golpe).
+export default function SystemStatus(props) {
+  const onClose = (e) => props.onClose?.(e)
   const [warmStatus, setWarmStatus] = createSignal(null)
   const [vramPlan, setVramPlan]     = createSignal(null)
   const [loading, setLoading]       = createSignal(true)
@@ -33,7 +36,7 @@ export default function SystemStatus({ onClose, closing }) {
       ])
       if (warm.status === 'fulfilled') setWarmStatus(warm.value.data)
       if (vram.status === 'fulfilled') setVramPlan(vram.value.data)
-    } catch {}
+    } catch { /* carga de fondo: un fallo puntual no debe molestar al usuario */ }
     setLoading(false)
   }
 
@@ -50,11 +53,11 @@ export default function SystemStatus({ onClose, closing }) {
 
   return (
     <Portal>
-    <div class={`sys-overlay${closing ? ' closing' : ''}`} onClick={onClose}>
+    <div class={`sys-overlay${props.closing ? ' closing' : ''}`} onClick={onClose}>
       <div class="sys-modal" onClick={e => e.stopPropagation()}>
         <div class="settings-title">
-          <span style="font-weight:700;font-size:15px">{t('sys.title')}</span>
-          <button onClick={onClose} style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:18px">✕</button>
+          <span style="font-weight:700;font-size:var(--fs-md)">{t('sys.title')}</span>
+          <button onClick={onClose} style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:var(--fs-lg)" aria-label="cerrar">✕</button>
         </div>
 
         <Show when={loading()}>
@@ -128,7 +131,7 @@ export default function SystemStatus({ onClose, closing }) {
               <div class="settings-section-title">{t('sys.hot_models')}</div>
               <Show
                 when={Object.keys(warmStatus().loaded_in_vram).length > 0}
-                fallback={<div style="font-size:12px;color:var(--text-3);padding:6px 0">{t('sys.no_models')}</div>}
+                fallback={<div style="font-size:var(--fs-sm);color:var(--text-3);padding:6px 0">{t('sys.no_models')}</div>}
               >
                 <For each={Object.entries(warmStatus().loaded_in_vram)}>
                   {([model, info]) => (
@@ -177,7 +180,7 @@ export default function SystemStatus({ onClose, closing }) {
                 <a
                   href={url}
                   target="_blank"
-                  style="padding:5px 10px;border-radius:var(--r-xs);background:var(--hover-surface);border:1px solid var(--glass-border);color:var(--text-2);font-size:11px;text-decoration:none;transition:all .12s"
+                  style="padding:5px 10px;border-radius:var(--r-xs);background:var(--hover-surface);border:1px solid var(--glass-border);color:var(--text-2);font-size:var(--fs-xs);text-decoration:none;transition:all .12s"
                   onMouseEnter={e => { e.currentTarget.style.background='var(--glass-hi)'; e.currentTarget.style.color='var(--text-1)' }}
                   onMouseLeave={e => { e.currentTarget.style.background='var(--hover-surface)'; e.currentTarget.style.color='var(--text-2)' }}
                 >

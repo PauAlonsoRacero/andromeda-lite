@@ -44,6 +44,23 @@ for _pkg in ("httpx", "httpcore", "h11", "anyio", "sniffio", "certifi"):
         hiddenimports.append(_pkg)
 hiddenimports += collect_submodules("httpx") + collect_submodules("httpcore")
 
+# El propio backend: buena parte de los módulos se importan DENTRO de funciones
+# (para evitar ciclos y acelerar el arranque), y el análisis estático de
+# PyInstaller no ve esos imports. Sin recolectar el árbol completo, en el .app
+# fallan justo las piezas cargadas de forma perezosa: skills, RAG, el almacén de
+# claves MCP o el instalador de runtimes.
+try:
+    hiddenimports += collect_submodules("app")
+except Exception:
+    # Respaldo explícito con los paquetes que sí sabemos que existen.
+    hiddenimports += [
+        "app.rag", "app.rag.bm25", "app.skills", "app.skills.loader",
+        "app.mcp", "app.mcp.secrets_store", "app.mcp.runtime_installer",
+        "app.core.slash_commands", "app.core.compaction", "app.core.model_health",
+        "app.routes.save_file", "app.routes.components_health",
+        "app.routes.rag", "app.routes.skills", "app.routes.commands",
+    ]
+
 # Backend de ventana específico de cada plataforma. Sin estos, PyInstaller
 # puede no empaquetar el motor correcto y la ventana saldría en blanco.
 if sys.platform == "win32":
@@ -55,6 +72,17 @@ if sys.platform == "win32":
     ]
 elif sys.platform == "darwin":
     hiddenimports += ["webview.platforms.cocoa"]
+    # pyobjc: pywebview los importa en tiempo de ejecución (no en el análisis
+    # estático de PyInstaller), así que hay que empaquetarlos explícitamente.
+    # Sin esto el .app se genera "bien" pero no abre ninguna ventana.
+    for _pkg in ("objc", "Cocoa", "WebKit", "Quartz", "Foundation"):
+        try:
+            _d, _b, _h = collect_all(_pkg)
+            datas += _d
+            binaries += _b
+            hiddenimports += _h
+        except Exception:
+            hiddenimports.append(_pkg)
 else:
     hiddenimports += ["webview.platforms.gtk", "webview.platforms.qt"]
 

@@ -41,3 +41,16 @@ Andromeda.app/
 Thumbs.db
 .idea/
 .vscode/
+
+# Secretos y datos de usuario — nunca deben acabar en el repositorio.
+# El directorio de datos es configurable (ANDROMEDA_DATA_DIR), así que no basta
+# con ignorar data/: estos nombres se ignoran esté donde esté el fichero.
+mcp_secrets.json
+**/mcp_secrets.json
+*.db
+**/memory.db
+**/traces.db
+**/rag_index.json
+**/memory_profile.json
+**/ui_state.json
+**/user_skills/

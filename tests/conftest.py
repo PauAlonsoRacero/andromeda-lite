@@ -10,6 +10,32 @@ import asyncio
 import os
 import sys
 import tempfile
+
+# ── Aislamiento de los datos de la suite ──────────────────────────────────
+# Debe ocurrir ANTES de importar nada de la aplicación: varios módulos leen
+# ANDROMEDA_DATA_DIR al importarse y su valor por defecto ("data") es una ruta
+# RELATIVA, así que sin esto la suite escribe bases de datos y hasta un
+# mcp_secrets.json dentro del propio repositorio, y contamina las ejecuciones
+# siguientes (un documento indexado por un test hacía fallar a otro).
+# Modo test: reduce los timeouts de sondeo de Ollama. Sin esto cada arranque de
+# la aplicación espera a que fallen todas las URLs candidatas (~2,6 s) y, con
+# más de 300 tests, eso son minutos de espera pura.
+os.environ.setdefault("ANDROMEDA_ENVIRONMENT", "test")
+
+if not os.environ.get("ANDROMEDA_TEST_DATA_DIR"):
+    _test_data_dir = tempfile.mkdtemp(prefix="andromeda-tests-")
+    os.environ["ANDROMEDA_TEST_DATA_DIR"] = _test_data_dir
+    os.environ["ANDROMEDA_DATA_DIR"] = _test_data_dir
+
+    # Fijar la variable no basta: algunos módulos caen a Path.home() y otros a
+    # la ruta relativa "data", que apunta al repositorio. Redirigir el home de
+    # la suite cierra esa vía de escape de una vez, en lugar de ir parcheando
+    # test por test (13 ficheros escribían en data/ antes de esto).
+    from pathlib import Path as _Path
+    _real_home = _Path.home
+    _fake_home = _Path(_test_data_dir) / "home"
+    _fake_home.mkdir(parents=True, exist_ok=True)
+    _Path.home = staticmethod(lambda: _fake_home)
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -159,3 +185,55 @@ def app():
     """App sin estado inicializado — solo para unit tests que no llaman a endpoints."""
     from app import create_app
     return create_app()
+
+
+@pytest.fixture(autouse=True)
+def _restore_mcp_config():
+    """Devuelve config/mcp_servers.yaml a su estado original tras cada test.
+
+    Los tests que activan un servidor MCP escriben en el fichero REAL del
+    repositorio. Si uno falla a medias deja un `enabled: true` puesto, lo que
+    hace fallar a otros tests según el orden de ejecución y, peor, deja el
+    repositorio modificado.
+    """
+    from pathlib import Path
+    cfg = Path(__file__).resolve().parent.parent / "config" / "mcp_servers.yaml"
+    original = cfg.read_text(encoding="utf-8") if cfg.exists() else None
+    yield
+    if original is not None and cfg.read_text(encoding="utf-8") != original:
+        cfg.write_text(original, encoding="utf-8")
+
+
+@pytest.fixture(scope="session")
+def shared_client():
+    """Cliente compartido por toda la sesión, para tests que solo LEEN.
+
+    Crear la aplicación cuesta ~2,6 s (arranca el lifespan completo) y se hacía
+    27 veces, así que la suite tardaba más de dos minutos. Dos minutos es
+    suficiente para dejar de ejecutarla antes de cada commit, que es justo
+    cuando más sirve.
+
+    Los tests que modifican estado deben seguir creando su propia aplicación
+    con un directorio de datos propio: compartir estado entre ellos provoca
+    fallos que dependen del orden de ejecución.
+    """
+    from fastapi.testclient import TestClient
+    from app import create_app
+    with TestClient(create_app()) as c:
+        yield c
+
+
+@pytest.fixture(autouse=True)
+def _reset_ollama_cache():
+    """Olvida el resultado cacheado de buscar Ollama entre tests.
+
+    La caché evita re-sondear todas las URLs en cada petición (260 ms cuando
+    Ollama está apagado), pero entre tests debe limpiarse: si no, un test que
+    levanta un servidor falso no lo detecta porque queda el fallo del anterior.
+    """
+    try:
+        from app.ollama_resolver import reset_cache
+        reset_cache()
+    except Exception:
+        pass
+    yield
