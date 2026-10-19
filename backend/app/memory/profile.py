@@ -70,7 +70,10 @@ class MemoryProfile:
 
     def __init__(self, path: str | Path):
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:      # disco de solo lectura: _write lo tolera después
+            logger.warning(f"No se pudo crear la carpeta del perfil: {exc}")
 
     # ── E/S ──────────────────────────────────────────────────────────────────
     def _read(self) -> dict:

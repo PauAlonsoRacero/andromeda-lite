@@ -46,7 +46,10 @@ def test_subprocess_env_drops_pyinstaller_vars(monkeypatch):
     from app.mcp import runtime_installer as ri
     monkeypatch.setenv("_MEIPASS", "/tmp/_MEI123")
     monkeypatch.setenv("PYTHONHOME", "/bundle/python")
-    ok, out = asyncio.run(ri._run(["/bin/sh", "-c", "echo [$_MEIPASS][$PYTHONHOME]"]))
+    import sys
+    codigo = ("import os;print('[%s][%s]' % (os.environ.get('_MEIPASS', ''),"
+              " os.environ.get('PYTHONHOME', '')))")
+    ok, out = asyncio.run(ri._run([sys.executable, "-c", codigo]))
     assert ok and out.strip() == "[][]"
 
 

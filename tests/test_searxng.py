@@ -59,6 +59,9 @@ def test_search_falls_back_when_searxng_fails(monkeypatch):
 
     monkeypatch.setattr(web_search, "_search_searxng", falla)
     monkeypatch.setattr(web_search, "_search_ddg_lite", ok)
+    # Otro test puede haber dejado "duckduckgo-html" como último motor válido y
+    # entonces se probaría primero (con red real en el CI): se aísla aquí.
+    monkeypatch.setattr(web_search, "_ultimo_motor_ok", None)
     resultados = asyncio.run(web_search.search_web("consulta"))
     assert llamadas[:2] == ["searxng", "ddg"]
     assert resultados

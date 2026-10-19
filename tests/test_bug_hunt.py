@@ -17,7 +17,7 @@ def test_no_fire_and_forget_tasks():
     destruir la tarea a mitad (la descarga de modelos se quedaba congelada)."""
     sueltas = []
     for f in glob.glob(str(APP / "**/*.py"), recursive=True):
-        if f.endswith("core/background.py"):
+        if Path(f).as_posix().endswith("core/background.py"):
             continue   # es la implementación que guarda la referencia
         for n, linea in enumerate(Path(f).read_text(encoding="utf-8").splitlines(), 1):
             if re.match(r"\s*asyncio\.create_task\(", linea):

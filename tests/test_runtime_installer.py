@@ -13,12 +13,18 @@ def test_detects_runtime_from_command():
     assert ri.runtime_for_command([]) is None
 
 
-def test_search_path_includes_common_install_dirs():
-    """Una app empaquetada no ve el PATH del shell: hay que ampliarlo."""
+def test_search_path_includes_common_install_dirs(monkeypatch):
+    """Una app empaquetada no ve el PATH del shell: hay que ampliarlo.
+
+    search_path() solo añade las carpetas que existen; en un runner limpio
+    ~/.local/bin no existe, así que se simula que todas existen.
+    """
     import os
     from app.mcp import runtime_installer as ri
+    monkeypatch.setattr(ri.os.path, "isdir", lambda p: True)
     path = ri.search_path()
-    assert os.path.expanduser("~/.local/bin") in path or "/usr/local/bin" in path
+    assert os.path.expanduser("~/.local/bin") in path
+    assert os.path.expanduser("~/.cargo/bin") in path
 
 
 def test_ensure_path_is_idempotent():
